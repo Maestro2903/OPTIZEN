@@ -46,7 +46,7 @@ const pharmacyItemSchema = z.object({
   expiry_date: z.string().optional(),
   hsn_code: z.string().optional(),
   gst_percentage: z.string().optional(),
-  prescription_required: z.boolean().default(false),
+  prescription_required: z.boolean(),
   dosage_form: z.string().optional(),
   strength: z.string().optional(),
   storage_instructions: z.string().optional(),

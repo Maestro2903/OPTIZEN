@@ -21,7 +21,7 @@ interface BedCardProps {
     days_in_ward: number
     surgery_scheduled_time?: string
     doctor_name?: string
-  }
+  } | null
   onClick?: () => void
 }
 

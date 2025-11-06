@@ -235,8 +235,7 @@ export default function PharmacyPage() {
 
   const lowStockOptical = opticalItems.filter(item => item.stock_quantity <= item.reorder_level).length
   const totalInventoryValue = [...pharmacyItems, ...opticalItems].reduce((sum, item) => {
-    const price = "mrp" in item ? item.mrp : item.mrp
-    return sum + (price * item.stock_quantity)
+    return sum + (item.mrp * item.stock_quantity)
   }, 0)
 
   return (

@@ -148,7 +148,7 @@ export default function BedsPage() {
   const totalBeds = bedsData.length
   const occupiedBeds = bedsData.filter(b => b.bed.status === 'occupied').length
   const availableBeds = bedsData.filter(b => b.bed.status === 'available').length
-  const maintenanceBeds = bedsData.filter(b => b.bed.status === 'maintenance' || b.bed.status === 'cleaning').length
+  const maintenanceBeds = bedsData.filter(b => b.bed.status === 'maintenance').length
   const occupancyRate = ((occupiedBeds / totalBeds) * 100).toFixed(1)
   const bedsWithSurgeryToday = bedsData.filter(b => {
     if (!b.assignment?.surgery_scheduled_time) return false
@@ -506,7 +506,7 @@ export default function BedsPage() {
                     <CardTitle className="text-base">Maintenance</CardTitle>
                   </div>
                   <Badge variant="secondary" className="bg-gray-100 text-gray-700">
-                    {filteredBeds.filter(b => b.bed.status === 'maintenance' || b.bed.status === 'cleaning').length}
+                    {filteredBeds.filter(b => b.bed.status === 'maintenance').length}
                   </Badge>
                 </div>
                 <CardDescription className="text-xs">
@@ -515,7 +515,7 @@ export default function BedsPage() {
               </CardHeader>
               <CardContent className="space-y-3 min-h-[500px]">
                 {filteredBeds
-                  .filter(b => b.bed.status === 'maintenance' || b.bed.status === 'cleaning')
+                  .filter(b => b.bed.status === 'maintenance')
                   .map((bedData) => (
                     <div
                       key={bedData.bed.id}
@@ -580,7 +580,7 @@ export default function BedsPage() {
                             className={
                               bed.status === 'available' ? 'bg-green-100 text-green-700 border-green-200' :
                               bed.status === 'occupied' ? 'bg-red-100 text-red-700 border-red-200' :
-                              bed.status === 'maintenance' || bed.status === 'cleaning' ? 'bg-gray-100 text-gray-700 border-gray-200' :
+                              bed.status === 'maintenance' ? 'bg-gray-100 text-gray-700 border-gray-200' :
                               'bg-yellow-100 text-yellow-700 border-yellow-200'
                             }
                           >
