@@ -31,6 +31,9 @@ import {
   Award,
   Database,
   UserCog,
+  Clock,
+  TrendingUp,
+  Bed,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -79,6 +82,11 @@ const data = {
       icon: Users,
     },
     {
+      title: "Appointments",
+      url: "/dashboard/appointments",
+      icon: Calendar,
+    },
+    {
       title: "Cases",
       url: "/dashboard/cases",
       icon: FolderOpen,
@@ -99,19 +107,39 @@ const data = {
       icon: CreditCard,
     },
     {
+      title: "Pharmacy",
+      url: "/dashboard/pharmacy",
+      icon: Package,
+    },
+    {
+      title: "Revenue",
+      url: "/dashboard/revenue",
+      icon: TrendingUp,
+    },
+    {
+      title: "Beds",
+      url: "/dashboard/beds",
+      icon: Bed,
+    },
+    {
       title: "Certificates",
       url: "/dashboard/certificates",
       icon: Award,
     },
     {
-      title: "Master",
-      url: "/dashboard/master",
-      icon: Database,
+      title: "Attendance",
+      url: "/dashboard/attendance",
+      icon: Clock,
     },
     {
       title: "Employees",
       url: "/dashboard/employees",
       icon: UserCog,
+    },
+    {
+      title: "Master",
+      url: "/dashboard/master",
+      icon: Database,
     },
   ],
 }

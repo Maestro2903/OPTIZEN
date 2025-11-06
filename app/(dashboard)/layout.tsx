@@ -1,3 +1,5 @@
+"use client"
+
 import { AppSidebar } from "@/components/app-sidebar"
 import { Header } from "@/components/layout/header"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
@@ -10,12 +12,33 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
+import { usePathname } from "next/navigation"
+
+// Map of paths to page names
+const pathToPageName: Record<string, string> = {
+  "/dashboard": "Overview",
+  "/dashboard/patients": "Patients",
+  "/dashboard/cases": "Cases",
+  "/dashboard/billing": "Billing & Invoices",
+  "/dashboard/documents": "Documents",
+  "/dashboard/certificates": "Certificates",
+  "/dashboard/appointments": "Appointments",
+  "/dashboard/pharmacy": "Pharmacy",
+  "/dashboard/attendance": "Staff Attendance",
+  "/dashboard/revenue": "Revenue",
+  "/dashboard/beds": "Bed Management",
+  "/dashboard/operations": "Operations",
+  "/dashboard/settings": "Settings",
+}
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const pathname = usePathname()
+  const currentPageName = pathToPageName[pathname] || "Overview"
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -33,7 +56,7 @@ export default function DashboardLayout({
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>Overview</BreadcrumbPage>
+                  <BreadcrumbPage>{currentPageName}</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
