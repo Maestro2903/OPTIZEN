@@ -44,6 +44,15 @@ const bedFormSchema = z.object({
   facilities: z.string().optional(),
 })
 
+// Suggested daily rates based on ward type
+const suggestedRates = {
+  general: 1500,
+  icu: 5000,
+  private: 3500,
+  semi_private: 2500,
+  emergency: 2000,
+}
+
 interface BedFormProps {
   children: React.ReactNode
   bedData?: any
@@ -69,15 +78,6 @@ export function BedForm({ children, bedData, mode = "create" }: BedFormProps) {
   })
 
   const selectedWardType = form.watch("ward_type")
-
-  // Suggest daily rates based on ward type
-  const suggestedRates = {
-    general: 1500,
-    icu: 5000,
-    private: 3500,
-    semi_private: 2500,
-    emergency: 2000,
-  }
 
   React.useEffect(() => {
     if (mode === "create" && !form.getValues("daily_rate")) {
