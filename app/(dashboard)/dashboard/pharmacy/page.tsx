@@ -27,10 +27,14 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ViewEditDialog } from "@/components/view-edit-dialog"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { PharmacyItemForm } from "@/components/pharmacy-item-form"
 import { OpticalItemForm } from "@/components/optical-item-form"
 import { StockMovementForm } from "@/components/stock-movement-form"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
+import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
 
 // Mock data for pharmacy items
 const pharmacyItems = [
@@ -209,6 +213,28 @@ const movementTypeColors = {
 }
 
 export default function PharmacyPage() {
+  const [currentView, setCurrentView] = React.useState("list")
+  const [appliedFilters, setAppliedFilters] = React.useState<string[]>([])
+  const [currentSort, setCurrentSort] = React.useState("name")
+  const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('asc')
+
+  const [pharmCurrentView, setPharmCurrentView] = React.useState("list")
+  const [pharmAppliedFilters, setPharmAppliedFilters] = React.useState<string[]>([])
+  const [pharmCurrentSort, setPharmCurrentSort] = React.useState("name")
+  const [pharmSortDirection, setPharmSortDirection] = React.useState<'asc' | 'desc'>('asc')
+  const [pharmSearchTerm, setPharmSearchTerm] = React.useState("")
+
+  const [opticalCurrentView, setOpticalCurrentView] = React.useState("list")
+  const [opticalAppliedFilters, setOpticalAppliedFilters] = React.useState<string[]>([])
+  const [opticalCurrentSort, setOpticalCurrentSort] = React.useState("name")
+  const [opticalSortDirection, setOpticalSortDirection] = React.useState<'asc' | 'desc'>('asc')
+  const [opticalSearchTerm, setOpticalSearchTerm] = React.useState("")
+
+  const [movementsCurrentView, setMovementsCurrentView] = React.useState("list")
+  const [movementsAppliedFilters, setMovementsAppliedFilters] = React.useState<string[]>([])
+  const [movementsCurrentSort, setMovementsCurrentSort] = React.useState("date")
+  const [movementsSortDirection, setMovementsSortDirection] = React.useState<'asc' | 'desc'>('desc')
+  const [movementsSearchTerm, setMovementsSearchTerm] = React.useState("")
   const getExpiryStatus = (expiryDate: string) => {
     const today = new Date()
     const expiry = new Date(expiryDate.split("/").reverse().join("-"))
@@ -237,6 +263,267 @@ export default function PharmacyPage() {
   const totalInventoryValue = [...pharmacyItems, ...opticalItems].reduce((sum, item) => {
     return sum + (item.mrp * item.stock_quantity)
   }, 0)
+
+  // View options configurations for each tab
+  const pharmacyViewConfig: ViewOptionsConfig = {
+    views: [
+      { id: "list", label: "List" },
+      { id: "grid", label: "Grid" },
+    ],
+    filters: [
+      { id: "low-stock", label: "Low Stock", count: pharmacyItems.filter(item => item.stock_quantity <= item.reorder_level).length },
+      { id: "expiring", label: "Expiring Soon", count: expiringSoon },
+      { id: "eye-drops", label: "Eye Drops", count: pharmacyItems.filter(item => item.category === "Eye Drops").length },
+      { id: "antibiotics", label: "Antibiotics", count: pharmacyItems.filter(item => item.category === "Antibiotics").length },
+    ],
+    sortOptions: [
+      { id: "name", label: "Name" },
+      { id: "stock", label: "Stock Quantity" },
+      { id: "price", label: "Price" },
+      { id: "expiry", label: "Expiry Date" },
+    ],
+    showExport: true,
+  }
+
+  const opticalViewConfig: ViewOptionsConfig = {
+    views: [
+      { id: "list", label: "List" },
+      { id: "grid", label: "Grid" },
+    ],
+    filters: [
+      { id: "low-stock", label: "Low Stock", count: lowStockOptical },
+      { id: "frames", label: "Frames", count: opticalItems.filter(item => item.item_type === "frames").length },
+      { id: "lenses", label: "Lenses", count: opticalItems.filter(item => item.item_type === "lenses").length },
+      { id: "accessories", label: "Accessories", count: opticalItems.filter(item => item.item_type === "accessories").length },
+    ],
+    sortOptions: [
+      { id: "name", label: "Name" },
+      { id: "stock", label: "Stock Quantity" },
+      { id: "price", label: "Price" },
+      { id: "brand", label: "Brand" },
+    ],
+    showExport: true,
+  }
+
+  const movementsViewConfig: ViewOptionsConfig = {
+    views: [
+      { id: "list", label: "List" },
+    ],
+    filters: [
+      { id: "purchase", label: "Purchase", count: stockMovements.filter(m => m.type === "purchase").length },
+      { id: "sale", label: "Sale", count: stockMovements.filter(m => m.type === "sale").length },
+      { id: "expired", label: "Expired", count: stockMovements.filter(m => m.type === "expired").length },
+      { id: "pharmacy", label: "Pharmacy", count: stockMovements.filter(m => m.item_type === "pharmacy").length },
+      { id: "optical", label: "Optical", count: stockMovements.filter(m => m.item_type === "optical").length },
+    ],
+    sortOptions: [
+      { id: "date", label: "Date" },
+      { id: "type", label: "Type" },
+      { id: "value", label: "Total Value" },
+      { id: "quantity", label: "Quantity" },
+    ],
+    showExport: true,
+  }
+
+  // Filter and sort functions for each tab
+  const filteredAndSortedPharmacyItems = React.useMemo(() => {
+    let filtered = [...pharmacyItems]
+
+    // Apply text search
+    if (pharmSearchTerm.trim()) {
+      const q = pharmSearchTerm.trim().toLowerCase()
+      filtered = filtered.filter(item =>
+        item.name.toLowerCase().includes(q) ||
+        item.generic_name.toLowerCase().includes(q) ||
+        item.category.toLowerCase().includes(q) ||
+        item.supplier.toLowerCase().includes(q) ||
+        item.batch_number.toLowerCase().includes(q)
+      )
+    }
+
+    if (pharmAppliedFilters.includes("low-stock")) {
+      filtered = filtered.filter(item => item.stock_quantity <= item.reorder_level)
+    }
+    if (pharmAppliedFilters.includes("expiring")) {
+      filtered = filtered.filter(item => {
+        const expiry = new Date(item.expiry_date.split("/").reverse().join("-"))
+        const today = new Date()
+        const diffMonths = (expiry.getTime() - today.getTime()) / (1000 * 3600 * 24 * 30)
+        return diffMonths < 3 && diffMonths > 0
+      })
+    }
+    if (pharmAppliedFilters.includes("eye-drops")) {
+      filtered = filtered.filter(item => item.category === "Eye Drops")
+    }
+    if (pharmAppliedFilters.includes("antibiotics")) {
+      filtered = filtered.filter(item => item.category === "Antibiotics")
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let aValue, bValue
+      switch (pharmCurrentSort) {
+        case "name":
+          aValue = a.name
+          bValue = b.name
+          break
+        case "stock":
+          aValue = a.stock_quantity
+          bValue = b.stock_quantity
+          break
+        case "price":
+          aValue = a.unit_price
+          bValue = b.unit_price
+          break
+        case "expiry":
+          aValue = new Date(a.expiry_date.split("/").reverse().join("-"))
+          bValue = new Date(b.expiry_date.split("/").reverse().join("-"))
+          break
+        default:
+          aValue = a.name
+          bValue = b.name
+      }
+
+      if (pharmSortDirection === 'asc') {
+        return aValue > bValue ? 1 : -1
+      } else {
+        return aValue < bValue ? 1 : -1
+      }
+    })
+
+    return filtered
+  }, [pharmAppliedFilters, pharmCurrentSort, pharmSortDirection, pharmSearchTerm])
+
+  const filteredAndSortedOpticalItems = React.useMemo(() => {
+    let filtered = [...opticalItems]
+
+    // Apply text search
+    if (opticalSearchTerm.trim()) {
+      const q = opticalSearchTerm.trim().toLowerCase()
+      filtered = filtered.filter(item =>
+        item.sku.toLowerCase().includes(q) ||
+        item.name.toLowerCase().includes(q) ||
+        item.brand.toLowerCase().includes(q) ||
+        item.item_type.toLowerCase().includes(q) ||
+        item.category.toLowerCase().includes(q) ||
+        item.color.toLowerCase().includes(q)
+      )
+    }
+
+    if (opticalAppliedFilters.includes("low-stock")) {
+      filtered = filtered.filter(item => item.stock_quantity <= item.reorder_level)
+    }
+    if (opticalAppliedFilters.includes("frames")) {
+      filtered = filtered.filter(item => item.item_type === "frames")
+    }
+    if (opticalAppliedFilters.includes("lenses")) {
+      filtered = filtered.filter(item => item.item_type === "lenses")
+    }
+    if (opticalAppliedFilters.includes("accessories")) {
+      filtered = filtered.filter(item => item.item_type === "accessories")
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let aValue, bValue
+      switch (opticalCurrentSort) {
+        case "name":
+          aValue = a.name
+          bValue = b.name
+          break
+        case "stock":
+          aValue = a.stock_quantity
+          bValue = b.stock_quantity
+          break
+        case "price":
+          aValue = a.selling_price
+          bValue = b.selling_price
+          break
+        case "brand":
+          aValue = a.brand
+          bValue = b.brand
+          break
+        default:
+          aValue = a.name
+          bValue = b.name
+      }
+
+      if (opticalSortDirection === 'asc') {
+        return aValue > bValue ? 1 : -1
+      } else {
+        return aValue < bValue ? 1 : -1
+      }
+    })
+
+    return filtered
+  }, [opticalAppliedFilters, opticalCurrentSort, opticalSortDirection, opticalSearchTerm])
+
+  const filteredAndSortedMovements = React.useMemo(() => {
+    let filtered = [...stockMovements]
+
+    // Apply text search
+    if (movementsSearchTerm.trim()) {
+      const q = movementsSearchTerm.trim().toLowerCase()
+      filtered = filtered.filter(m =>
+        m.item_name.toLowerCase().includes(q) ||
+        m.type.toLowerCase().includes(q) ||
+        m.item_type.toLowerCase().includes(q) ||
+        (m.reference || '').toLowerCase().includes(q) ||
+        (m.customer || '').toLowerCase().includes(q) ||
+        (m.supplier || '').toLowerCase().includes(q)
+      )
+    }
+
+    if (movementsAppliedFilters.includes("purchase")) {
+      filtered = filtered.filter(m => m.type === "purchase")
+    }
+    if (movementsAppliedFilters.includes("sale")) {
+      filtered = filtered.filter(m => m.type === "sale")
+    }
+    if (movementsAppliedFilters.includes("expired")) {
+      filtered = filtered.filter(m => m.type === "expired")
+    }
+    if (movementsAppliedFilters.includes("pharmacy")) {
+      filtered = filtered.filter(m => m.item_type === "pharmacy")
+    }
+    if (movementsAppliedFilters.includes("optical")) {
+      filtered = filtered.filter(m => m.item_type === "optical")
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let aValue, bValue
+      switch (movementsCurrentSort) {
+        case "date":
+          aValue = new Date(a.date.split("/").reverse().join("-"))
+          bValue = new Date(b.date.split("/").reverse().join("-"))
+          break
+        case "type":
+          aValue = a.type
+          bValue = b.type
+          break
+        case "value":
+          aValue = a.total
+          bValue = b.total
+          break
+        case "quantity":
+          aValue = Math.abs(a.quantity)
+          bValue = Math.abs(b.quantity)
+          break
+        default:
+          aValue = new Date(a.date.split("/").reverse().join("-"))
+          bValue = new Date(b.date.split("/").reverse().join("-"))
+      }
+
+      if (movementsSortDirection === 'asc') {
+        return aValue > bValue ? 1 : -1
+      } else {
+        return aValue < bValue ? 1 : -1
+      }
+    })
+
+    return filtered
+  }, [movementsAppliedFilters, movementsCurrentSort, movementsSortDirection, movementsSearchTerm])
 
   return (
     <div className="flex flex-col gap-4">
@@ -316,11 +603,24 @@ export default function PharmacyPage() {
                       type="search"
                       placeholder="Search medicines..."
                       className="pl-8 w-[200px]"
+                      value={pharmSearchTerm}
+                      onChange={(e) => setPharmSearchTerm(e.target.value)}
                     />
                   </div>
-                  <Button variant="outline" size="icon">
-                    <Filter className="h-4 w-4" />
-                  </Button>
+                  <ViewOptions
+                    config={pharmacyViewConfig}
+                    currentView={pharmCurrentView}
+                    appliedFilters={pharmAppliedFilters}
+                    currentSort={pharmCurrentSort}
+                    sortDirection={pharmSortDirection}
+                    onViewChange={setPharmCurrentView}
+                    onFilterChange={setPharmAppliedFilters}
+                    onSortChange={(sort, direction) => {
+                      setPharmCurrentSort(sort)
+                      setPharmSortDirection(direction)
+                    }}
+                    onExport={() => console.log("Export pharmacy data")}
+                  />
                   <PharmacyItemForm>
                     <Button className="gap-2">
                       <Plus className="h-4 w-4" />
@@ -347,7 +647,7 @@ export default function PharmacyPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {pharmacyItems.map((item) => {
+                    {filteredAndSortedPharmacyItems.map((item) => {
                       const stockStatus = getLowStockStatus(item.stock_quantity, item.reorder_level)
                       const expiryStatus = getExpiryStatus(item.expiry_date)
                       return (
@@ -383,9 +683,158 @@ export default function PharmacyPage() {
                           <TableCell className="text-sm">{item.supplier}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1">
-                              <Button variant="ghost" size="icon" className="h-8 w-8" title="View">
-                                <Eye className="h-4 w-4" />
-                              </Button>
+                              <ViewEditDialog
+                                title={`Medicine - ${item.name}`}
+                                description={item.generic_name}
+                                data={item as any}
+                                renderViewAction={(data: any) => (
+                                  <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                      <p className="text-muted-foreground">Name</p>
+                                      <p className="font-medium">{data.name}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-muted-foreground">Generic</p>
+                                      <p className="text-muted-foreground">{data.generic_name}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-muted-foreground">Category</p>
+                                      <Badge variant="secondary">{data.category}</Badge>
+                                    </div>
+                                    <div>
+                                      <p className="text-muted-foreground">Supplier</p>
+                                      <p className="text-sm">{data.supplier}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-muted-foreground">Stock</p>
+                                      <p className="font-semibold">{data.stock_quantity}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-muted-foreground">Reorder Level</p>
+                                      <p className="font-semibold">{data.reorder_level}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-muted-foreground">Unit Price</p>
+                                      <p className="font-semibold">₹{Number(data.unit_price).toFixed(2)}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-muted-foreground">MRP</p>
+                                      <p className="font-semibold">₹{Number(data.mrp).toFixed(2)}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-muted-foreground">Batch</p>
+                                      <p className="font-mono text-xs">{data.batch_number}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-muted-foreground">Expiry</p>
+                                      <p className="text-sm">{data.expiry_date}</p>
+                                    </div>
+                                  </div>
+                                )}
+                                renderEditAction={(form: any) => (
+                                  <Form {...form}>
+                                    <div className="grid grid-cols-2 gap-4">
+                                      <FormField control={form.control} name={"name"} render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Name</FormLabel>
+                                          <FormControl>
+                                            <Input {...field} />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}/>
+                                      <FormField control={form.control} name={"generic_name"} render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Generic Name</FormLabel>
+                                          <FormControl>
+                                            <Input {...field} />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}/>
+                                      <FormField control={form.control} name={"category"} render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Category</FormLabel>
+                                          <FormControl>
+                                            <Input {...field} />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}/>
+                                      <FormField control={form.control} name={"supplier"} render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Supplier</FormLabel>
+                                          <FormControl>
+                                            <Input {...field} />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}/>
+                                      <FormField control={form.control} name={"stock_quantity"} render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Stock Quantity</FormLabel>
+                                          <FormControl>
+                                            <Input type="number" {...field} />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}/>
+                                      <FormField control={form.control} name={"reorder_level"} render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Reorder Level</FormLabel>
+                                          <FormControl>
+                                            <Input type="number" {...field} />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}/>
+                                      <FormField control={form.control} name={"unit_price"} render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Unit Price</FormLabel>
+                                          <FormControl>
+                                            <Input type="number" step="0.01" {...field} />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}/>
+                                      <FormField control={form.control} name={"mrp"} render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>MRP</FormLabel>
+                                          <FormControl>
+                                            <Input type="number" step="0.01" {...field} />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}/>
+                                      <FormField control={form.control} name={"batch_number"} render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Batch Number</FormLabel>
+                                          <FormControl>
+                                            <Input {...field} />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}/>
+                                      <FormField control={form.control} name={"expiry_date"} render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Expiry Date</FormLabel>
+                                          <FormControl>
+                                            <Input {...field} />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}/>
+                                    </div>
+                                  </Form>
+                                )}
+                                onSaveAction={async (values: any) => {
+                                  console.log("Update medicine", values)
+                                }}
+                              >
+                                <Button variant="ghost" size="icon" className="h-8 w-8" title="View">
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </ViewEditDialog>
                               <PharmacyItemForm itemData={item} mode="edit">
                                 <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit">
                                   <Edit className="h-4 w-4" />
@@ -429,11 +878,24 @@ export default function PharmacyPage() {
                       type="search"
                       placeholder="Search items..."
                       className="pl-8 w-[200px]"
+                      value={opticalSearchTerm}
+                      onChange={(e) => setOpticalSearchTerm(e.target.value)}
                     />
                   </div>
-                  <Button variant="outline" size="icon">
-                    <Filter className="h-4 w-4" />
-                  </Button>
+                  <ViewOptions
+                    config={opticalViewConfig}
+                    currentView={opticalCurrentView}
+                    appliedFilters={opticalAppliedFilters}
+                    currentSort={opticalCurrentSort}
+                    sortDirection={opticalSortDirection}
+                    onViewChange={setOpticalCurrentView}
+                    onFilterChange={setOpticalAppliedFilters}
+                    onSortChange={(sort, direction) => {
+                      setOpticalCurrentSort(sort)
+                      setOpticalSortDirection(direction)
+                    }}
+                    onExport={() => console.log("Export optical data")}
+                  />
                   <OpticalItemForm>
                     <Button className="gap-2">
                       <Plus className="h-4 w-4" />
@@ -461,7 +923,7 @@ export default function PharmacyPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {opticalItems.map((item) => {
+                    {filteredAndSortedOpticalItems.map((item) => {
                       const stockStatus = getLowStockStatus(item.stock_quantity, item.reorder_level)
                       return (
                         <TableRow key={item.id}>
@@ -534,11 +996,24 @@ export default function PharmacyPage() {
                       type="search"
                       placeholder="Search movements..."
                       className="pl-8 w-[200px]"
+                      value={movementsSearchTerm}
+                      onChange={(e) => setMovementsSearchTerm(e.target.value)}
                     />
                   </div>
-                  <Button variant="outline" size="icon">
-                    <Filter className="h-4 w-4" />
-                  </Button>
+                  <ViewOptions
+                    config={movementsViewConfig}
+                    currentView={movementsCurrentView}
+                    appliedFilters={movementsAppliedFilters}
+                    currentSort={movementsCurrentSort}
+                    sortDirection={movementsSortDirection}
+                    onViewChange={setMovementsCurrentView}
+                    onFilterChange={setMovementsAppliedFilters}
+                    onSortChange={(sort, direction) => {
+                      setMovementsCurrentSort(sort)
+                      setMovementsSortDirection(direction)
+                    }}
+                    onExport={() => console.log("Export movements data")}
+                  />
                   <StockMovementForm>
                     <Button className="gap-2">
                       <Plus className="h-4 w-4" />
@@ -565,7 +1040,7 @@ export default function PharmacyPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {stockMovements.map((movement) => (
+                    {filteredAndSortedMovements.map((movement) => (
                       <TableRow key={movement.id}>
                         <TableCell className="text-sm">{movement.date}</TableCell>
                         <TableCell>

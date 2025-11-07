@@ -28,6 +28,9 @@ import {
 } from "@/components/ui/table"
 import { InvoiceForm } from "@/components/invoice-form"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
+import { ViewEditDialog } from "@/components/view-edit-dialog"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 const invoices = [
   {
@@ -69,6 +72,18 @@ const statusColors = {
 }
 
 export default function BillingPage() {
+  const [searchTerm, setSearchTerm] = React.useState("")
+  const filteredInvoices = React.useMemo(() => {
+    if (!searchTerm.trim()) return invoices
+    const q = searchTerm.trim().toLowerCase()
+    return invoices.filter(inv =>
+      inv.id.toLowerCase().includes(q) ||
+      inv.date.toLowerCase().includes(q) ||
+      inv.patient_name.toLowerCase().includes(q) ||
+      inv.items.toLowerCase().includes(q) ||
+      inv.status.toLowerCase().includes(q)
+    )
+  }, [searchTerm])
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
@@ -145,6 +160,8 @@ export default function BillingPage() {
                   type="search"
                   placeholder="Search invoices..."
                   className="pl-8 w-[200px]"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
               <Button variant="outline" size="icon">
@@ -171,7 +188,7 @@ export default function BillingPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {invoices.map((invoice, index) => (
+                {filteredInvoices.map((invoice, index) => (
                   <TableRow key={invoice.id}>
                     <TableCell>{index + 1}</TableCell>
                     <TableCell className="font-medium">{invoice.id}</TableCell>
@@ -191,9 +208,85 @@ export default function BillingPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" title="View">
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                        <ViewEditDialog
+                          title={`Invoice - ${invoice.id}`}
+                          description={`Patient: ${invoice.patient_name}`}
+                          data={invoice as any}
+                          renderViewAction={(data: any) => (
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <p className="text-muted-foreground">Date</p>
+                                <p className="font-medium">{data.date}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Patient</p>
+                                <p className="font-medium uppercase">{data.patient_name}</p>
+                              </div>
+                              <div className="col-span-2">
+                                <p className="text-muted-foreground">Items</p>
+                                <p className="text-muted-foreground">{data.items}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Total</p>
+                                <p className="font-semibold">{data.total}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Status</p>
+                                <Badge variant="outline" className={statusColors[data.status as keyof typeof statusColors]}>
+                                  {data.status}
+                                </Badge>
+                              </div>
+                            </div>
+                          )}
+                          renderEditAction={(form: any) => (
+                            <Form {...form}>
+                              <div className="grid grid-cols-2 gap-4">
+                                <FormField
+                                  control={form.control}
+                                  name={"date"}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Date</FormLabel>
+                                      <FormControl>
+                                        <Input {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name={"status"}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Status</FormLabel>
+                                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl>
+                                          <SelectTrigger>
+                                            <SelectValue placeholder="Select status" />
+                                          </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                          <SelectItem value="Paid">Paid</SelectItem>
+                                          <SelectItem value="Partial">Partial</SelectItem>
+                                          <SelectItem value="Unpaid">Unpaid</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+                            </Form>
+                          )}
+                          onSaveAction={async (values: any) => {
+                            console.log("Update invoice", values)
+                          }}
+                        >
+                          <Button variant="ghost" size="icon" className="h-8 w-8" title="View">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </ViewEditDialog>
                         <InvoiceForm invoiceData={invoice} mode="edit">
                           <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit">
                             <Edit className="h-4 w-4" />

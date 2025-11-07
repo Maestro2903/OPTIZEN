@@ -24,10 +24,25 @@ import {
 } from "@/components/ui/table"
 import { DischargeForm } from "@/components/discharge-form"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
+import { ViewEditDialog } from "@/components/view-edit-dialog"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 
 const discharges: any[] = []
 
 export default function DischargesPage() {
+  const [searchTerm, setSearchTerm] = React.useState("")
+  const filteredDischarges = React.useMemo(() => {
+    if (!searchTerm.trim()) return discharges
+    const q = searchTerm.trim().toLowerCase()
+    return discharges.filter(d =>
+      (d.patient_name || '').toLowerCase().includes(q) ||
+      (d.admission_date || '').toLowerCase().includes(q) ||
+      (d.discharge_date || '').toLowerCase().includes(q) ||
+      (d.notes || '').toLowerCase().includes(q)
+    )
+  }, [searchTerm])
 
   return (
     <div className="flex flex-col gap-4">
@@ -101,6 +116,8 @@ export default function DischargesPage() {
                   type="search"
                   placeholder="Search discharges..."
                   className="pl-8 w-[200px]"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
               <Button variant="outline" size="icon">
@@ -122,14 +139,14 @@ export default function DischargesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {discharges.length === 0 ? (
+                {filteredDischarges.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
                       No discharge records yet
                     </TableCell>
                   </TableRow>
                 ) : (
-                  discharges.map((discharge, index) => (
+                  filteredDischarges.map((discharge, index) => (
                     <TableRow key={index}>
                       <TableCell>{index + 1}</TableCell>
                       <TableCell>{discharge.admission_date}</TableCell>
@@ -137,9 +154,80 @@ export default function DischargesPage() {
                       <TableCell>{discharge.discharge_date}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8" title="View">
-                            <Eye className="h-4 w-4" />
-                          </Button>
+                          <ViewEditDialog
+                            title={`Discharge - ${discharge?.patient_name ?? "Record"}`}
+                            description={`Admission: ${discharge?.admission_date ?? "-"}`}
+                            data={discharge as any}
+                            renderViewAction={(data: any) => (
+                              <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                  <p className="text-muted-foreground">Patient</p>
+                                  <p className="font-medium">{data?.patient_name ?? '-'}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">Admission Date</p>
+                                  <p>{data?.admission_date ?? '-'}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">Discharge Date</p>
+                                  <p>{data?.discharge_date ?? '-'}</p>
+                                </div>
+                                <div className="col-span-2">
+                                  <p className="text-muted-foreground">Notes</p>
+                                  <p className="text-muted-foreground">{data?.notes ?? '-'}</p>
+                                </div>
+                              </div>
+                            )}
+                            renderEditAction={(form: any) => (
+                              <Form {...form}>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <FormField control={form.control} name={"patient_name"} render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Patient</FormLabel>
+                                      <FormControl>
+                                        <Input {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}/>
+                                  <FormField control={form.control} name={"admission_date"} render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Admission Date</FormLabel>
+                                      <FormControl>
+                                        <Input {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}/>
+                                  <FormField control={form.control} name={"discharge_date"} render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Discharge Date</FormLabel>
+                                      <FormControl>
+                                        <Input {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}/>
+                                  <FormField control={form.control} name={"notes"} render={({ field }) => (
+                                    <FormItem className="col-span-2">
+                                      <FormLabel>Notes</FormLabel>
+                                      <FormControl>
+                                        <Textarea rows={3} {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}/>
+                                </div>
+                              </Form>
+                            )}
+                            onSaveAction={async (values: any) => {
+                              console.log("Update discharge", values)
+                            }}
+                          >
+                            <Button variant="ghost" size="icon" className="h-8 w-8" title="View">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </ViewEditDialog>
                           <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit">
                             <Edit className="h-4 w-4" />
                           </Button>

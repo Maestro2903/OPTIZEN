@@ -27,6 +27,10 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { AppointmentForm } from "@/components/appointment-form"
+import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
+import { ViewEditDialog } from "@/components/view-edit-dialog"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 // Mock appointments data
 const appointments = [
@@ -167,6 +171,12 @@ const typeLabels = {
 }
 
 export default function AppointmentsPage() {
+  const [currentView, setCurrentView] = React.useState("list")
+  const [appliedFilters, setAppliedFilters] = React.useState<string[]>([])
+  const [currentSort, setCurrentSort] = React.useState("date")
+  const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('asc')
+  const [searchTerm, setSearchTerm] = React.useState("")
+
   const today = new Date().toISOString().split("T")[0]
   
   const todayAppointments = appointments.filter(a => a.date === "08/11/2025")
@@ -179,6 +189,128 @@ export default function AppointmentsPage() {
   
   const pendingConfirmations = appointments.filter(a => a.status === "scheduled").length
   const completedToday = appointments.filter(a => a.date === "08/11/2025" && a.status === "completed").length
+
+  const viewOptionsConfig: ViewOptionsConfig = {
+    views: [
+      { id: "list", label: "List" },
+      { id: "calendar", label: "Calendar" },
+    ],
+    filters: [
+      { id: "today", label: "Today", count: todayAppointments.length },
+      { id: "scheduled", label: "Scheduled", count: appointments.filter(a => a.status === "scheduled").length },
+      { id: "confirmed", label: "Confirmed", count: appointments.filter(a => a.status === "confirmed").length },
+      { id: "completed", label: "Completed", count: appointments.filter(a => a.status === "completed").length },
+      { id: "consult", label: "Consultation", count: appointments.filter(a => a.type === "consult").length },
+      { id: "surgery", label: "Surgery", count: appointments.filter(a => a.type === "surgery").length },
+    ],
+    sortOptions: [
+      { id: "date", label: "Date & Time" },
+      { id: "patient", label: "Patient Name" },
+      { id: "doctor", label: "Doctor" },
+      { id: "type", label: "Type" },
+      { id: "status", label: "Status" },
+    ],
+    showExport: true,
+    showSettings: true,
+  }
+
+  const handleViewChange = (view: string) => {
+    setCurrentView(view)
+  }
+
+  const handleFilterChange = (filters: string[]) => {
+    setAppliedFilters(filters)
+  }
+
+  const handleSortChange = (sort: string, direction: 'asc' | 'desc') => {
+    setCurrentSort(sort)
+    setSortDirection(direction)
+  }
+
+  const handleExport = () => {
+    console.log("Export appointments data")
+  }
+
+  const handleSettings = () => {
+    console.log("Open appointment settings")
+  }
+
+  // Filter and sort appointments
+  const filteredAndSortedAppointments = React.useMemo(() => {
+    let filtered = [...appointments]
+
+    // Apply text search
+    if (searchTerm.trim()) {
+      const q = searchTerm.trim().toLowerCase()
+      filtered = filtered.filter(a =>
+        a.patient_name.toLowerCase().includes(q) ||
+        a.doctor.toLowerCase().includes(q) ||
+        a.type.toLowerCase().includes(q) ||
+        a.status.toLowerCase().includes(q) ||
+        a.room.toLowerCase().includes(q) ||
+        a.date.toLowerCase().includes(q) ||
+        a.time.toLowerCase().includes(q)
+      )
+    }
+
+    // Apply filters
+    if (appliedFilters.includes("today")) {
+      filtered = filtered.filter(a => a.date === "08/11/2025")
+    }
+    if (appliedFilters.includes("scheduled")) {
+      filtered = filtered.filter(a => a.status === "scheduled")
+    }
+    if (appliedFilters.includes("confirmed")) {
+      filtered = filtered.filter(a => a.status === "confirmed")
+    }
+    if (appliedFilters.includes("completed")) {
+      filtered = filtered.filter(a => a.status === "completed")
+    }
+    if (appliedFilters.includes("consult")) {
+      filtered = filtered.filter(a => a.type === "consult")
+    }
+    if (appliedFilters.includes("surgery")) {
+      filtered = filtered.filter(a => a.type === "surgery")
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let aValue, bValue
+      switch (currentSort) {
+        case "date":
+          aValue = new Date(`${a.date.split("/").reverse().join("-")} ${a.time}`)
+          bValue = new Date(`${b.date.split("/").reverse().join("-")} ${b.time}`)
+          break
+        case "patient":
+          aValue = a.patient_name
+          bValue = b.patient_name
+          break
+        case "doctor":
+          aValue = a.doctor
+          bValue = b.doctor
+          break
+        case "type":
+          aValue = a.type
+          bValue = b.type
+          break
+        case "status":
+          aValue = a.status
+          bValue = b.status
+          break
+        default:
+          aValue = new Date(`${a.date.split("/").reverse().join("-")} ${a.time}`)
+          bValue = new Date(`${b.date.split("/").reverse().join("-")} ${b.time}`)
+      }
+
+      if (sortDirection === 'asc') {
+        return aValue > bValue ? 1 : -1
+      } else {
+        return aValue < bValue ? 1 : -1
+      }
+    })
+
+    return filtered
+  }, [appliedFilters, currentSort, sortDirection, searchTerm])
 
   return (
     <div className="flex flex-col gap-4">
@@ -256,11 +388,22 @@ export default function AppointmentsPage() {
                   type="search"
                   placeholder="Search appointments..."
                   className="pl-8 w-[200px]"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <Button variant="outline" size="icon">
-                <Filter className="h-4 w-4" />
-              </Button>
+              <ViewOptions
+                config={viewOptionsConfig}
+                currentView={currentView}
+                appliedFilters={appliedFilters}
+                currentSort={currentSort}
+                sortDirection={sortDirection}
+                onViewChange={handleViewChange}
+                onFilterChange={handleFilterChange}
+                onSortChange={handleSortChange}
+                onExport={handleExport}
+                onSettings={handleSettings}
+              />
             </div>
           </div>
         </CardHeader>
@@ -280,7 +423,7 @@ export default function AppointmentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {appointments.map((appointment) => (
+                {filteredAndSortedAppointments.map((appointment) => (
                   <TableRow key={appointment.id}>
                     <TableCell>
                       <div>
@@ -318,9 +461,103 @@ export default function AppointmentsPage() {
                     <TableCell className="text-sm">{appointment.duration}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" title="View">
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                        <ViewEditDialog
+                          title={`Appointment - ${appointment.patient_name}`}
+                          description={`${appointment.date} at ${appointment.time} with ${appointment.doctor}`}
+                          data={appointment as any}
+                          renderViewAction={(data: any) => (
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <p className="text-muted-foreground">Patient</p>
+                                <p className="font-medium">{data.patient_name}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Doctor</p>
+                                <p className="font-medium">{data.doctor}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Date</p>
+                                <p className="font-medium">{data.date}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Time</p>
+                                <p className="font-medium">{data.time}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Type</p>
+                                <Badge variant="secondary">{typeLabels[data.type as keyof typeof typeLabels]}</Badge>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Status</p>
+                                <Badge variant="outline" className={statusColors[data.status as keyof typeof statusColors]}>
+                                  {data.status}
+                                </Badge>
+                              </div>
+                            </div>
+                          )}
+                          renderEditAction={(form: any) => (
+                            <Form {...form}>
+                              <div className="grid grid-cols-2 gap-4">
+                                <FormField
+                                  control={form.control}
+                                  name={"date"}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Date</FormLabel>
+                                      <FormControl>
+                                        <Input {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name={"time"}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Time</FormLabel>
+                                      <FormControl>
+                                        <Input {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name={"status"}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Status</FormLabel>
+                                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl>
+                                          <SelectTrigger>
+                                            <SelectValue placeholder="Select status" />
+                                          </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                          <SelectItem value="scheduled">Scheduled</SelectItem>
+                                          <SelectItem value="confirmed">Confirmed</SelectItem>
+                                          <SelectItem value="completed">Completed</SelectItem>
+                                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+                            </Form>
+                          )}
+                          onSaveAction={async (values: any) => {
+                            console.log("Update appointment", values)
+                          }}
+                        >
+                          <Button variant="ghost" size="icon" className="h-8 w-8" title="View">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </ViewEditDialog>
                         <AppointmentForm appointmentData={appointment} mode="edit">
                           <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit">
                             <Edit className="h-4 w-4" />

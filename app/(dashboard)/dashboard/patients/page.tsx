@@ -64,6 +64,8 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Textarea } from "@/components/ui/textarea"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
+import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
+import { ViewEditDialog } from "@/components/view-edit-dialog"
 
 const patientFormSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -125,6 +127,11 @@ const patientFormSchema = z.object({
 export default function PatientsPage() {
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
   const [editingPatient, setEditingPatient] = React.useState<any>(null)
+  const [currentView, setCurrentView] = React.useState("list")
+  const [appliedFilters, setAppliedFilters] = React.useState<string[]>([])
+  const [currentSort, setCurrentSort] = React.useState("name")
+  const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('asc')
+  const [searchTerm, setSearchTerm] = React.useState("")
 
   const form = useForm<z.infer<typeof patientFormSchema>>({
     resolver: zodResolver(patientFormSchema),
@@ -163,6 +170,115 @@ export default function PatientsPage() {
   const handleDelete = (patientId: number) => {
     console.log("Delete patient:", patientId)
   }
+
+  const viewOptionsConfig: ViewOptionsConfig = {
+    filters: [
+      { id: "active", label: "Active Patients", count: patients.filter(p => p.status === "Active").length },
+      { id: "male", label: "Male", count: patients.filter(p => p.gender === "Male").length },
+      { id: "female", label: "Female", count: patients.filter(p => p.gender === "Female").length },
+      { id: "gujarat", label: "Gujarat", count: patients.filter(p => p.state === "Gujarat").length },
+      { id: "maharashtra", label: "Maharashtra", count: patients.filter(p => p.state === "Maharashtra").length },
+    ],
+    sortOptions: [
+      { id: "name", label: "Name" },
+      { id: "age", label: "Age" },
+      { id: "last_visit", label: "Last Visit" },
+      { id: "state", label: "State" },
+    ],
+    showExport: true,
+    showSettings: true,
+  }
+
+  const handleViewChange = (view: string) => {
+    setCurrentView(view)
+  }
+
+  const handleFilterChange = (filters: string[]) => {
+    setAppliedFilters(filters)
+  }
+
+  const handleSortChange = (sort: string, direction: 'asc' | 'desc') => {
+    setCurrentSort(sort)
+    setSortDirection(direction)
+  }
+
+  const handleExport = () => {
+    console.log("Export patients data")
+    // Add export functionality here
+  }
+
+  const handleSettings = () => {
+    console.log("Open patient settings")
+    // Add settings functionality here
+  }
+
+  // Filter and sort patients based on current selections
+  const filteredAndSortedPatients = React.useMemo(() => {
+    let filtered = [...patients]
+
+    // Apply text search
+    if (searchTerm.trim()) {
+      const q = searchTerm.trim().toLowerCase()
+      filtered = filtered.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        (p.email || '').toLowerCase().includes(q) ||
+        p.mobile.toLowerCase().includes(q) ||
+        p.gender.toLowerCase().includes(q) ||
+        p.state.toLowerCase().includes(q)
+      )
+    }
+
+    // Apply filters
+    if (appliedFilters.includes("active")) {
+      filtered = filtered.filter(p => p.status === "Active")
+    }
+    if (appliedFilters.includes("male")) {
+      filtered = filtered.filter(p => p.gender === "Male")
+    }
+    if (appliedFilters.includes("female")) {
+      filtered = filtered.filter(p => p.gender === "Female")
+    }
+    if (appliedFilters.includes("gujarat")) {
+      filtered = filtered.filter(p => p.state === "Gujarat")
+    }
+    if (appliedFilters.includes("maharashtra")) {
+      filtered = filtered.filter(p => p.state === "Maharashtra")
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let aValue, bValue
+      switch (currentSort) {
+        case "name":
+          aValue = a.name
+          bValue = b.name
+          break
+        case "age":
+          aValue = a.age
+          bValue = b.age
+          break
+        case "last_visit":
+          aValue = new Date(a.last_visit.split("/").reverse().join("-"))
+          bValue = new Date(b.last_visit.split("/").reverse().join("-"))
+          break
+        case "state":
+          aValue = a.state
+          bValue = b.state
+          break
+        default:
+          aValue = a.name
+          bValue = b.name
+      }
+
+      if (sortDirection === 'asc') {
+        return aValue > bValue ? 1 : -1
+      } else {
+        return aValue < bValue ? 1 : -1
+      }
+    })
+
+    return filtered
+  }, [appliedFilters, currentSort, sortDirection, searchTerm])
 
   return (
     <div className="flex flex-col gap-4">
@@ -390,11 +506,22 @@ export default function PatientsPage() {
                   type="search"
                   placeholder="Search patients..."
                   className="pl-8 w-[200px]"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <Button variant="outline" size="icon">
-                <Filter className="h-4 w-4" />
-              </Button>
+              <ViewOptions
+                config={viewOptionsConfig}
+                currentView={currentView}
+                appliedFilters={appliedFilters}
+                currentSort={currentSort}
+                sortDirection={sortDirection}
+                onViewChange={handleViewChange}
+                onFilterChange={handleFilterChange}
+                onSortChange={handleSortChange}
+                onExport={handleExport}
+                onSettings={handleSettings}
+              />
             </div>
         </div>
         </CardHeader>
@@ -415,7 +542,7 @@ export default function PatientsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {patients.map((patient, index) => (
+                {filteredAndSortedPatients.map((patient, index) => (
                   <TableRow key={patient.id}>
                     <TableCell>{index + 1}</TableCell>
                     <TableCell className="font-medium uppercase">{patient.name}</TableCell>
@@ -429,9 +556,153 @@ export default function PatientsPage() {
                     <TableCell className="text-muted-foreground text-sm">{patient.last_visit}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" title="View">
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                        <ViewEditDialog
+                          title={`Patient - ${patient.name}`}
+                          description={`Details for ${patient.name}`}
+                          data={patient}
+                          schema={patientFormSchema}
+                          renderViewAction={(data: any) => (
+                            <div className="space-y-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Name</p>
+                                  <p className="font-semibold uppercase">{data?.name}</p>
+                                </div>
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Age</p>
+                                  <p className="font-semibold">{data?.age}</p>
+                                </div>
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Gender</p>
+                                  <Badge variant="secondary">{data?.gender}</Badge>
+                                </div>
+                                <div>
+                                  <p className="text-sm text-muted-foreground">State</p>
+                                  <p className="font-semibold">{data?.state}</p>
+                                </div>
+                                <div className="col-span-2">
+                                  <p className="text-sm text-muted-foreground">Email</p>
+                                  <p className="text-sm text-muted-foreground">{data?.email || '-'}</p>
+                                </div>
+                                <div className="col-span-2">
+                                  <p className="text-sm text-muted-foreground">Mobile</p>
+                                  <p className="font-semibold">{data?.mobile}</p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          renderEditAction={(form: any) => (
+                            <Form {...form}>
+                              <div className="grid grid-cols-2 gap-4">
+                                <FormField
+                                  control={form.control}
+                                  name={"name"}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Full Name *</FormLabel>
+                                      <FormControl>
+                                        <Input className="uppercase" {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name={"age"}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Age *</FormLabel>
+                                      <FormControl>
+                                        <Input {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name={"gender"}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Gender *</FormLabel>
+                                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl>
+                                          <SelectTrigger>
+                                            <SelectValue placeholder="Select gender" />
+                                          </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                          <SelectItem value="Male">Male</SelectItem>
+                                          <SelectItem value="Female">Female</SelectItem>
+                                          <SelectItem value="Other">Other</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name={"state"}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>State *</FormLabel>
+                                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl>
+                                          <SelectTrigger>
+                                            <SelectValue placeholder="Select state" />
+                                          </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                          <SelectItem value="Gujarat">Gujarat</SelectItem>
+                                          <SelectItem value="Maharashtra">Maharashtra</SelectItem>
+                                          <SelectItem value="Karnataka">Karnataka</SelectItem>
+                                          <SelectItem value="Tamil Nadu">Tamil Nadu</SelectItem>
+                                          <SelectItem value="Delhi">Delhi</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name={"email"}
+                                  render={({ field }) => (
+                                    <FormItem className="col-span-2">
+                                      <FormLabel>Email</FormLabel>
+                                      <FormControl>
+                                        <Input type="email" {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name={"mobile"}
+                                  render={({ field }) => (
+                                    <FormItem className="col-span-2">
+                                      <FormLabel>Mobile *</FormLabel>
+                                      <FormControl>
+                                        <Input {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+                            </Form>
+                          )}
+                          onSaveAction={async (values: any) => {
+                            console.log("Update patient", values)
+                          }}
+                        >
+                          <Button variant="ghost" size="icon" className="h-8 w-8" title="View">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </ViewEditDialog>
                         <Button
                           variant="ghost"
                           size="icon"

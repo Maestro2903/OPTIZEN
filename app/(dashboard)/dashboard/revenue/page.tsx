@@ -35,6 +35,9 @@ import {
   RevenueByPaymentMethod,
   RevenueByServiceType,
 } from "@/components/revenue-charts"
+import { ViewEditDialog } from "@/components/view-edit-dialog"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 // Mock expenses data
 const expenses = [
@@ -161,6 +164,36 @@ export default function RevenuePage() {
 
   const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0)
 
+  const [expensesSearchTerm, setExpensesSearchTerm] = React.useState("")
+  const [transactionsSearchTerm, setTransactionsSearchTerm] = React.useState("")
+
+  const filteredExpenses = React.useMemo(() => {
+    if (!expensesSearchTerm.trim()) return expenses
+    const q = expensesSearchTerm.trim().toLowerCase()
+    return expenses.filter(e =>
+      e.date.toLowerCase().includes(q) ||
+      e.category.toLowerCase().includes(q) ||
+      (e.sub_category || '').toLowerCase().includes(q) ||
+      e.description.toLowerCase().includes(q) ||
+      e.vendor.toLowerCase().includes(q) ||
+      e.payment_method.toLowerCase().includes(q) ||
+      (e.bill_number || '').toLowerCase().includes(q)
+    )
+  }, [expensesSearchTerm])
+
+  const filteredTransactions = React.useMemo(() => {
+    if (!transactionsSearchTerm.trim()) return recentTransactions
+    const q = transactionsSearchTerm.trim().toLowerCase()
+    return recentTransactions.filter(t =>
+      t.id.toLowerCase().includes(q) ||
+      t.date.toLowerCase().includes(q) ||
+      t.patient.toLowerCase().includes(q) ||
+      t.type.toLowerCase().includes(q) ||
+      t.payment_method.toLowerCase().includes(q) ||
+      t.status.toLowerCase().includes(q)
+    )
+  }, [transactionsSearchTerm])
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
@@ -277,6 +310,8 @@ export default function RevenuePage() {
                       type="search"
                       placeholder="Search expenses..."
                       className="pl-8 w-[200px]"
+                      value={expensesSearchTerm}
+                      onChange={(e) => setExpensesSearchTerm(e.target.value)}
                     />
                   </div>
                   <Button variant="outline" size="icon">
@@ -307,7 +342,7 @@ export default function RevenuePage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {expenses.map((expense) => (
+                    {filteredExpenses.map((expense) => (
                       <TableRow key={expense.id}>
                         <TableCell className="text-sm">{expense.date}</TableCell>
                         <TableCell>
@@ -332,9 +367,131 @@ export default function RevenuePage() {
                         <TableCell className="text-xs font-mono">{expense.bill_number}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" className="h-8 w-8" title="View">
-                              <Eye className="h-4 w-4" />
-                            </Button>
+                            <ViewEditDialog
+                              title={`Expense - ${expense.description}`}
+                              description={`Bill: ${expense.bill_number}`}
+                              data={expense as any}
+                              renderViewAction={(data: any) => (
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                  <div>
+                                    <p className="text-muted-foreground">Date</p>
+                                    <p>{data.date}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Category</p>
+                                    <Badge variant="outline" className={categoryColors[data.category as keyof typeof categoryColors]}>
+                                      {data.category}
+                                    </Badge>
+                                  </div>
+                                  <div className="col-span-2">
+                                    <p className="text-muted-foreground">Description</p>
+                                    <p className="text-muted-foreground">{data.description}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Vendor</p>
+                                    <p>{data.vendor}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Payment</p>
+                                    <Badge variant="secondary">{data.payment_method}</Badge>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Amount</p>
+                                    <p className="font-semibold">₹{Number(data.amount).toLocaleString()}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Bill No.</p>
+                                    <p className="font-mono text-xs">{data.bill_number}</p>
+                                  </div>
+                                </div>
+                              )}
+                              renderEditAction={(form: any) => (
+                                <Form {...form}>
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <FormField control={form.control} name={"date"} render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Date</FormLabel>
+                                        <FormControl>
+                                          <Input {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}/>
+                                    <FormField control={form.control} name={"category"} render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Category</FormLabel>
+                                        <FormControl>
+                                          <Input {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}/>
+                                    <FormField control={form.control} name={"description"} render={({ field }) => (
+                                      <FormItem className="col-span-2">
+                                        <FormLabel>Description</FormLabel>
+                                        <FormControl>
+                                          <Input {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}/>
+                                    <FormField control={form.control} name={"vendor"} render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Vendor</FormLabel>
+                                        <FormControl>
+                                          <Input {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}/>
+                                    <FormField control={form.control} name={"payment_method"} render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Payment</FormLabel>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                          <FormControl>
+                                            <SelectTrigger>
+                                              <SelectValue placeholder="Select method" />
+                                            </SelectTrigger>
+                                          </FormControl>
+                                          <SelectContent>
+                                            <SelectItem value="Cash">Cash</SelectItem>
+                                            <SelectItem value="Card">Card</SelectItem>
+                                            <SelectItem value="UPI">UPI</SelectItem>
+                                            <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}/>
+                                    <FormField control={form.control} name={"amount"} render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Amount</FormLabel>
+                                        <FormControl>
+                                          <Input type="number" step="0.01" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}/>
+                                    <FormField control={form.control} name={"bill_number"} render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Bill Number</FormLabel>
+                                        <FormControl>
+                                          <Input {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}/>
+                                  </div>
+                                </Form>
+                              )}
+                              onSaveAction={async (values: any) => {
+                                console.log("Update expense", values)
+                              }}
+                            >
+                              <Button variant="ghost" size="icon" className="h-8 w-8" title="View">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </ViewEditDialog>
                             <ExpenseForm expenseData={expense} mode="edit">
                               <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit">
                                 <Edit className="h-4 w-4" />
@@ -385,6 +542,8 @@ export default function RevenuePage() {
                       type="search"
                       placeholder="Search transactions..."
                       className="pl-8 w-[200px]"
+                      value={transactionsSearchTerm}
+                      onChange={(e) => setTransactionsSearchTerm(e.target.value)}
                     />
                   </div>
                   <Button variant="outline" size="icon">
@@ -408,7 +567,7 @@ export default function RevenuePage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {recentTransactions.map((transaction) => (
+                    {filteredTransactions.map((transaction) => (
                       <TableRow key={transaction.id}>
                         <TableCell className="font-mono font-medium">{transaction.id}</TableCell>
                         <TableCell className="text-sm">{transaction.date}</TableCell>

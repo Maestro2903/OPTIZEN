@@ -20,13 +20,8 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -52,6 +47,130 @@ interface ExpenseFormProps {
 
 export function ExpenseForm({ children, expenseData, mode = "create" }: ExpenseFormProps) {
   const [isOpen, setIsOpen] = React.useState(false)
+
+  const CATEGORY_OPTIONS = [
+    "salary","utilities","supplies","maintenance","rent","marketing","equipment","other"
+  ]
+  const PAYMENT_OPTIONS = ["Cash","Bank Transfer","Card","UPI","Cheque"]
+
+  function SimpleCombobox({
+    options,
+    value,
+    onChange,
+    placeholder,
+    className,
+  }: {
+    options: string[]
+    value?: string
+    onChange: (v: string) => void
+    placeholder?: string
+    className?: string
+  }) {
+    const [open, setOpen] = React.useState(false)
+    const [inputValue, setInputValue] = React.useState(value || "")
+    const [isTyping, setIsTyping] = React.useState(false)
+    
+    React.useEffect(() => {
+      if (!isTyping) {
+        setInputValue(value || "")
+      }
+    }, [value, isTyping])
+
+    const [debounced, setDebounced] = React.useState(inputValue)
+    React.useEffect(() => {
+      const t = setTimeout(() => setDebounced(inputValue), 150)
+      return () => clearTimeout(t)
+    }, [inputValue])
+
+    const filtered = React.useMemo(() => {
+      if (!isTyping && open) return options
+      const q = (debounced || "").trim().toLowerCase()
+      if (!q) return options
+      return options.filter((o) => o.toLowerCase().includes(q))
+    }, [options, debounced, isTyping, open])
+
+    const [active, setActive] = React.useState(0)
+    React.useEffect(() => setActive(0), [debounced, open])
+
+    const handleSelect = (opt: string) => {
+      onChange(opt)
+      setInputValue(opt)
+      setIsTyping(false)
+      setOpen(false)
+    }
+
+    const handleClear = () => {
+      onChange("")
+      setInputValue("")
+      setIsTyping(false)
+      setOpen(false)
+    }
+
+    return (
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            role="combobox"
+            className={`w-full justify-between border-gray-300 text-left font-normal ${!value && 'text-muted-foreground'} ${className || ''}`}
+          >
+            <span className="truncate">{value || placeholder || "Select option"}</span>
+            <span className="ml-2">▼</span>
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="p-0 w-[var(--radix-popover-trigger-width)] z-[100]" align="start" sideOffset={4}>
+          <div className="p-2 border-b">
+            <Input
+              placeholder="Search..."
+              value={inputValue}
+              onChange={(e) => {
+                setInputValue(e.target.value)
+                setIsTyping(true)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowDown') { e.preventDefault(); setActive((p) => Math.min(p + 1, Math.max(filtered.length - 1, 0))) }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((p) => Math.max(p - 1, 0)) }
+                else if (e.key === 'Enter') { if (filtered[active]) { e.preventDefault(); handleSelect(filtered[active]) } }
+                else if (e.key === 'Escape') { setOpen(false) }
+              }}
+              className="h-8 border-gray-300 focus-visible:ring-gray-300 bg-white text-foreground"
+              autoComplete="off"
+              autoFocus
+            />
+          </div>
+          <ScrollArea className="max-h-60 bg-white">
+            {value && !isTyping ? (
+              <button
+                type="button"
+                className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-gray-100 border-b"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={handleClear}
+              >
+                ✕ Clear selection
+              </button>
+            ) : null}
+            {filtered.length === 0 ? (
+              <div className="p-2 text-sm text-muted-foreground">No results</div>
+            ) : (
+              filtered.map((opt, idx) => (
+                <button
+                  type="button"
+                  key={opt}
+                  className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${opt === value || idx === active ? 'bg-gray-100' : ''}`}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onMouseEnter={() => setActive(idx)}
+                  onClick={() => handleSelect(opt)}
+                >
+                  {opt}
+                </button>
+              ))
+            )}
+          </ScrollArea>
+        </PopoverContent>
+      </Popover>
+    )
+  }
 
   const form = useForm<z.infer<typeof expenseSchema>>({
     resolver: zodResolver(expenseSchema),
@@ -106,23 +225,12 @@ export function ExpenseForm({ children, expenseData, mode = "create" }: ExpenseF
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Category *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="salary">Salary</SelectItem>
-                        <SelectItem value="utilities">Utilities</SelectItem>
-                        <SelectItem value="supplies">Supplies</SelectItem>
-                        <SelectItem value="maintenance">Maintenance</SelectItem>
-                        <SelectItem value="rent">Rent</SelectItem>
-                        <SelectItem value="marketing">Marketing</SelectItem>
-                        <SelectItem value="equipment">Equipment</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <SimpleCombobox
+                      options={CATEGORY_OPTIONS}
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder="Search category"
+                    />
                     <FormMessage />
                   </FormItem>
                 )}
@@ -192,20 +300,12 @@ export function ExpenseForm({ children, expenseData, mode = "create" }: ExpenseF
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Payment Method</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select method" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Cash">Cash</SelectItem>
-                        <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                        <SelectItem value="Card">Card</SelectItem>
-                        <SelectItem value="UPI">UPI</SelectItem>
-                        <SelectItem value="Cheque">Cheque</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <SimpleCombobox
+                      options={PAYMENT_OPTIONS}
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder="Search method"
+                    />
                     <FormMessage />
                   </FormItem>
                 )}

@@ -144,6 +144,7 @@ export default function BedsPage() {
   const [beds, setBeds] = React.useState(bedsData)
   const [draggedBed, setDraggedBed] = React.useState<any>(null)
   const [dragOverColumn, setDragOverColumn] = React.useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = React.useState("")
 
   const totalBeds = bedsData.length
   const occupiedBeds = bedsData.filter(b => b.bed.status === 'occupied').length
@@ -216,10 +217,25 @@ export default function BedsPage() {
   }
 
   // Filter beds
-  const filteredBeds = beds.filter(({ bed }) => {
+  const filteredBeds = beds.filter(({ bed, assignment }) => {
     if (wardFilter !== "all" && bed.ward_type !== wardFilter) return false
     if (floorFilter !== "all" && bed.floor_number !== parseInt(floorFilter)) return false
     if (statusFilter !== "all" && bed.status !== statusFilter) return false
+
+    if (searchTerm.trim()) {
+      const q = searchTerm.trim().toLowerCase()
+      const matches =
+        bed.bed_number.toLowerCase().includes(q) ||
+        bed.ward_name.toLowerCase().includes(q) ||
+        bed.ward_type.toLowerCase().includes(q) ||
+        String(bed.floor_number).toLowerCase().includes(q) ||
+        (bed.room_number || '').toLowerCase().includes(q) ||
+        bed.status.toLowerCase().includes(q) ||
+        (assignment?.patient_name || '').toLowerCase().includes(q) ||
+        (assignment?.patient_mrn || '').toLowerCase().includes(q) ||
+        (assignment?.doctor_name || '').toLowerCase().includes(q)
+      if (!matches) return false
+    }
     return true
   })
 
@@ -358,6 +374,8 @@ export default function BedsPage() {
                 type="search"
                 placeholder="Search..."
                 className="pl-8 w-[180px]"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
           </div>

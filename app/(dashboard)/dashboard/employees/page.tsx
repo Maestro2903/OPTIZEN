@@ -27,6 +27,9 @@ import {
 } from "@/components/ui/table"
 import { EmployeeForm } from "@/components/employee-form"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
+import { ViewEditDialog } from "@/components/view-edit-dialog"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 const employees = [
   {
@@ -74,6 +77,19 @@ const statusColors = {
 }
 
 export default function EmployeesPage() {
+  const [searchTerm, setSearchTerm] = React.useState("")
+  const filteredEmployees = React.useMemo(() => {
+    if (!searchTerm.trim()) return employees
+    const q = searchTerm.trim().toLowerCase()
+    return employees.filter(emp =>
+      emp.id.toLowerCase().includes(q) ||
+      emp.name.toLowerCase().includes(q) ||
+      emp.role.toLowerCase().includes(q) ||
+      emp.email.toLowerCase().includes(q) ||
+      emp.phone.toLowerCase().includes(q) ||
+      emp.status.toLowerCase().includes(q)
+    )
+  }, [searchTerm])
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
@@ -150,6 +166,8 @@ export default function EmployeesPage() {
                   type="search"
                   placeholder="Search employees..."
                   className="pl-8 w-[200px]"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
               <Button variant="outline" size="icon">
@@ -175,7 +193,7 @@ export default function EmployeesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {employees.map((emp, index) => (
+                {filteredEmployees.map((emp, index) => (
                   <TableRow key={emp.id}>
                     <TableCell>{index + 1}</TableCell>
                     <TableCell className="font-medium">{emp.id}</TableCell>
@@ -206,12 +224,106 @@ export default function EmployeesPage() {
                     <TableCell>{emp.joined}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" title="View">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit">
-                          <Edit className="h-4 w-4" />
-                        </Button>
+                        <ViewEditDialog
+                          title={`Employee - ${emp.name}`}
+                          description={`${emp.role}`}
+                          data={emp as any}
+                          renderViewAction={(data: any) => (
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <p className="text-muted-foreground">Name</p>
+                                <p className="font-medium">{data.name}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Role</p>
+                                <Badge variant="secondary">{data.role}</Badge>
+                              </div>
+                              <div className="col-span-2">
+                                <p className="text-muted-foreground">Email</p>
+                                <p className="text-muted-foreground">{data.email}</p>
+                              </div>
+                              <div className="col-span-2">
+                                <p className="text-muted-foreground">Phone</p>
+                                <p className="text-muted-foreground">{data.phone}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Status</p>
+                                <Badge variant="outline" className={statusColors[data.status as keyof typeof statusColors]}>{data.status}</Badge>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Joined</p>
+                                <p>{data.joined}</p>
+                              </div>
+                            </div>
+                          )}
+                          renderEditAction={(form: any) => (
+                            <Form {...form}>
+                              <div className="grid grid-cols-2 gap-4">
+                                <FormField control={form.control} name={"name"} render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Name</FormLabel>
+                                    <FormControl>
+                                      <Input {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}/>
+                                <FormField control={form.control} name={"role"} render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Role</FormLabel>
+                                    <FormControl>
+                                      <Input {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}/>
+                                <FormField control={form.control} name={"email"} render={({ field }) => (
+                                  <FormItem className="col-span-2">
+                                    <FormLabel>Email</FormLabel>
+                                    <FormControl>
+                                      <Input type="email" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}/>
+                                <FormField control={form.control} name={"phone"} render={({ field }) => (
+                                  <FormItem className="col-span-2">
+                                    <FormLabel>Phone</FormLabel>
+                                    <FormControl>
+                                      <Input {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}/>
+                                <FormField control={form.control} name={"status"} render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Status</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                      <FormControl>
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Select status" />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        <SelectItem value="Active">Active</SelectItem>
+                                        <SelectItem value="Inactive">Inactive</SelectItem>
+                                        <SelectItem value="OnLeave">OnLeave</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}/>
+                              </div>
+                            </Form>
+                          )}
+                          onSaveAction={async (values: any) => {
+                            console.log("Update employee", values)
+                          }}
+                        >
+                          <Button variant="ghost" size="icon" className="h-8 w-8" title="View/Edit">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </ViewEditDialog>
                         <DeleteConfirmDialog
                           title="Delete Employee"
                           description={`Are you sure you want to delete ${emp.name}? This action cannot be undone.`}

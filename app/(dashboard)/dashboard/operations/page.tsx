@@ -58,6 +58,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
+import { ViewEditDialog } from "@/components/view-edit-dialog"
 
 // OpticNauts Operation Schema
 const operationFormSchema = z.object({
@@ -106,6 +107,7 @@ const operations = [
 
 export default function OperationsPage() {
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
+  const [searchTerm, setSearchTerm] = React.useState("")
 
   const form = useForm<z.infer<typeof operationFormSchema>>({
     resolver: zodResolver(operationFormSchema),
@@ -531,6 +533,8 @@ export default function OperationsPage() {
                   type="search"
                   placeholder="Search operations..."
                   className="pl-8 w-[200px]"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
               <Button variant="outline" size="icon">
@@ -556,7 +560,21 @@ export default function OperationsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {operations.map((op, index) => (
+                {operations
+                  .filter(op => {
+                    if (!searchTerm.trim()) return true
+                    const q = searchTerm.trim().toLowerCase()
+                    return (
+                      op.id.toLowerCase().includes(q) ||
+                      op.date.toLowerCase().includes(q) ||
+                      op.patient_name.toLowerCase().includes(q) ||
+                      op.operation.toLowerCase().includes(q) ||
+                      op.begin_time.toLowerCase().includes(q) ||
+                      op.end_time.toLowerCase().includes(q) ||
+                      op.amount.toLowerCase().includes(q)
+                    )
+                  })
+                  .map((op, index) => (
                   <TableRow key={op.id}>
                     <TableCell>{index + 1}</TableCell>
                     <TableCell>{op.date}</TableCell>
@@ -568,12 +586,97 @@ export default function OperationsPage() {
                     <TableCell className="font-semibold">{op.amount}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" title="View">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit">
-                          <Edit className="h-4 w-4" />
-                        </Button>
+                        <ViewEditDialog
+                          title={`Operation - ${op.operation}`}
+                          description={`${op.date} • ${op.begin_time}-${op.end_time}`}
+                          data={op as any}
+                          renderViewAction={(data: any) => (
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <p className="text-muted-foreground">Patient</p>
+                                <p className="font-medium">{data.patient_name}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Operation</p>
+                                <p className="font-medium">{data.operation}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Date</p>
+                                <p>{data.date}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Time</p>
+                                <p>{data.begin_time} - {data.end_time}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Duration</p>
+                                <p>{data.duration}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Amount</p>
+                                <p className="font-semibold">{data.amount}</p>
+                              </div>
+                            </div>
+                          )}
+                          renderEditAction={(form: any) => (
+                            <Form {...form}>
+                              <div className="grid grid-cols-2 gap-4">
+                                <FormField control={form.control} name={"operation"} render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Operation</FormLabel>
+                                    <FormControl>
+                                      <Input {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}/>
+                                <FormField control={form.control} name={"date"} render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Date</FormLabel>
+                                    <FormControl>
+                                      <Input {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}/>
+                                <FormField control={form.control} name={"begin_time"} render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Begin Time</FormLabel>
+                                    <FormControl>
+                                      <Input {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}/>
+                                <FormField control={form.control} name={"end_time"} render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>End Time</FormLabel>
+                                    <FormControl>
+                                      <Input {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}/>
+                                <FormField control={form.control} name={"amount"} render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Amount</FormLabel>
+                                    <FormControl>
+                                      <Input {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}/>
+                              </div>
+                            </Form>
+                          )}
+                          onSaveAction={async (values: any) => {
+                            console.log("Update operation", values)
+                          }}
+                        >
+                          <Button variant="ghost" size="icon" className="h-8 w-8" title="View/Edit">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </ViewEditDialog>
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => window.print()} title="Print">
                           <Printer className="h-4 w-4" />
                         </Button>
