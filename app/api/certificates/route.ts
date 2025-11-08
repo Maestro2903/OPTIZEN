@@ -7,11 +7,23 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
 
     // Get query parameters
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '10')
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '10')))
     const search = searchParams.get('search') || ''
-    const sortBy = searchParams.get('sortBy') || 'issue_date'
+    const sortByParam = searchParams.get('sortBy') || 'issue_date'
     const sortOrder = searchParams.get('sortOrder') || 'desc'
+
+    // Validate sortBy against whitelist
+    const allowedSortColumns = [
+      'issue_date',
+      'certificate_number',
+      'type',
+      'purpose',
+      'status',
+      'created_at',
+      'updated_at'
+    ]
+    const sortBy = allowedSortColumns.includes(sortByParam) ? sortByParam : 'issue_date'
     const type = searchParams.get('type')
     const status = searchParams.get('status')
     const patient_id = searchParams.get('patient_id')
@@ -36,7 +48,20 @@ export async function GET(request: NextRequest) {
 
     // Apply filters
     if (search) {
-      query = query.or(`certificate_number.ilike.%${search}%, patients.full_name.ilike.%${search}%, purpose.ilike.%${search}%`)
+      // First, find patient IDs that match the search term
+      const { data: matchingPatients } = await supabase
+        .from('patients')
+        .select('id')
+        .ilike('full_name', `%${search}%`)
+
+      const patientIds = matchingPatients?.map(p => p.id) || []
+
+      // Apply search to certificate fields and patient IDs
+      if (patientIds.length > 0) {
+        query = query.or(`certificate_number.ilike.%${search}%,purpose.ilike.%${search}%,patient_id.in.(${patientIds.join(',')})`)
+      } else {
+        query = query.or(`certificate_number.ilike.%${search}%,purpose.ilike.%${search}%`)
+      }
     }
 
     if (type) {
@@ -111,6 +136,37 @@ export async function POST(request: NextRequest) {
     const supabase = createClient()
     const body = await request.json()
 
+    // Validate required fields
+    if (!body.patient_id) {
+      return NextResponse.json(
+        { success: false, error: 'Patient ID is required' },
+        { status: 400 }
+      )
+    }
+
+    if (!body.type) {
+      return NextResponse.json(
+        { success: false, error: 'Certificate type is required' },
+        { status: 400 }
+      )
+    }
+
+    if (!body.purpose) {
+      return NextResponse.json(
+        { success: false, error: 'Purpose is required' },
+        { status: 400 }
+      )
+    }
+
+    // Validate certificate type
+    const allowedTypes = ['Medical Certificate', 'Fitness Certificate', 'Eye Test Certificate', 'Custom']
+    if (!allowedTypes.includes(body.type)) {
+      return NextResponse.json(
+        { success: false, error: `Invalid certificate type. Allowed types: ${allowedTypes.join(', ')}` },
+        { status: 400 }
+      )
+    }
+
     // Generate certificate number
     const prefix = 'CERT'
     const timestamp = Date.now()
@@ -161,8 +217,28 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Certificate creation error:', error)
+
+      // Check for specific error types
+      if (error.code === '23503') { // Foreign key constraint violation
+        return NextResponse.json(
+          { success: false, error: 'Invalid patient ID or referenced data does not exist' },
+          { status: 400 }
+        )
+      } else if (error.code === '23505') { // Unique constraint violation
+        return NextResponse.json(
+          { success: false, error: 'Certificate with this information already exists' },
+          { status: 400 }
+        )
+      } else if (error.message?.includes('validation') || error.message?.includes('constraint')) {
+        return NextResponse.json(
+          { success: false, error: error.message },
+          { status: 400 }
+        )
+      }
+
+      // Default to 500 for unexpected server errors
       return NextResponse.json(
-        { success: false, error: error.message },
+        { success: false, error: 'Internal server error' },
         { status: 500 }
       )
     }

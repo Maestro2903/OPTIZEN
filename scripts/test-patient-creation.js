@@ -39,10 +39,28 @@ async function testPatientCreation() {
     })
     console.log('')
 
-    const data = await response.json()
-    console.log('📦 Response body:')
-    console.log(JSON.stringify(data, null, 2))
-    console.log('')
+    // Handle non-2xx responses
+    if (!response.ok) {
+      console.log('❌ Patient creation failed!')
+      console.log(`   HTTP Status: ${response.status}`)
+      console.log(`   Content-Type: ${response.headers.get('content-type')}`)
+    }
+
+    // Safely parse JSON response
+    const rawBody = await response.text()
+    let data
+    try {
+      data = JSON.parse(rawBody)
+      console.log('📦 Response body:')
+      console.log(JSON.stringify(data, null, 2))
+      console.log('')
+    } catch (parseError) {
+      console.log('⚠️  Failed to parse JSON response')
+      console.log('📦 Raw response body:')
+      console.log(rawBody)
+      console.log('')
+      throw new Error(`JSON parse failed: ${parseError.message}. Raw body: ${rawBody.substring(0, 200)}`)
+    }
 
     if (response.ok) {
       console.log('✅ Patient created successfully!')

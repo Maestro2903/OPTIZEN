@@ -99,12 +99,30 @@ export async function GET(request: NextRequest) {
     const supabase = createClient()
     const { searchParams } = new URL(request.url)
 
-    // Get query parameters
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '10')
+    // Get and validate query parameters
+    let page = parseInt(searchParams.get('page') || '1')
+    let limit = parseInt(searchParams.get('limit') || '10')
+
+    // Validate and sanitize pagination params
+    if (!Number.isFinite(page) || page < 1) {
+      page = 1
+    }
+    if (!Number.isFinite(limit) || limit < 1) {
+      limit = 10
+    }
+    limit = Math.min(100, limit) // Clamp limit to max 100
+
     const search = searchParams.get('search') || ''
-    const sortBy = searchParams.get('sortBy') || 'transaction_date'
-    const sortOrder = searchParams.get('sortOrder') || 'desc'
+
+    // Validate sortBy parameter against whitelist
+    const allowedSorts = ['transaction_date', 'amount', 'type', 'category', 'description', 'payment_method', 'created_at', 'updated_at']
+    const rawSortBy = searchParams.get('sortBy') || 'transaction_date'
+    const sortBy = allowedSorts.includes(rawSortBy) ? rawSortBy : 'transaction_date'
+
+    // Validate sortOrder parameter
+    const rawSortOrder = searchParams.get('sortOrder') || 'desc'
+    const sortOrder = ['asc', 'desc'].includes(rawSortOrder) ? rawSortOrder : 'desc'
+
     const type = searchParams.get('type') // 'income' or 'expense'
     const category = searchParams.get('category')
     const date_from = searchParams.get('date_from')
@@ -120,7 +138,13 @@ export async function GET(request: NextRequest) {
 
     // Apply filters
     if (search) {
-      query = query.or(`description.ilike.%${search}%, category.ilike.%${search}%, reference.ilike.%${search}%`)
+      // Escape special LIKE characters to prevent wildcard injection
+      const escapedSearch = search
+        .replace(/\\/g, '\\\\')
+        .replace(/%/g, '\\%')
+        .replace(/_/g, '\\_')
+      const searchPattern = `%${escapedSearch}%`
+      query = query.or(`description.ilike.${searchPattern}, category.ilike.${searchPattern}, reference.ilike.${searchPattern}`)
     }
 
     if (type) {
@@ -308,13 +332,12 @@ export async function POST(request: NextRequest) {
       user_id: authResult.user.id,
       transaction_type: transaction.type,
       amount: transaction.amount,
-      currency: transaction.currency,
       patient_id: transaction.patient_id,
       invoice_id: transaction.invoice_id,
-      reference_number: transaction.reference_number,
+      reference_number: transaction.reference,
       description: transaction.description,
       ip_address: getClientInfo(request).ipAddress,
-      metadata: { 
+      metadata: {
         category: transaction.category,
         transaction_id: transaction.id
       }

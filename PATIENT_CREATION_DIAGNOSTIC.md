@@ -35,12 +35,19 @@ Run the database migrations:
 
 ```bash
 # Navigate to Supabase Dashboard
-# https://supabase.com/dashboard/project/wtrkwqagxphqkwmtbhtd
+# https://supabase.com/dashboard/project/<YOUR_SUPABASE_PROJECT_ID>
+# Replace <YOUR_SUPABASE_PROJECT_ID> with your actual project ID
 
-# Go to SQL Editor and run these migrations in order:
-# 1. Create patients table (from migrations folder)
-# 2. Apply RLS policies
-# 3. Apply seed data
+# Go to SQL Editor and run these migrations in order from supabase/migrations/:
+# 1. Run 001_initial_schema.sql (creates patients table and other core tables)
+# 2. Run 002_rls_policies.sql (applies Row Level Security policies)
+# 3. Run 003_pharmacy_attendance_revenue.sql (additional features)
+# 4. Run 004_bed_management.sql (bed management features)
+# 5. Run 005_master_data.sql (seed master data)
+# 6. Run 006_security_and_constraints.sql (RBAC and security constraints)
+
+# Or use Supabase CLI to apply all migrations:
+# supabase db push
 ```
 
 ### 4. 🔐 RLS Policies Not Set Up
@@ -115,7 +122,9 @@ curl -X POST http://localhost:3001/api/patients \
 ### Step 4: Check Database Tables
 Verify the `patients` table exists in Supabase:
 
-1. Go to https://supabase.com/dashboard/project/wtrkwqagxphqkwmtbhtd
+1. Go to https://supabase.com/dashboard and navigate to your project
+   - Or use direct link: https://supabase.com/dashboard/project/<YOUR_SUPABASE_PROJECT_ID>
+   - (Replace <YOUR_SUPABASE_PROJECT_ID> with your actual project ID)
 2. Click "Table Editor"
 3. Look for "patients" table
 4. If missing, run the migrations

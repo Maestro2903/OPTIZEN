@@ -701,14 +701,39 @@ All list endpoints support real-time updates via Supabase subscriptions:
 
 ```javascript
 // Example: Subscribe to patients changes
-const subscription = supabase
-  .from('patients')
-  .on('*', (payload) => {
-    console.log('Change received!', payload)
-    // Update UI accordingly
-  })
+const channel = supabase
+  .channel('patients-changes')
+  .on(
+    'postgres_changes',
+    {
+      event: '*',           // Can be 'INSERT', 'UPDATE', 'DELETE', or '*' for all events
+      schema: 'public',     // Database schema (required)
+      table: 'patients',    // Table name (required)
+      filter: 'status=eq.active' // Optional: row-level filter (e.g., 'id=eq.123')
+    },
+    (payload) => {
+      console.log('Change received!', payload)
+      // payload.eventType: 'INSERT' | 'UPDATE' | 'DELETE'
+      // payload.new: new row data (for INSERT/UPDATE)
+      // payload.old: old row data (for UPDATE/DELETE)
+      // Update UI accordingly
+    }
+  )
   .subscribe()
+
+// To unsubscribe:
+// supabase.removeChannel(channel)
 ```
+
+**Real-time Subscription Options:**
+- `event`: Specify the type of changes to listen for:
+  - `'INSERT'` - New records only
+  - `'UPDATE'` - Modified records only
+  - `'DELETE'` - Deleted records only
+  - `'*'` - All changes
+- `schema`: Database schema name (typically `'public'`)
+- `table`: Table name to subscribe to
+- `filter`: Optional row-level filter using Supabase's PostgREST syntax (e.g., `'patient_id=eq.123'`, `'status=neq.cancelled'`)
 
 ---
 

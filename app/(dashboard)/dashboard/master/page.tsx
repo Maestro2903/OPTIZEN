@@ -51,19 +51,59 @@ function CategoryTab({
   }, [items, searchTerm])
 
   const handleEdit = (item: MasterDataItem) => {
+    // Cancel any existing edit first to ensure only one item is edited at a time
+    if (editingItem && editingItem.id !== item.id) {
+      handleCancelEdit()
+    }
     setEditingItem(item)
     setEditingName(item.name)
   }
 
   const handleSaveEdit = () => {
-    if (editingItem && editingName.trim()) {
-      onUpdate(editingItem.id, {
-        name: editingName.trim(),
-        description: editingItem.description
-      })
-      setEditingItem(null)
-      setEditingName("")
+    if (!editingItem || !editingName.trim()) return
+
+    const trimmedName = editingName.trim()
+    
+    // Validate name length
+    if (trimmedName.length < 2) {
+      // TODO: Show validation error toast/message
+      console.error("Name must be at least 2 characters")
+      return
     }
+    
+    if (trimmedName.length > 100) {
+      // TODO: Show validation error toast/message
+      console.error("Name must not exceed 100 characters")
+      return
+    }
+    
+    // Validate allowed characters (alphanumeric, spaces, hyphens, underscores)
+    const nameRegex = /^[a-zA-Z0-9\s\-_]+$/
+    if (!nameRegex.test(trimmedName)) {
+      // TODO: Show validation error toast/message
+      console.error("Name contains invalid characters. Only letters, numbers, spaces, hyphens, and underscores are allowed")
+      return
+    }
+    
+    // Check for duplicates (case-insensitive)
+    const isDuplicate = items.some(item => 
+      item.id !== editingItem.id && 
+      item.name.toLowerCase() === trimmedName.toLowerCase()
+    )
+    
+    if (isDuplicate) {
+      // TODO: Show validation error toast/message
+      console.error("An item with this name already exists")
+      return
+    }
+    
+    // All validations passed, update the item
+    onUpdate(editingItem.id, {
+      name: trimmedName,
+      description: editingItem.description
+    })
+    setEditingItem(null)
+    setEditingName("")
   }
 
   const handleCancelEdit = () => {
@@ -99,7 +139,7 @@ function CategoryTab({
             name: data.name,
             description: data.description,
             is_active: true,
-            sort_order: items.length + 1,  // Note: Uses current page count; ideally should use total from API
+            // Backend computes sort_order = MAX(sort_order) + 1 for correct ordering
             metadata: {}
           })}
         >

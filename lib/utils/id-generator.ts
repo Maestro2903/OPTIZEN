@@ -23,9 +23,12 @@ function generateRandomString(length: number = 6): string {
 }
 
 /**
- * Generate a unique patient ID
+ * Generate a unique patient ID - ATOMIC (prevents TOCTOU race)
  * Format: PAT-YYYYMMDD-XXXXXX
  * Where XXXXXX is a random alphanumeric string
+ * 
+ * Uses atomic insert-or-fail to prevent race conditions under concurrent load.
+ * Retries on unique constraint violations (Postgres error code 23505).
  */
 export async function generatePatientId(): Promise<string> {
   const supabase = createClient()
@@ -37,34 +40,42 @@ export async function generatePatientId(): Promise<string> {
     const random = generateRandomString(6)
     const patientId = `PAT-${dateStr}-${random}`
     
-    // Check if ID already exists
+    // Atomic approach: attempt insert into a reservation/lock table
+    // or directly into patients table with only the patient_id column
+    // This requires a unique constraint on patients.patient_id
     const { data, error } = await supabase
       .from('patients')
-      .select('id')
-      .eq('patient_id', patientId)
-      .maybeSingle()
+      .insert([{ patient_id: patientId }])
+      .select('patient_id')
+      .single()
     
-    if (error) {
-      console.error('Error checking patient ID uniqueness:', error)
-      throw new Error('Failed to generate patient ID')
-    }
-    
-    if (!data) {
-      // ID is unique
+    if (!error) {
+      // Successfully inserted - ID is guaranteed unique
       return patientId
     }
     
-    // Collision detected, try again
-    console.warn(`Patient ID collision detected: ${patientId}, attempt ${attempt + 1}/${maxAttempts}`)
+    // Check if error is unique constraint violation (Postgres code 23505)
+    if (error.code === '23505' || error.message.includes('duplicate') || error.message.includes('unique')) {
+      console.warn(`Patient ID collision detected: ${patientId}, attempt ${attempt + 1}/${maxAttempts}`)
+      // Retry with new random ID
+      continue
+    }
+    
+    // Other database error - fail immediately
+    console.error('Error generating patient ID:', error)
+    throw new Error(`Failed to generate patient ID: ${error.message}`)
   }
   
   throw new Error('Failed to generate unique patient ID after maximum attempts')
 }
 
 /**
- * Generate a unique case number
+ * Generate a unique case number - ATOMIC (prevents TOCTOU race)
  * Format: CASE-YYYY-XXXXXXXXXX
  * Where XXXXXXXXXX is timestamp + random
+ * 
+ * Uses atomic insert-or-fail to prevent race conditions.
+ * Requires unique constraint on encounters.case_no.
  */
 export async function generateCaseNumber(): Promise<string> {
   const supabase = createClient()
@@ -76,25 +87,29 @@ export async function generateCaseNumber(): Promise<string> {
     const random = generateRandomString(4)
     const caseNumber = `CASE-${year}-${timestamp}${random}`
     
-    // Check if case number already exists
+    // Atomic approach: attempt insert with only case_no
+    // This requires a unique constraint on encounters.case_no
     const { data, error } = await supabase
       .from('encounters')
-      .select('id')
-      .eq('case_no', caseNumber)
-      .maybeSingle()
+      .insert([{ case_no: caseNumber }])
+      .select('case_no')
+      .single()
     
-    if (error) {
-      console.error('Error checking case number uniqueness:', error)
-      throw new Error('Failed to generate case number')
-    }
-    
-    if (!data) {
-      // Case number is unique
+    if (!error) {
+      // Successfully inserted - case number is guaranteed unique
       return caseNumber
     }
     
-    // Collision detected, try again
-    console.warn(`Case number collision detected: ${caseNumber}, attempt ${attempt + 1}/${maxAttempts}`)
+    // Check if error is unique constraint violation
+    if (error.code === '23505' || error.message.includes('duplicate') || error.message.includes('unique')) {
+      console.warn(`Case number collision detected: ${caseNumber}, attempt ${attempt + 1}/${maxAttempts}`)
+      // Retry with new random case number
+      continue
+    }
+    
+    // Other database error - fail immediately
+    console.error('Error generating case number:', error)
+    throw new Error(`Failed to generate case number: ${error.message}`)
   }
   
   throw new Error('Failed to generate unique case number after maximum attempts')
@@ -144,9 +159,12 @@ export async function generateInvoiceNumber(): Promise<string> {
 }
 
 /**
- * Generate a unique employee ID
+ * Generate a unique employee ID - ATOMIC (prevents TOCTOU race)
  * Format: EMP-YYYY-XXXX
  * Where XXXX is a random alphanumeric string
+ * 
+ * Uses atomic insert-or-fail to prevent race conditions.
+ * Requires unique constraint on employees.employee_id.
  */
 export async function generateEmployeeId(): Promise<string> {
   const supabase = createClient()
@@ -157,33 +175,40 @@ export async function generateEmployeeId(): Promise<string> {
     const random = generateRandomString(4)
     const employeeId = `EMP-${year}-${random}`
     
-    // Check if ID already exists
+    // Atomic approach: attempt insert with only employee_id
+    // This requires a unique constraint on employees.employee_id
     const { data, error } = await supabase
       .from('employees')
-      .select('id')
-      .eq('employee_id', employeeId)
-      .maybeSingle()
+      .insert([{ employee_id: employeeId }])
+      .select('employee_id')
+      .single()
     
-    if (error) {
-      console.error('Error checking employee ID uniqueness:', error)
-      throw new Error('Failed to generate employee ID')
-    }
-    
-    if (!data) {
-      // ID is unique
+    if (!error) {
+      // Successfully inserted - ID is guaranteed unique
       return employeeId
     }
     
-    // Collision detected, try again
-    console.warn(`Employee ID collision detected: ${employeeId}, attempt ${attempt + 1}/${maxAttempts}`)
+    // Check if error is unique constraint violation
+    if (error.code === '23505' || error.message.includes('duplicate') || error.message.includes('unique')) {
+      console.warn(`Employee ID collision detected: ${employeeId}, attempt ${attempt + 1}/${maxAttempts}`)
+      // Retry with new random ID
+      continue
+    }
+    
+    // Other database error - fail immediately
+    console.error('Error generating employee ID:', error)
+    throw new Error(`Failed to generate employee ID: ${error.message}`)
   }
   
   throw new Error('Failed to generate unique employee ID after maximum attempts')
 }
 
 /**
- * Generate a unique operation ID
+ * Generate a unique operation ID - ATOMIC (prevents TOCTOU race)
  * Format: OP-YYYYMMDD-XXXX
+ * 
+ * Uses atomic insert-or-fail to prevent race conditions.
+ * Requires unique constraint on surgeries.surgery_id.
  */
 export async function generateOperationId(): Promise<string> {
   const supabase = createClient()
@@ -195,25 +220,29 @@ export async function generateOperationId(): Promise<string> {
     const random = generateRandomString(4)
     const operationId = `OP-${dateStr}-${random}`
     
-    // Check if ID already exists
+    // Atomic approach: attempt insert with only surgery_id
+    // This requires a unique constraint on surgeries.surgery_id
     const { data, error } = await supabase
       .from('surgeries')
-      .select('id')
-      .eq('surgery_id', operationId)
-      .maybeSingle()
+      .insert([{ surgery_id: operationId }])
+      .select('surgery_id')
+      .single()
     
-    if (error) {
-      console.error('Error checking operation ID uniqueness:', error)
-      throw new Error('Failed to generate operation ID')
-    }
-    
-    if (!data) {
-      // ID is unique
+    if (!error) {
+      // Successfully inserted - ID is guaranteed unique
       return operationId
     }
     
-    // Collision detected, try again
-    console.warn(`Operation ID collision detected: ${operationId}, attempt ${attempt + 1}/${maxAttempts}`)
+    // Check if error is unique constraint violation
+    if (error.code === '23505' || error.message.includes('duplicate') || error.message.includes('unique')) {
+      console.warn(`Operation ID collision detected: ${operationId}, attempt ${attempt + 1}/${maxAttempts}`)
+      // Retry with new random ID
+      continue
+    }
+    
+    // Other database error - fail immediately
+    console.error('Error generating operation ID:', error)
+    throw new Error(`Failed to generate operation ID: ${error.message}`)
   }
   
   throw new Error('Failed to generate unique operation ID after maximum attempts')

@@ -21,7 +21,7 @@ if (!timeRegex.test(appointment_time)) {
 }
 
 // Parse time and calculate end time with validation
-const [hoursStr, minutesStr] = newStartTime.split(':')
+const [hoursStr, minutesStr] = appointment_time.split(':')
 const hours = parseInt(hoursStr, 10)
 const minutes = parseInt(minutesStr, 10)
 

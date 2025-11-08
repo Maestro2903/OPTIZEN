@@ -1,5 +1,7 @@
 # 🏥 EYECARE CRM - START HERE
 
+> **Important:** Before using this documentation, obtain your Supabase project ID from the Supabase Dashboard and replace all occurrences of `YOUR_PROJECT_ID` in this file with your actual project ID. Never commit real project IDs to version control.
+
 ## ⚠️ CURRENT ISSUE: Unable to Add Patients
 
 ### 🎯 Quick Fix (5 minutes)
@@ -77,7 +79,7 @@ EYECARE/
 
 ## 🗄️ Database Setup
 
-### Required Migrations (in order):
+### Required Migrations (run in numeric order):
 1. `001_initial_schema.sql` - Base tables
 2. `002_rls_policies.sql` - Security policies
 3. `003_pharmacy_attendance_revenue.sql` - Extended modules
@@ -89,16 +91,18 @@ EYECARE/
 9. `009_audit_logging.sql` - Audit logs
 10. `010_session_management.sql` - Sessions
 11. `011_delete_sample_data.sql` - Clean sample data
-12. **`012_fix_patients_schema.sql`** ⭐ **RUN THIS FIRST** - Fixes patients table
+12. **`012_fix_patients_schema.sql`** ⭐ **RUN THIS LAST** - Fixes patients table schema
+
+> **Important:** Run migrations in numeric order (001 through 012) to avoid dependency issues. Migration 012 should be run last as it modifies the patients table created in earlier migrations.
 
 ### How to Apply:
 ```bash
 # Option 1: Supabase Dashboard
-# Go to: https://supabase.com/dashboard/project/wtrkwqagxphqkwmtbhtd/editor
-# Copy/paste SQL from migration files
+# Go to: https://supabase.com/dashboard/project/YOUR_PROJECT_ID/editor
+# Copy/paste SQL from migration files in order (001-012)
 
-# Option 2: Supabase CLI
-supabase link --project-ref wtrkwqagxphqkwmtbhtd
+# Option 2: Supabase CLI (applies all migrations automatically)
+supabase link --project-ref YOUR_PROJECT_ID
 supabase db push
 ```
 
@@ -193,12 +197,14 @@ Server will auto-switch to port 3001. Check terminal output.
 ---
 
 ## 📅 Last Updated
-November 8, 2024
+November 8, 2025
 
 ## 🔗 Important Links
-- **Supabase Dashboard:** https://supabase.com/dashboard/project/wtrkwqagxphqkwmtbhtd
+- **Supabase Dashboard:** https://supabase.com/dashboard/project/YOUR_PROJECT_ID
 - **Local App:** http://localhost:3001
 - **Login:** http://localhost:3001/auth/login
+
+> **Note:** Replace `YOUR_PROJECT_ID` with your actual Supabase project reference from your project settings.
 
 ---
 

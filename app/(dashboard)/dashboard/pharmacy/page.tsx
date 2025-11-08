@@ -176,6 +176,11 @@ export default function PharmacyPage() {
       }
     } catch (error) {
       console.error('Error creating pharmacy item:', error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create item. Please try again.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -253,11 +258,14 @@ export default function PharmacyPage() {
     if (filters.includes("low_stock")) {
       filterParams.low_stock = true
     }
-    if (filters.includes("antibiotics")) {
-      filterParams.category = "antibiotics"
-    }
-    if (filters.includes("analgesics")) {
-      filterParams.category = "analgesics"
+    
+    // Handle category filters - only one category should be active at a time
+    // If multiple category filters are selected, use the last one
+    const categoryFilters = ["antibiotics", "analgesics", "supplements"]
+    const selectedCategories = filters.filter(f => categoryFilters.includes(f))
+    if (selectedCategories.length > 0) {
+      // Use the last selected category
+      filterParams.category = selectedCategories[selectedCategories.length - 1]
     }
 
     filter(filterParams)

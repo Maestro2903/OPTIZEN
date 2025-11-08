@@ -26,17 +26,26 @@ async function testConnection() {
     process.exit(1)
   }
 
+  // Table to test (configurable via env or fallback)
+  const tableName = process.env.DB_TABLE_NAME || 'employees'
+
   try {
-    // Test with anon key
+    // Test with anon key using connection-only check
     console.log('🔌 Testing connection with anon key...')
     const supabase = createClient(supabaseUrl, supabaseAnonKey)
     
-    const { data, error } = await supabase.from('employees').select('count', { count: 'exact', head: true })
-    
-    if (error) {
-      console.log(`   ⚠️  Connection OK, but query requires authentication: ${error.message}`)
-    } else {
+    try {
+      // Use auth.getSession() for connection-only check (doesn't depend on tables)
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+
+      if (sessionError) {
+        console.log(`   ❌ Auth check returned error: ${sessionError.message}`)
+        throw sessionError
+      }
       console.log('   ✅ Connection successful!')
+    } catch (connError) {
+      console.log(`   ❌ Connection failed: ${connError.message}`)
+      throw connError
     }
 
     // Test service role key if available
@@ -44,14 +53,25 @@ async function testConnection() {
       console.log('\n🔐 Testing connection with service role key...')
       const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
       
-      const { data: adminData, error: adminError } = await supabaseAdmin
-        .from('employees')
-        .select('count', { count: 'exact', head: true })
-      
-      if (adminError) {
+      try {
+        const { data: adminData, error: adminError } = await supabaseAdmin
+          .from(tableName)
+          .select('count', { count: 'exact', head: true })
+        
+        if (adminError) {
+          // Check if it's a missing table error
+          if (adminError.message.includes('does not exist')) {
+            console.log(`   ⚠️  Connection OK, but table '${tableName}' does not exist`)
+            console.log(`   💡 Tip: Run migrations or set DB_TABLE_NAME to an existing table`)
+          } else {
+            console.log(`   ❌ Service role query failed: ${adminError.message}`)
+          }
+        } else {
+          console.log('   ✅ Service role connection successful!')
+        }
+      } catch (adminError) {
         console.log(`   ❌ Service role connection failed: ${adminError.message}`)
-      } else {
-        console.log('   ✅ Service role connection successful!')
+        console.log(`   Full error:`, adminError)
       }
     }
 

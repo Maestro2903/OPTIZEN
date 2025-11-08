@@ -4,16 +4,45 @@ import { NextRequest, NextResponse } from 'next/server'
 // GET /api/employees/[id] - Get a specific employee by ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient()
-    const { id } = params
+    const { id } = await params
 
     // Check authentication
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Validate and sanitize ID parameter
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(id)) {
+      return NextResponse.json({ error: 'Invalid employee ID format' }, { status: 400 })
+    }
+
+    // Authorization check - allow if user is accessing their own record, admin, or manager
+    const isOwnRecord = session.user.id === id
+    const userRole = session.user.user_metadata?.role || session.user.app_metadata?.role
+    const isAdmin = userRole === 'admin'
+    const isManager = userRole === 'manager'
+
+    if (!isOwnRecord && !isAdmin && !isManager) {
+      // For managers, check if they manage this employee (if employee table has manager_id field)
+      if (userRole === 'manager') {
+        const { data: employeeCheck } = await supabase
+          .from('employees')
+          .select('manager_id')
+          .eq('id', id)
+          .single()
+
+        if (employeeCheck?.manager_id !== session.user.id) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+      } else {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
     }
 
     // Fetch employee by ID
@@ -45,11 +74,11 @@ export async function GET(
 // PUT /api/employees/[id] - Update an employee
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient()
-    const { id } = params
+    const { id } = await params
 
     // Check authentication
     const { data: { session } } = await supabase.auth.getSession()
@@ -57,7 +86,43 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Validate ID parameter
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(id)) {
+      return NextResponse.json({ error: 'Invalid employee ID format' }, { status: 400 })
+    }
+
     const body = await request.json()
+
+    // Basic request body validation
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json(
+        { error: 'Invalid request body' },
+        { status: 400 }
+      )
+    }
+
+    // Validate required fields if provided
+    if (body.email && typeof body.email !== 'string') {
+      return NextResponse.json(
+        { error: 'Email must be a string' },
+        { status: 400 }
+      )
+    }
+
+    if (body.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) {
+      return NextResponse.json(
+        { error: 'Invalid email format' },
+        { status: 400 }
+      )
+    }
+
+    if (body.phone && typeof body.phone !== 'string') {
+      return NextResponse.json(
+        { error: 'Phone must be a string' },
+        { status: 400 }
+      )
+    }
 
     // Remove fields that shouldn't be updated
     const {
@@ -84,7 +149,18 @@ export async function PUT(
         return NextResponse.json({ error: 'Employee not found' }, { status: 404 })
       }
       if (error.code === '23505') { // Unique constraint violation
-        return NextResponse.json({ error: 'Email already exists' }, { status: 409 })
+        // Parse error to determine which field caused the violation
+        let conflictField = 'Resource'
+        if ((error as any).constraint?.includes('email') || (error as any).detail?.includes('email')) {
+          conflictField = 'Email'
+        } else if ((error as any).constraint?.includes('username') || (error as any).detail?.includes('username')) {
+          conflictField = 'Username'
+        } else if ((error as any).constraint?.includes('employee_id') || (error as any).detail?.includes('employee_id')) {
+          conflictField = 'Employee ID'
+        }
+        return NextResponse.json({
+          error: `${conflictField} already exists`
+        }, { status: 409 })
       }
       console.error('Database error:', error)
       return NextResponse.json({ error: 'Failed to update employee' }, { status: 500 })
@@ -132,17 +208,24 @@ export async function DELETE(
       return NextResponse.json({ error: 'Failed to fetch employee' }, { status: 500 })
     }
 
-    if (!targetEmployee) {
-      return NextResponse.json({ error: 'Employee not found' }, { status: 404 })
+    // Authorization check - only admins, managers, or self-deactivation allowed
+    const userRole = session.user.user_metadata?.role || session.user.app_metadata?.role
+    const isAdmin = userRole === 'admin'
+    const isManager = userRole === 'manager'
+    const isSelfDeactivation = String(session.user.id) === String(id)
+
+    if (!isAdmin && !isManager && !isSelfDeactivation) {
+      return NextResponse.json({
+        error: 'Forbidden: You do not have permission to deactivate this employee'
+      }, { status: 403 })
     }
 
-    // Authorization check
-    // TODO: Implement role-based access control
-    // Only admins/managers should be able to deactivate employees
-    // For now, any authenticated user can deactivate (add proper RBAC when user roles are available)
-    // if (session.user.role !== 'admin' && session.user.role !== 'manager' && session.user.id !== id) {
-    //   return NextResponse.json({ error: 'Forbidden: You do not have permission to deactivate this employee' }, { status: 403 })
-    // }
+    // For non-admins/non-managers, only allow self-deactivation
+    if (!isAdmin && !isManager && !isSelfDeactivation) {
+      return NextResponse.json({
+        error: 'Forbidden: You can only deactivate your own account'
+      }, { status: 403 })
+    }
 
     // Soft delete by updating status to inactive
     const { data: employee, error } = await supabase

@@ -16,6 +16,27 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Check authorization - verify user has access to this invoice
+    const { data: invoiceAuth, error: fetchError } = await supabase
+      .from('invoices')
+      .select('id, created_by, patient_id')
+      .eq('id', id)
+      .single()
+
+    if (fetchError || !invoiceAuth) {
+      return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
+    }
+
+    // Verify user owns this invoice or has appropriate role
+    const userRole = session.user.user_metadata?.role || session.user.app_metadata?.role
+    const isAdmin = userRole === 'admin'
+    const isManager = userRole === 'manager'
+    const ownsInvoice = invoiceAuth.created_by === session.user.id
+
+    if (!ownsInvoice && !isAdmin && !isManager) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     // Fetch invoice with patient information and items
     const { data: invoice, error } = await supabase
       .from('invoices')
@@ -78,7 +99,66 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Check authorization - verify user has access to this invoice
+    const { data: invoiceAuth, error: fetchError } = await supabase
+      .from('invoices')
+      .select('id, created_by, patient_id')
+      .eq('id', id)
+      .single()
+
+    if (fetchError || !invoiceAuth) {
+      return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
+    }
+
+    // Verify user owns this invoice or has appropriate role
+    const userRole = session.user.user_metadata?.role || session.user.app_metadata?.role
+    const isAdmin = userRole === 'admin'
+    const isManager = userRole === 'manager'
+    const ownsInvoice = invoiceAuth.created_by === session.user.id
+
+    if (!ownsInvoice && !isAdmin && !isManager) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const body = await request.json()
+
+    // Validate request body
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json(
+        { error: 'Invalid request body' },
+        { status: 400 }
+      )
+    }
+
+    // Validate numeric fields
+    if (body.total_amount !== undefined) {
+      if (typeof body.total_amount !== 'number' || body.total_amount < 0 || !Number.isFinite(body.total_amount)) {
+        return NextResponse.json(
+          { error: 'total_amount must be a non-negative number' },
+          { status: 400 }
+        )
+      }
+    }
+
+    if (body.amount_paid !== undefined) {
+      if (typeof body.amount_paid !== 'number' || body.amount_paid < 0 || !Number.isFinite(body.amount_paid)) {
+        return NextResponse.json(
+          { error: 'amount_paid must be a non-negative number' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Validate status if present
+    if (body.status !== undefined) {
+      const allowedStatuses = ['draft', 'sent', 'paid', 'cancelled', 'overdue']
+      if (!allowedStatuses.includes(body.status)) {
+        return NextResponse.json(
+          { error: `status must be one of: ${allowedStatuses.join(', ')}` },
+          { status: 400 }
+        )
+      }
+    }
 
     // Remove fields that shouldn't be updated
     const {
@@ -100,11 +180,10 @@ export async function PUT(
 
       if (fetchError) {
         console.error('Database error:', fetchError)
+        if (fetchError.code === 'PGRST116') { // Not found
+          return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
+        }
         return NextResponse.json({ error: 'Failed to fetch current invoice' }, { status: 500 })
-      }
-
-      if (!currentInvoice) {
-        return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
       }
 
       // Use nullish coalescing to preserve zero values
@@ -184,6 +263,27 @@ export async function DELETE(
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check authorization - verify user has access to this invoice
+    const { data: invoiceAuth, error: fetchError } = await supabase
+      .from('invoices')
+      .select('id, created_by, patient_id')
+      .eq('id', id)
+      .single()
+
+    if (fetchError || !invoiceAuth) {
+      return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
+    }
+
+    // Verify user owns this invoice or has appropriate role
+    const userRole = session.user.user_metadata?.role || session.user.app_metadata?.role
+    const isAdmin = userRole === 'admin'
+    const isManager = userRole === 'manager'
+    const ownsInvoice = invoiceAuth.created_by === session.user.id
+
+    if (!ownsInvoice && !isAdmin && !isManager) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Update status to cancelled instead of hard delete

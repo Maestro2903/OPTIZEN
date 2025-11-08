@@ -683,10 +683,16 @@ export const revenueApi = {
   create: (data: Omit<RevenueTransaction, 'id' | 'created_at' | 'updated_at'>) =>
     apiService.create<RevenueTransaction>('revenue', data),
 
-  getSummary: (params: { month?: string; year?: string; date_from?: string; date_to?: string } = {}) =>
-    apiService.fetchApi<RevenueSummary>('/revenue/summary', {
+  getSummary: (params: { month?: string; year?: string; date_from?: string; date_to?: string } = {}) => {
+    const queryParams = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value) queryParams.append(key, String(value))
+    })
+    const query = queryParams.toString() ? `?${queryParams.toString()}` : ''
+    return apiService.fetchApi<RevenueSummary>(`/revenue/summary${query}`, {
       method: 'GET',
-    }),
+    })
+  },
 }
 
 // ===============================
@@ -823,9 +829,16 @@ export class RealtimeService {
     callback: (payload: any) => void,
     filter?: string
   ) {
+    const channelConfig: any = { event: '*', schema: 'public', table: tableName }
+    
+    // Apply filter if provided (format: "column=eq.value")
+    if (filter) {
+      channelConfig.filter = filter
+    }
+
     const channel = this.supabase
       .channel(`public:${tableName}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: tableName }, callback)
+      .on('postgres_changes', channelConfig, callback)
       .subscribe()
 
     return channel

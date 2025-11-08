@@ -4,11 +4,11 @@ import { NextRequest, NextResponse } from 'next/server'
 // GET /api/master-data/[id] - Get a specific master data item by ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient()
-    const { id } = params
+    const { id } = await params
 
     // Check authentication
     const { data: { session } } = await supabase.auth.getSession()
@@ -45,11 +45,11 @@ export async function GET(
 // PUT /api/master-data/[id] - Update a master data item
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient()
-    const { id } = params
+    const { id } = await params
 
     // Check authentication
     const { data: { session } } = await supabase.auth.getSession()
@@ -96,9 +96,58 @@ export async function PUT(
 
     // Check if there's anything to update
     if (Object.keys(updateData).length === 0) {
-      return NextResponse.json({ 
-        error: 'No valid fields to update. Allowed fields: ' + allowedFields.join(', ') 
+      return NextResponse.json({
+        error: 'No valid fields to update. Allowed fields: ' + allowedFields.join(', ')
       }, { status: 400 })
+    }
+
+    // Validate field values
+    if (updateData.name !== undefined) {
+      if (typeof updateData.name !== 'string' || updateData.name.trim().length === 0) {
+        return NextResponse.json({
+          error: 'name must be a non-empty string'
+        }, { status: 400 })
+      }
+    }
+
+    if (updateData.description !== undefined) {
+      if (typeof updateData.description !== 'string') {
+        return NextResponse.json({
+          error: 'description must be a string'
+        }, { status: 400 })
+      }
+    }
+
+    if (updateData.sort_order !== undefined) {
+      if (typeof updateData.sort_order !== 'number' || updateData.sort_order < 0 || !Number.isInteger(updateData.sort_order)) {
+        return NextResponse.json({
+          error: 'sort_order must be a non-negative integer'
+        }, { status: 400 })
+      }
+    }
+
+    if (updateData.is_active !== undefined) {
+      if (typeof updateData.is_active !== 'boolean') {
+        return NextResponse.json({
+          error: 'is_active must be a boolean'
+        }, { status: 400 })
+      }
+    }
+
+    if (updateData.metadata !== undefined) {
+      if (updateData.metadata !== null && (typeof updateData.metadata !== 'object' || Array.isArray(updateData.metadata))) {
+        return NextResponse.json({
+          error: 'metadata must be an object or null'
+        }, { status: 400 })
+      }
+    }
+
+    if (updateData.value !== undefined) {
+      if (typeof updateData.value !== 'string' && typeof updateData.value !== 'number') {
+        return NextResponse.json({
+          error: 'value must be a string or number'
+        }, { status: 400 })
+      }
     }
 
     // Add updated_at timestamp

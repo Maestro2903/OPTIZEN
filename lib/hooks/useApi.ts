@@ -152,8 +152,8 @@ export function useApiList<T>(
 
   // Fetch data on mount and when params change
   useEffect(() => {
-    fetchData()
-  }, [fetchData])
+    fetchData(params)
+  }, [fetchData, params])
 
   const updateParams = useCallback((newParams: Partial<typeof params>) => {
     setParams(prev => ({ ...prev, ...newParams }))
@@ -339,7 +339,6 @@ export function useApiDelete() {
     options: {
       onSuccess?: () => void
       onError?: (error: string) => void
-      confirmMessage?: string
       successMessage?: string
     } = {}
   ): Promise<boolean> => {
@@ -354,7 +353,6 @@ export function useApiDelete() {
         toast({
           title: 'Deleted',
           description: successMessage || response.message || 'Item deleted successfully',
-          variant: 'destructive',
         })
 
         onSuccess?.()

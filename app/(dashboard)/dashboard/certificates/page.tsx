@@ -69,14 +69,23 @@ export default function CertificatesPage() {
   const handleDelete = async (certificateId: string) => {
     try {
       setIsLoading(true)
-      // TODO: Replace with actual API call
-      // await fetch(`/api/certificates/${certificateId}`, { method: 'DELETE' })
-
-      // For now, remove from local state
+      
+      // TODO: Replace with actual API call when endpoint is ready
+      // const response = await fetch(`/api/certificates/${certificateId}`, { method: 'DELETE' })
+      // if (!response.ok) throw new Error('Failed to delete certificate')
+      
+      // Simulate API call for now
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // Only update local state after successful API response
       setCertificatesList(prev => prev.filter(c => c.id !== certificateId))
-      console.log("Certificate deleted:", certificateId)
+      
+      // TODO: Show success toast/notification to user
+      // toast({ title: 'Success', description: 'Certificate deleted successfully' })
     } catch (error) {
       console.error("Error deleting certificate:", error)
+      // TODO: Show error toast/notification to user  
+      // toast({ title: 'Error', description: 'Failed to delete certificate', variant: 'destructive' })
     } finally {
       setIsLoading(false)
     }
@@ -128,8 +137,10 @@ export default function CertificatesPage() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{certificatesList.length}</div>
-            <p className="text-xs text-muted-foreground">certificates</p>
+            {/* TODO: Filter by certificate date/issuedAt field for current month
+                Current: Shows total count instead of month-filtered count */}
+            <div className="text-lg font-bold">-</div>
+            <p className="text-xs text-muted-foreground">filtering not implemented</p>
           </CardContent>
         </Card>
         <Card>
@@ -148,8 +159,10 @@ export default function CertificatesPage() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{certificatesList.length}</div>
-            <p className="text-xs text-muted-foreground">certificates</p>
+            {/* TODO: Filter by certificate date/issuedAt field for current week
+                Current: Shows total count instead of week-filtered count */}
+            <div className="text-lg font-bold">-</div>
+            <p className="text-xs text-muted-foreground">filtering not implemented</p>
           </CardContent>
         </Card>
       </div>

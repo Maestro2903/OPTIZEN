@@ -54,9 +54,12 @@ export async function GET(request: NextRequest) {
     const supabase = createClient()
     const { searchParams } = new URL(request.url)
 
-    // Get query parameters
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '50')
+    // Get query parameters with safe parsing
+    const pageParam = parseInt(searchParams.get('page') || '1', 10)
+    const limitParam = parseInt(searchParams.get('limit') || '50', 10)
+
+    const page = Number.isNaN(pageParam) ? 1 : Math.max(1, pageParam)
+    const limit = Number.isNaN(limitParam) ? 50 : Math.min(100, Math.max(1, limitParam))
     const search = searchParams.get('search') || ''
     const sortBy = searchParams.get('sortBy') || 'bed_number'
     const sortOrder = searchParams.get('sortOrder') || 'asc'

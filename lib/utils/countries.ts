@@ -101,6 +101,7 @@ export const statesByCountry: Record<string, { value: string; label: string }[]>
     { value: "Vermont", label: "Vermont" },
     { value: "Virginia", label: "Virginia" },
     { value: "Washington", label: "Washington" },
+    { value: "Washington D.C.", label: "Washington D.C." },
     { value: "West Virginia", label: "West Virginia" },
     { value: "Wisconsin", label: "Wisconsin" },
     { value: "Wyoming", label: "Wyoming" },

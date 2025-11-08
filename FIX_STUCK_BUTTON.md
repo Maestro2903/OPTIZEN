@@ -20,8 +20,9 @@ Your form is **filled correctly** but the button gets stuck because:
 
 **Go to Supabase Dashboard:**
 ```
-https://supabase.com/dashboard/project/wtrkwqagxphqkwmtbhtd/editor
+https://supabase.com/dashboard/project/<YOUR_SUPABASE_PROJECT_ID>/editor
 ```
+> **Note:** Replace `<YOUR_SUPABASE_PROJECT_ID>` with your actual Supabase project ID. Find it in your Supabase project settings or from your project URL.
 
 **Click SQL Editor and paste this:**
 
@@ -89,13 +90,13 @@ EXECUTE FUNCTION update_updated_at_column();
 1. **Close the patient form** (click X or Cancel)
 2. **Refresh the page** (press F5)
 3. **Click "+ Add Patient" again**
-4. **Fill the form** (you can copy from your screenshot):
-   - Full Name: SHREE SHANTH R
-   - Date of Birth: 21/11/2025
+4. **Fill the form** (example with test data):
+   - Full Name: John Doe
+   - Date of Birth: 01/01/1990
    - Gender: Male
-   - Email: shreeshanthr06@gmail.com
-   - Mobile: 6382765347
-   - State: Tamil Nadu
+   - Email: patient@example.com
+   - Mobile: 9876543210
+   - State: Karnataka
 5. **Click "Add Patient"**
 
 ✅ **Should work now!**
@@ -135,8 +136,8 @@ If you DON'T have login credentials yet:
 **Symptoms:** Red text appears under fields
 
 **Required Fields:**
-- ✅ Full Name (minimum 2 characters)
-- ✅ Mobile (10 digits: 6382765347)
+- ✅ Full Name (minimum 2 characters, e.g., "John Doe")
+- ✅ Mobile (10 digits, e.g., "9876543210")
 - ✅ Gender (select from dropdown)
 - ✅ State (select from dropdown)
 
@@ -240,32 +241,54 @@ document.cookie.includes('sb-access-token')
 
 ## 📞 Emergency Quick Fix Script
 
-Copy/paste this in terminal:
+Copy/paste this in terminal (replace YOUR_PROJECT_ID with your Supabase project ID):
 
 ```bash
 #!/bin/bash
 echo "🔧 Emergency Patient Fix"
 echo ""
 
-# Check if server running
-if curl -s http://localhost:3000/api/patients > /dev/null 2>&1; then
-  echo "✅ Server running on port 3000"
-elif curl -s http://localhost:3001/api/patients > /dev/null 2>&1; then
-  echo "✅ Server running on port 3001"
-else
-  echo "❌ Server not running!"
-  echo "   Run: npm run dev"
+# Set your Supabase project ID
+SUPABASE_PROJECT_ID="${SUPABASE_PROJECT_ID:-<YOUR_SUPABASE_PROJECT_ID>}"
+
+# Check if server running on common ports
+SERVER_RUNNING=false
+for PORT in 3000 3001 5173 8000; do
+  if curl -s --max-time 2 http://localhost:$PORT/api/health > /dev/null 2>&1 || \
+     curl -s --max-time 2 http://localhost:$PORT/api/patients > /dev/null 2>&1; then
+    echo "✅ Server running on port $PORT"
+    SERVER_RUNNING=true
+    SERVER_PORT=$PORT
+    break
+  fi
+done
+
+if [ "$SERVER_RUNNING" = false ]; then
+  echo "❌ Server not running on common ports (3000, 3001, 5173, 8000)"
+  echo "   Checked: /api/health and /api/patients endpoints"
+  echo ""
+  echo "💡 Start your server with:"
+  echo "   npm run dev"
+  echo "   # or"
+  echo "   yarn dev"
   exit 1
 fi
 
 echo ""
 echo "📋 Next steps:"
-echo "1. Go to: https://supabase.com/dashboard/project/wtrkwqagxphqkwmtbhtd/editor"
-echo "2. Run the SQL from Step 2 above"
-echo "3. Login to your app"
+echo "1. Go to: https://supabase.com/dashboard (navigate to your project)"
+echo "   Or direct link: https://supabase.com/dashboard/project/$SUPABASE_PROJECT_ID/editor"
+echo "2. Open SQL Editor and run the migration from Step 2 above"
+echo "3. Login to your app at: http://localhost:$SERVER_PORT/auth/login"
 echo "4. Try adding patient again"
 echo ""
-echo "🔍 Check browser console (F12) for actual error!"
+echo "🔍 Debug checklist:"
+echo "   - Browser console (F12) shows any errors?"
+echo "   - Are you logged in? Check for 'sb-access-token' cookie"
+echo "   - Does 'patients' table exist in Supabase?"
+echo ""
+echo "📊 Test your API directly:"
+echo "   curl http://localhost:$SERVER_PORT/api/patients"
 ```
 
 ---

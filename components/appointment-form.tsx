@@ -110,12 +110,14 @@ export function AppointmentForm({ children, appointmentData, mode = "create", on
 
   // Load doctors from employees
   React.useEffect(() => {
+    const controller = new AbortController()
+
     const loadDoctors = async () => {
       if (!isOpen) return
       setLoadingDoctors(true)
       try {
         const response = await employeesApi.list({ role: 'Doctor', limit: 1000, status: 'active' })
-        if (response.success && response.data) {
+        if (response.success && response.data && !controller.signal.aborted) {
           setDoctors(
             response.data.map((doctor) => ({
               value: doctor.id,
@@ -123,28 +125,40 @@ export function AppointmentForm({ children, appointmentData, mode = "create", on
             }))
           )
         }
-      } catch (error) {
+      } catch (error: any) {
+        if (error.name === 'AbortError') return
         console.error("Error loading doctors:", error)
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to load doctors list."
-        })
+        if (!controller.signal.aborted) {
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Failed to load doctors list."
+          })
+        }
       } finally {
-        setLoadingDoctors(false)
+        if (!controller.signal.aborted) {
+          setLoadingDoctors(false)
+        }
       }
     }
+
     loadDoctors()
+
+    return () => {
+      controller.abort()
+    }
   }, [isOpen, toast])
 
   // Load room types from master data
   React.useEffect(() => {
+    const controller = new AbortController()
+
     const loadRooms = async () => {
       if (!isOpen) return
       setLoadingRooms(true)
       try {
         const response = await masterDataApi.list({ category: 'room_types', limit: 100 })
-        if (response.success && response.data) {
+        if (response.success && response.data && !controller.signal.aborted) {
           setRooms(
             response.data.map((room) => ({
               value: room.name,
@@ -152,23 +166,52 @@ export function AppointmentForm({ children, appointmentData, mode = "create", on
             }))
           )
         }
-      } catch (error) {
+      } catch (error: any) {
+        if (error.name === 'AbortError') return
         console.error("Error loading rooms:", error)
         // Non-critical, don't show error toast
       } finally {
         setLoadingRooms(false)
       }
     }
+
     loadRooms()
+
+    return () => {
+      controller.abort()
+    }
   }, [isOpen])
 
   async function onSubmit(values: z.infer<typeof appointmentSchema>) {
     try {
-      if (onSubmitProp) {
-        await onSubmitProp(values)
+      if (!onSubmitProp) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "No submission handler provided."
+        })
+        return
       }
+
+      await onSubmitProp(values)
       setIsOpen(false)
-      form.reset()
+
+      // Reset form to original values in edit mode, defaults in create mode
+      if (mode === "edit" && appointmentData) {
+        form.reset({
+          patient_id: appointmentData.patient_id || "",
+          provider_id: appointmentData.provider_id || "",
+          appointment_date: appointmentData.appointment_date || "",
+          start_time: appointmentData.start_time || "",
+          end_time: appointmentData.end_time || "",
+          type: appointmentData.type || "consult",
+          room: appointmentData.room || "",
+          notes: appointmentData.notes || "",
+        })
+      } else {
+        form.reset()
+      }
+
       toast({
         title: "Success",
         description: mode === "edit" ? "Appointment updated successfully." : "Appointment booked successfully."

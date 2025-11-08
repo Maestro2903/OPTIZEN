@@ -49,16 +49,30 @@ export default function DischargesPage() {
 
   // Function to handle delete with API integration
   const handleDelete = async (dischargeId: string) => {
+    // Prevent concurrent deletes
+    if (isLoading) return
+
     try {
       setIsLoading(true)
-      // TODO: Replace with actual API call
-      // await fetch(`/api/discharges/${dischargeId}`, { method: 'DELETE' })
-
-      // For now, remove from local state
+      
+      // TODO: Replace with actual API call when endpoint is ready
+      // const response = await fetch(`/api/discharges/${dischargeId}`, { method: 'DELETE' })
+      // if (!response.ok) {
+      //   throw new Error('Failed to delete discharge')
+      // }
+      
+      // Simulate API call for now
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // Only update local state after successful API response
       setDischargeList(prev => prev.filter(d => d.id !== dischargeId))
-      console.log("Discharge deleted:", dischargeId)
+      
+      // TODO: Show success toast/notification to user
+      // toast({ title: 'Success', description: 'Discharge deleted successfully' })
     } catch (error) {
       console.error("Error deleting discharge:", error)
+      // TODO: Show error toast/notification to user
+      // toast({ title: 'Error', description: 'Failed to delete discharge', variant: 'destructive' })
     } finally {
       setIsLoading(false)
     }
@@ -311,7 +325,13 @@ export default function DischargesPage() {
                             description="Are you sure you want to delete this discharge record? This action cannot be undone."
                             onConfirm={() => handleDelete(discharge.id)}
                           >
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" title="Delete">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-destructive" 
+                              title="Delete"
+                              disabled={isLoading}
+                            >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </DeleteConfirmDialog>

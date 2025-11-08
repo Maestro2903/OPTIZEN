@@ -198,6 +198,7 @@ export default function AppointmentsPage() {
       { id: "scheduled", label: "Scheduled" },
       { id: "completed", label: "Completed" },
       { id: "cancelled", label: "Cancelled" },
+      { id: "no-show", label: "No-Show" },
     ],
     sortOptions: [
       { id: "appointment_date", label: "Date & Time" },
@@ -365,7 +366,16 @@ export default function AppointmentsPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          {/* TODO: Implement view appointment dialog/modal
+                              Add onClick handler to show appointment details in a modal */}
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8"
+                            onClick={() => alert(`View appointment:\n\nPatient: ${appointment.patients?.full_name || appointment.patient_id}\nDate: ${appointment.appointment_date}\nTime: ${appointment.appointment_time}\nStatus: ${appointment.status}`)}
+                            title="View appointment details"
+                            aria-label="View appointment details"
+                          >
                             <Eye className="h-4 w-4" />
                           </Button>
                           <Button

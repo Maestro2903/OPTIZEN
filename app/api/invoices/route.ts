@@ -75,9 +75,12 @@ export async function GET(request: NextRequest) {
         )
       `, { count: 'exact' })
 
-    // Apply search filter (note: nested table search requires referencedTable option)
+    // Apply search filter - separate parent table and joined table searches
     if (search) {
-      query = query.or(`invoice_number.ilike.%${search}%,patients.full_name.ilike.%${search}%,patients.mobile.ilike.%${search}%`, { referencedTable: 'patients' })
+      // Search in invoice columns (parent table)
+      query = query.or(`invoice_number.ilike.%${search}%`)
+      // Search in patient columns (joined table)
+      query = query.or(`full_name.ilike.%${search}%,mobile.ilike.%${search}%`, { referencedTable: 'patients' })
     }
 
     // Parse and validate status parameter (supports arrays)

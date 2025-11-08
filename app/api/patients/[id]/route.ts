@@ -142,6 +142,16 @@ export async function PUT(
       }
     }
 
+    // Validate status field if present
+    if (updateData.status !== undefined) {
+      const allowedStatuses = ['active', 'inactive']
+      if (!allowedStatuses.includes(updateData.status)) {
+        return NextResponse.json({
+          error: `Invalid status value. Allowed values: ${allowedStatuses.join(', ')}`
+        }, { status: 400 })
+      }
+    }
+
     // Check if there's anything to update
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({
@@ -196,12 +206,19 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(id)) {
+      return NextResponse.json({ error: 'Invalid patient ID format' }, { status: 400 })
+    }
+
     // Soft delete by updating status to inactive
     const { data: patient, error } = await supabase
       .from('patients')
       .update({
         status: 'inactive',
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        updated_by: session.user.id
       })
       .eq('id', id)
       .select()

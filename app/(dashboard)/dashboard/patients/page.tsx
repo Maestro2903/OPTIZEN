@@ -183,10 +183,10 @@ export default function PatientsPage() {
         }
       } else {
         // Create new patient
-        // Generate collision-resistant patient ID
-        const timestamp = Date.now()
-        const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase()
-        const patientId = `PAT-${timestamp}-${randomSuffix}`
+        // Generate globally unique patient ID using crypto.randomUUID()
+        // This eliminates collision risk under concurrent requests
+        const uuid = crypto.randomUUID().replace(/-/g, '').substring(0, 12).toUpperCase()
+        const patientId = `PAT-${uuid}`
         
         const result = await createPatient(
           () => patientsApi.create({
@@ -219,7 +219,7 @@ export default function PatientsPage() {
       email: patient.email || "",
       mobile: patient.mobile,
       gender: patient.gender,
-      country: (patient as any).country || "India",
+      country: patient.country ?? "India",
       state: patient.state || "",
       address: patient.address || "",
       city: patient.city || "",

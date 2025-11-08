@@ -6,6 +6,42 @@
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createClientClient } from '@/lib/supabase/client'
 
+/**
+ * Secure logger that redacts sensitive information
+ * For production, replace with a proper logging service (DataDog, Sentry, etc.)
+ */
+const secureLogger = {
+  error: (message: string, context?: Record<string, any>) => {
+    // In production, use a proper logging service
+    // For now, log only non-sensitive information
+    const safeContext = context ? {
+      timestamp: context.timestamp || new Date().toISOString(),
+      userId: context.userId ? `user-${context.userId.substring(0, 8)}***` : undefined,
+      action: context.action,
+      errorType: context.errorType,
+      // Redact any PII/PHI fields
+    } : {}
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.error(`[AUDIT ERROR] ${message}`, safeContext)
+    }
+    // In production, send to logging service
+  },
+  
+  warn: (message: string, context?: Record<string, any>) => {
+    const safeContext = context ? {
+      timestamp: context.timestamp || new Date().toISOString(),
+      userId: context.userId ? `user-${context.userId.substring(0, 8)}***` : undefined,
+      action: context.action,
+    } : {}
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(`[AUDIT WARNING] ${message}`, safeContext)
+    }
+    // In production, send to logging service
+  }
+}
+
 export interface AuditLogEntry {
   id?: string
   user_id: string
@@ -85,13 +121,21 @@ export class AuditService {
         }])
 
       if (error) {
-        console.error('Error logging audit activity:', error)
+        secureLogger.error('Failed to log audit activity', {
+          userId: entry.user_id,
+          action: entry.action,
+          errorType: 'database_error'
+        })
         return { success: false, error: error.message }
       }
 
       return { success: true }
     } catch (error) {
-      console.error('Error in logActivity:', error)
+      secureLogger.error('Exception in logActivity', {
+        userId: entry.user_id,
+        action: entry.action,
+        errorType: 'exception'
+      })
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
   }
@@ -101,7 +145,8 @@ export class AuditService {
    */
   async logFinancialActivity(entry: FinancialAuditEntry): Promise<{ success: boolean; error?: string }> {
     try {
-      const { data, error } = await this.supabase
+      // Use a transaction-like approach: both operations must succeed
+      const { data: financialData, error: financialError } = await this.supabase
         .from('financial_audit_logs')
         .insert([{
           ...entry,
@@ -109,13 +154,17 @@ export class AuditService {
           created_at: new Date().toISOString()
         }])
 
-      if (error) {
-        console.error('Error logging financial audit:', error)
-        return { success: false, error: error.message }
+      if (financialError) {
+        secureLogger.error('Failed to log financial audit', {
+          userId: entry.user_id,
+          action: entry.transaction_type,
+          errorType: 'database_error'
+        })
+        return { success: false, error: financialError.message }
       }
 
       // Also log in general audit log for comprehensive tracking
-      await this.logActivity({
+      const activityResult = await this.logActivity({
         user_id: entry.user_id,
         action: entry.transaction_type,
         table_name: 'financial_transactions',
@@ -129,9 +178,22 @@ export class AuditService {
         ip_address: entry.ip_address
       })
 
+      if (!activityResult.success) {
+        secureLogger.error('Failed to log general activity for financial transaction', {
+          userId: entry.user_id,
+          action: entry.transaction_type,
+          errorType: 'incomplete_audit'
+        })
+        return { success: false, error: 'Incomplete audit trail: ' + activityResult.error }
+      }
+
       return { success: true }
     } catch (error) {
-      console.error('Error in logFinancialActivity:', error)
+      secureLogger.error('Exception in logFinancialActivity', {
+        userId: entry.user_id,
+        action: entry.transaction_type,
+        errorType: 'exception'
+      })
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
   }
@@ -141,20 +203,25 @@ export class AuditService {
    */
   async logMedicalActivity(entry: MedicalAuditEntry): Promise<{ success: boolean; error?: string }> {
     try {
-      const { data, error } = await this.supabase
+      // Use a transaction-like approach: both operations must succeed
+      const { data: medicalData, error: medicalError } = await this.supabase
         .from('medical_audit_logs')
         .insert([{
           ...entry,
           created_at: new Date().toISOString()
         }])
 
-      if (error) {
-        console.error('Error logging medical audit:', error)
-        return { success: false, error: error.message }
+      if (medicalError) {
+        secureLogger.error('Failed to log medical audit', {
+          userId: entry.user_id,
+          action: entry.action,
+          errorType: 'database_error'
+        })
+        return { success: false, error: medicalError.message }
       }
 
       // Also log in general audit log
-      await this.logActivity({
+      const activityResult = await this.logActivity({
         user_id: entry.user_id,
         action: entry.action,
         table_name: 'medical_records',
@@ -170,9 +237,22 @@ export class AuditService {
         ip_address: entry.ip_address
       })
 
+      if (!activityResult.success) {
+        secureLogger.error('Failed to log general activity for medical activity', {
+          userId: entry.user_id,
+          action: entry.action,
+          errorType: 'incomplete_audit'
+        })
+        return { success: false, error: 'Incomplete audit trail: ' + activityResult.error }
+      }
+
       return { success: true }
     } catch (error) {
-      console.error('Error in logMedicalActivity:', error)
+      secureLogger.error('Exception in logMedicalActivity', {
+        userId: entry.user_id,
+        action: entry.action,
+        errorType: 'exception'
+      })
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
   }
@@ -191,13 +271,21 @@ export class AuditService {
         }])
 
       if (error) {
-        console.error('Error logging session activity:', error)
+        secureLogger.error('Failed to log session activity', {
+          userId: entry.user_id,
+          action: entry.action,
+          errorType: 'database_error'
+        })
         return { success: false, error: error.message }
       }
 
       return { success: true }
     } catch (error) {
-      console.error('Error in logSessionActivity:', error)
+      secureLogger.error('Exception in logSessionActivity', {
+        userId: entry.user_id,
+        action: entry.action,
+        errorType: 'exception'
+      })
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
   }
@@ -326,6 +414,11 @@ export class AuditService {
         query = query.eq('table_name', filters.tableName)
       }
 
+      // Apply patient_id filter if provided
+      if (filters.patientId) {
+        query = query.eq('patient_id', filters.patientId)
+      }
+
       query = query
         .order('created_at', { ascending: false })
         .range(filters.offset || 0, (filters.offset || 0) + (filters.limit || 100) - 1)
@@ -390,60 +483,131 @@ export class AuditService {
   }
 
   /**
-   * Generate compliance report
+   * Generate compliance report with pagination to avoid OOM
+   * For large date ranges, use aggregation instead of fetching all records
    */
   async generateComplianceReport(
     startDate: string,
     endDate: string,
-    reportType?: 'financial' | 'medical' | 'security' | 'all'
+    reportType?: 'financial' | 'medical' | 'security' | 'all',
+    options?: {
+      maxRecords?: number  // Default: 1000, Max: 5000
+      aggregateOnly?: boolean  // Only return summary, not details
+    }
   ): Promise<{ data: any; error?: string }> {
     try {
-      const filters: any = { startDate, endDate }
+      const maxRecords = Math.min(options?.maxRecords || 1000, 5000) // Cap at 5000
+      const aggregateOnly = options?.aggregateOnly || false
 
-      // Get audit logs based on report type
-      let auditData
-      if (reportType === 'financial') {
-        const { data } = await this.supabase
-          .from('financial_audit_logs')
-          .select('*')
-          .gte('created_at', startDate)
-          .lte('created_at', endDate)
-        auditData = data
-      } else if (reportType === 'medical') {
-        const { data } = await this.supabase
-          .from('medical_audit_logs')
-          .select('*')
-          .gte('created_at', startDate)
-          .lte('created_at', endDate)
-        auditData = data
-      } else {
-        const { data } = await this.getAuditLogs({ ...filters, limit: 10000 })
-        auditData = data
-      }
-
-      // Generate summary statistics
-      const summary = {
-        totalActivities: auditData?.length || 0,
-        uniqueUsers: new Set(auditData?.map((log: any) => log.user_id)).size,
+      // Use DB-side aggregation for summary statistics
+      let summaryData: any = {
+        totalActivities: 0,
+        uniqueUsers: 0,
         activityBreakdown: {} as Record<string, number>,
         timeRange: { startDate, endDate },
         reportType: reportType || 'all',
         generatedAt: new Date().toISOString()
       }
 
+      // Get counts and aggregations from database
+      if (reportType === 'financial') {
+        const { count } = await this.supabase
+          .from('financial_audit_logs')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', startDate)
+          .lte('created_at', endDate)
+        
+        summaryData.totalActivities = count || 0
+      } else if (reportType === 'medical') {
+        const { count } = await this.supabase
+          .from('medical_audit_logs')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', startDate)
+          .lte('created_at', endDate)
+        
+        summaryData.totalActivities = count || 0
+      } else {
+        const result = await this.getAuditLogs({ 
+          startDate, 
+          endDate, 
+          limit: 1,  // Just get count
+          offset: 0 
+        })
+        summaryData.totalActivities = result.count || 0
+      }
+
+      // If aggregate only, return summary without details
+      if (aggregateOnly || summaryData.totalActivities > maxRecords) {
+        secureLogger.warn('Returning aggregate-only report due to large dataset', {
+          action: 'generateComplianceReport',
+          totalActivities: summaryData.totalActivities,
+          maxRecords
+        })
+
+        return {
+          data: {
+            summary: {
+              ...summaryData,
+              note: summaryData.totalActivities > maxRecords 
+                ? `Full details omitted: ${summaryData.totalActivities} records exceed maximum of ${maxRecords}. Use date filters or pagination.`
+                : 'Aggregate summary only'
+            },
+            details: null
+          }
+        }
+      }
+
+      // For smaller datasets, fetch details with pagination
+      let auditData: any[] = []
+      
+      if (reportType === 'financial') {
+        const { data } = await this.supabase
+          .from('financial_audit_logs')
+          .select('*')
+          .gte('created_at', startDate)
+          .lte('created_at', endDate)
+          .limit(maxRecords)
+          .order('created_at', { ascending: false })
+        auditData = data || []
+      } else if (reportType === 'medical') {
+        const { data } = await this.supabase
+          .from('medical_audit_logs')
+          .select('*')
+          .gte('created_at', startDate)
+          .lte('created_at', endDate)
+          .limit(maxRecords)
+          .order('created_at', { ascending: false })
+        auditData = data || []
+      } else {
+        const result = await this.getAuditLogs({ 
+          startDate, 
+          endDate, 
+          limit: maxRecords,
+          offset: 0 
+        })
+        auditData = result.data
+      }
+
+      // Calculate summary statistics from fetched data
+      summaryData.uniqueUsers = new Set(auditData.map((log: any) => log.user_id)).size
+      
       // Count activities by action
-      auditData?.forEach((log: any) => {
+      auditData.forEach((log: any) => {
         const action = log.action || log.transaction_type
-        summary.activityBreakdown[action] = (summary.activityBreakdown[action] || 0) + 1
+        summaryData.activityBreakdown[action] = (summaryData.activityBreakdown[action] || 0) + 1
       })
 
       return {
         data: {
-          summary,
+          summary: summaryData,
           details: auditData,
         }
       }
     } catch (error) {
+      secureLogger.error('Failed to generate compliance report', {
+        action: 'generateComplianceReport',
+        errorType: 'exception'
+      })
       return {
         data: null,
         error: error instanceof Error ? error.message : 'Unknown error'

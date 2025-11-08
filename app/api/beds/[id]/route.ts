@@ -7,7 +7,14 @@ export async function PUT(
 ) {
   try {
     const supabase = createClient()
-    const { id } = params
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+    const { id } = await params
     const body = await request.json()
 
     const { data: bed, error } = await supabase
@@ -89,6 +96,16 @@ export async function DELETE(
 ) {
   try {
     const supabase = createClient()
+
+    // Authentication check
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
     const { id } = params
 
     // Check if bed has active assignments

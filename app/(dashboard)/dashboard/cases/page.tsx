@@ -83,10 +83,10 @@ export default function CasesPage() {
 
   const handleAddCase = async (caseData: any) => {
     try {
-      // Generate collision-resistant case number
-      const timestamp = Date.now()
-      const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase()
-      const caseNumber = `OPT${new Date().getFullYear()}${timestamp.toString().slice(-6)}-${randomSuffix}`
+      // Generate globally unique case number using crypto.randomUUID()
+      // This eliminates collision risk under concurrent requests
+      const uuid = crypto.randomUUID().replace(/-/g, '').substring(0, 12).toUpperCase()
+      const caseNumber = `OPT${new Date().getFullYear()}-${uuid}`
       
       const result = await createCase(
         () => casesApi.create({
@@ -205,27 +205,38 @@ export default function CasesPage() {
             <FolderOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {/* TODO: Replace with API aggregate count instead of filtering current page */}
+            {/* TODO - HIGH PRIORITY: Replace with API aggregate count
+                Current implementation only counts active cases on current page (misleading).
+                Use /api/cases/metrics endpoint for accurate total count.
+                See FINAL_HANDOFF_DOCUMENTATION.md for metrics API details. */}
             <div className="text-2xl font-bold">{cases.filter(c => c.status === "active").length}</div>
-            <p className="text-xs text-muted-foreground">on this page</p>
+            <p className="text-xs text-muted-foreground">
+              ⚠️ Current page only (use metrics API for total)
+            </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">This Month</CardTitle>
+            <CardTitle className="text-sm font-medium">Completed (Page)</CardTitle>
             <FolderOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
+            {/* TODO: Add month filter to API query for accurate current month count
+                Current: Shows completed cases from current page only
+                Needed: Filter by created_at >= startOfMonth AND created_at < startOfNextMonth */}
             <div className="text-2xl font-bold">{cases.filter(c => c.status === "completed").length}</div>
-            <p className="text-xs text-muted-foreground">completed</p>
+            <p className="text-xs text-muted-foreground">⚠️ Current page only</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completed</CardTitle>
+            <CardTitle className="text-sm font-medium">Encounters</CardTitle>
             <FolderOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
+            {/* TODO: Use completion date instead of encounter date for "Completed today"
+                Current: Filters by encounter_date (when case started)
+                Needed: Filter by completion date when status changed to 'completed' */}
             <div className="text-2xl font-bold">{cases.filter(c => c.encounter_date === new Date().toISOString().split('T')[0]).length}</div>
             <p className="text-xs text-muted-foreground">today</p>
           </CardContent>

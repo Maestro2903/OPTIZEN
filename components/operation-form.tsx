@@ -36,7 +36,6 @@ const operationFormSchema = z.object({
   operation_date: z.string().min(1, "Operation date is required"),
   begin_time: z.string().optional(),
   end_time: z.string().optional(),
-  duration: z.string().optional(),
   eye: z.string().optional(),
   sys_diagnosis: z.string().optional(),
   anesthesia: z.string().optional(),
@@ -48,12 +47,35 @@ const operationFormSchema = z.object({
   print_notes: z.boolean().optional(),
   print_payment: z.boolean().optional(),
   print_iol: z.boolean().optional(),
+  status: z.string().optional(),
 })
+
+export interface OperationData {
+  id?: string
+  patient_id: string
+  case_id?: string
+  operation_name: string
+  operation_date: string
+  begin_time?: string
+  end_time?: string
+  eye?: string
+  sys_diagnosis?: string
+  anesthesia?: string
+  operation_notes?: string
+  payment_mode?: string
+  amount?: number
+  iol_name?: string
+  iol_power?: string
+  print_notes?: boolean
+  print_payment?: boolean
+  print_iol?: boolean
+  status?: string
+}
 
 interface OperationFormProps {
   children: React.ReactNode
-  onSubmit?: (data: any) => void
-  operationData?: any
+  onSubmit?: (data: OperationData) => Promise<void>
+  operationData?: OperationData
   mode?: "create" | "edit"
 }
 
@@ -70,45 +92,84 @@ export function OperationForm({ children, onSubmit, operationData, mode = "creat
   const form = useForm<z.infer<typeof operationFormSchema>>({
     resolver: zodResolver(operationFormSchema),
     defaultValues: {
-      patient_id: operationData?.patient_id || "",
-      case_id: operationData?.case_id || "",
-      operation_name: operationData?.operation_name || "",
-      operation_date: operationData?.operation_date || new Date().toISOString().split('T')[0],
-      begin_time: operationData?.begin_time || "",
-      end_time: operationData?.end_time || "",
-      duration: operationData?.duration || "",
-      eye: operationData?.eye || "",
-      sys_diagnosis: operationData?.sys_diagnosis || "",
-      anesthesia: operationData?.anesthesia || "",
-      operation_notes: operationData?.operation_notes || "",
-      payment_mode: operationData?.payment_mode || "",
-      amount: operationData?.amount?.toString() || "",
-      iol_name: operationData?.iol_name || "",
-      iol_power: operationData?.iol_power || "",
-      print_notes: operationData?.print_notes || false,
-      print_payment: operationData?.print_payment || false,
-      print_iol: operationData?.print_iol || false,
+      patient_id: "",
+      case_id: "",
+      operation_name: "",
+      operation_date: new Date().toISOString().split('T')[0],
+      begin_time: "",
+      end_time: "",
+      eye: "",
+      sys_diagnosis: "",
+      anesthesia: "",
+      operation_notes: "",
+      payment_mode: "",
+      amount: "",
+      iol_name: "",
+      iol_power: "",
+      print_notes: false,
+      print_payment: false,
+      print_iol: false,
+      status: "",
     },
   })
 
   const selectedPatientId = form.watch("patient_id")
+
+  // Reset form when dialog opens or operationData changes
+  React.useEffect(() => {
+    if (open) {
+      form.reset({
+        patient_id: operationData?.patient_id || "",
+        case_id: operationData?.case_id || "",
+        operation_name: operationData?.operation_name || "",
+        operation_date: operationData?.operation_date || new Date().toISOString().split('T')[0],
+        begin_time: operationData?.begin_time || "",
+        end_time: operationData?.end_time || "",
+        eye: operationData?.eye || "",
+        sys_diagnosis: operationData?.sys_diagnosis || "",
+        anesthesia: operationData?.anesthesia || "",
+        operation_notes: operationData?.operation_notes || "",
+        payment_mode: operationData?.payment_mode || "",
+        amount: operationData?.amount?.toString() || "",
+        iol_name: operationData?.iol_name || "",
+        iol_power: operationData?.iol_power || "",
+        print_notes: operationData?.print_notes || false,
+        print_payment: operationData?.print_payment || false,
+        print_iol: operationData?.print_iol || false,
+        status: operationData?.status || "",
+      })
+    }
+  }, [open, operationData, form])
 
   // Load patients
   React.useEffect(() => {
     const loadPatients = async () => {
       setLoadingPatients(true)
       try {
-        const response = await patientsApi.list({ limit: 1000 })
+        const response = await patientsApi.list({})
         if (response.success && response.data) {
           setPatients(
-            response.data.map((patient) => ({
-              value: patient.id,
-              label: `${patient.full_name} (${patient.patient_id})`,
-            }))
+            response.data
+              .filter((patient) => patient?.id && patient?.full_name && patient?.patient_id)
+              .map((patient) => ({
+                value: patient.id,
+                label: `${patient.full_name} (${patient.patient_id})`,
+              }))
           )
+        } else {
+          toast({
+            title: "Failed to load patients",
+            description: "Unable to fetch patient list. Please try again.",
+            variant: "destructive",
+          })
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error loading patients:", error)
+        toast({
+          title: "Failed to load patients",
+          description: error?.message ?? "An unexpected error occurred",
+          variant: "destructive",
+        })
       } finally {
         setLoadingPatients(false)
       }
@@ -116,7 +177,7 @@ export function OperationForm({ children, onSubmit, operationData, mode = "creat
     if (open) {
       loadPatients()
     }
-  }, [open])
+  }, [open, toast])
 
   // Load cases for selected patient
   React.useEffect(() => {
@@ -127,17 +188,30 @@ export function OperationForm({ children, onSubmit, operationData, mode = "creat
       }
       setLoadingCases(true)
       try {
-        const response = await casesApi.list({ patient_id: selectedPatientId, limit: 100 })
+        const response = await casesApi.list({ patient_id: selectedPatientId })
         if (response.success && response.data) {
           setCases(
-            response.data.map((caseItem) => ({
-              value: caseItem.id,
-              label: `${caseItem.case_no} - ${caseItem.diagnosis || 'No diagnosis'}`,
-            }))
+            response.data
+              .filter((caseItem) => caseItem?.id && caseItem?.case_no)
+              .map((caseItem) => ({
+                value: caseItem.id,
+                label: `${caseItem.case_no} - ${caseItem.diagnosis || 'No diagnosis'}`,
+              }))
           )
+        } else {
+          toast({
+            title: "Failed to load cases",
+            description: "Unable to fetch cases for this patient.",
+            variant: "destructive",
+          })
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error loading cases:", error)
+        toast({
+          title: "Failed to load cases",
+          description: error?.message ?? "An unexpected error occurred",
+          variant: "destructive",
+        })
       } finally {
         setLoadingCases(false)
       }
@@ -145,24 +219,37 @@ export function OperationForm({ children, onSubmit, operationData, mode = "creat
     if (open && selectedPatientId) {
       loadCases()
     }
-  }, [selectedPatientId, open])
+  }, [selectedPatientId, open, toast])
 
   // Load surgery types from master data
   React.useEffect(() => {
     const loadSurgeryTypes = async () => {
       setLoadingSurgeries(true)
       try {
-        const response = await masterDataApi.list({ category: 'surgery_types', limit: 100 })
+        const response = await masterDataApi.list({ category: 'surgery_types' })
         if (response.success && response.data) {
           setSurgeryTypes(
-            response.data.map((item) => ({
-              value: item.name,
-              label: item.name,
-            }))
+            response.data
+              .filter((item) => item?.name)
+              .map((item) => ({
+                value: item.name,
+                label: item.name,
+              }))
           )
+        } else {
+          toast({
+            title: "Failed to load surgery types",
+            description: "Unable to fetch surgery types. Please try again.",
+            variant: "destructive",
+          })
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error loading surgery types:", error)
+        toast({
+          title: "Failed to load surgery types",
+          description: error?.message ?? "An unexpected error occurred",
+          variant: "destructive",
+        })
       } finally {
         setLoadingSurgeries(false)
       }
@@ -170,18 +257,31 @@ export function OperationForm({ children, onSubmit, operationData, mode = "creat
     if (open) {
       loadSurgeryTypes()
     }
-  }, [open])
+  }, [open, toast])
 
   async function handleSubmit(values: z.infer<typeof operationFormSchema>) {
     try {
-      const operationData = {
+      const parsedAmount = values.amount ? parseFloat(values.amount) : undefined
+      
+      // Validate amount if provided
+      if (values.amount && !Number.isFinite(parsedAmount)) {
+        toast({
+          variant: "destructive",
+          title: "Invalid Amount",
+          description: "Please enter a valid amount.",
+        })
+        return
+      }
+
+      const submitData: OperationData = {
         ...values,
-        amount: values.amount ? parseFloat(values.amount) : undefined,
-        status: 'scheduled' as const,
+        amount: parsedAmount,
+        // Preserve existing status for edits, default to 'scheduled' for new operations
+        status: values.status || operationData?.status || 'scheduled',
       }
       
       if (onSubmit) {
-        await onSubmit(operationData)
+        await onSubmit(submitData)
       }
       
       setOpen(false)
@@ -190,12 +290,14 @@ export function OperationForm({ children, onSubmit, operationData, mode = "creat
         title: "Success",
         description: mode === "create" ? "Operation scheduled successfully." : "Operation updated successfully.",
       })
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error submitting operation:", error)
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to schedule operation. Please try again.",
+        description: mode === "create" 
+          ? "Failed to schedule operation. Please try again."
+          : "Failed to update operation. Please try again.",
       })
     }
   }

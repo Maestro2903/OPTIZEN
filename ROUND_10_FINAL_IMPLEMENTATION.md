@@ -696,9 +696,18 @@ const totalRevenue = metrics.total_revenue
 
 ### Low Priority (Sprint 2)
 
-7. **Backend ID Generation**
-   - Move patient/case/invoice ID generation server-side
-   - Prevents ID collisions completely
+7. **Backend ID Generation - CRITICAL TOCTOU FIX REQUIRED**
+   - **Issue:** `lib/utils/id-generator.ts` has TOCTOU race conditions in most generators
+   - **Current Problem:** Read-then-write pattern allows collisions under concurrent load
+   - **Required Fix:** Replace with atomic server-side ID allocation:
+     * **For SQL:** Use database sequences/serial IDs or `INSERT ... RETURNING` with unique constraints inside a transaction
+     * **For NoSQL:** Use atomic increment/update operations (e.g., `findOneAndUpdate` with `$inc` and `returnNewDocument/upsert`)
+     * **Alternative:** Use collision-free UUIDv4/v6 if monotonic sequencing is not required
+   - **Action Items:**
+     * Add proper uniqueness constraints in the datastore
+     * Add tests simulating concurrent requests to verify no collisions
+     * Mark as **HIGH PRIORITY** before production deployment
+   - **Risk:** ID collisions can cause data integrity issues, duplicate records, and audit trail problems
 
 8. **Export Functionality**
    - Implement CSV/PDF exports

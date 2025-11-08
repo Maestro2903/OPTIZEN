@@ -99,9 +99,21 @@ export default function AttendancePage() {
   // Load attendance summary
   React.useEffect(() => {
     const loadSummary = async () => {
-      const response = await attendanceApi.getSummary({ date: selectedDate })
-      if (response.success && response.data) {
-        setAttendanceSummary(response.data)
+      try {
+        const response = await attendanceApi.getSummary({ date: selectedDate })
+        if (response.success && response.data) {
+          setAttendanceSummary(response.data)
+        } else {
+          throw new Error(response.error || 'Failed to load attendance summary')
+        }
+      } catch (err) {
+        console.error('Failed to load attendance summary:', err)
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: err instanceof Error ? err.message : "Failed to load attendance summary"
+        })
+        // Keep previous summary data on error (don't clear with null due to TypeScript constraints)
       }
     }
     loadSummary()

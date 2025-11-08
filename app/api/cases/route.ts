@@ -64,9 +64,14 @@ export async function GET(request: NextRequest) {
         )
       `, { count: 'exact' })
 
-    // Apply search filter
+    // Apply search filter with sanitization to prevent wildcard injection
     if (search) {
-      query = query.or(`case_no.ilike.%${search}%,patients.full_name.ilike.%${search}%,patients.email.ilike.%${search}%,patients.mobile.ilike.%${search}%`)
+      // Escape special wildcard characters: backslash first, then % and _
+      const sanitizedSearch = search
+        .replace(/\\/g, '\\\\')
+        .replace(/%/g, '\\%')
+        .replace(/_/g, '\\_')
+      query = query.or(`case_no.ilike.%${sanitizedSearch}%,patients.full_name.ilike.%${sanitizedSearch}%,patients.email.ilike.%${sanitizedSearch}%,patients.mobile.ilike.%${sanitizedSearch}%`)
     }
 
     // Parse and validate status parameter (supports arrays)

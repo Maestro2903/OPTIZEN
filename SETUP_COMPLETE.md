@@ -3,10 +3,12 @@
 ## Configuration Applied
 
 ### 1. Supabase Credentials Configured
-- **Project URL**: `https://wtrkwqagxphqkwmtbhtd.supabase.co`
+- **Project URL**: `https://<your-project>.supabase.co` (configured in `.env.local` as `NEXT_PUBLIC_SUPABASE_URL`)
 - **Anon Key**: Configured in `.env.local`
 - **Service Role Key**: Configured in `.env.local`
 - **Access Token**: Configured in `.env.local`
+
+> **Note:** Replace `<your-project>` with your actual Supabase project reference. Never commit real project identifiers to version control.
 
 ### 2. Security Verified
 - ✅ `.env.local` is in `.gitignore`
@@ -33,14 +35,14 @@ Run the migrations to set up your database schema:
 # Install Supabase CLI if not already installed
 npm install -g supabase
 
-# Link to your project
-supabase link --project-ref wtrkwqagxphqkwmtbhtd
+# Link to your project (replace <PROJECT_REF> with your actual project reference)
+supabase link --project-ref <PROJECT_REF>
 
 # Run migrations
 supabase db push
 
 # Or apply migrations manually via Supabase Dashboard
-# Dashboard: https://supabase.com/dashboard/project/wtrkwqagxphqkwmtbhtd
+# Dashboard: https://supabase.com/dashboard/project/<PROJECT_REF>
 ```
 
 ### 2. Run Database Migrations
@@ -55,8 +57,11 @@ Apply the migration files in order:
 
 ### 3. Seed Initial Data (Optional)
 ```bash
-# Apply seed data
-psql -h db.wtrkwqagxphqkwmtbhtd.supabase.co -U postgres -d postgres -f supabase/seed.sql
+# Apply seed data (replace <DB_HOST> with your database host)
+# Find your DB host in Supabase Dashboard → Settings → Database
+psql -h <DB_HOST> -U postgres -d postgres -f supabase/seed.sql
+
+# Example: psql -h db.your-project.supabase.co -U postgres -d postgres -f supabase/seed.sql
 ```
 
 ### 4. Start Development Server

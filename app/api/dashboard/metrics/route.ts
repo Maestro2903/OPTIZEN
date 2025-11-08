@@ -9,7 +9,7 @@ import { requirePermission } from '@/lib/middleware/rbac'
 
 // GET /api/dashboard/metrics - Get all dashboard metrics
 export async function GET(request: NextRequest) {
-  // Authorization check - any authenticated user can view dashboard metrics
+  // Authorization check - requires patients view permission
   const authCheck = await requirePermission('patients', 'view')
   if (!authCheck.authorized) return authCheck.response
 
@@ -86,12 +86,14 @@ export async function GET(request: NextRequest) {
     const completedCases = casesResult.data?.filter(c => c.status === 'completed').length || 0
 
     // Process invoices metrics
-    const totalRevenue = invoicesResult.data?.reduce((sum, inv) => 
-      sum + (parseFloat(inv.total_amount) || 0), 0
-    ) || 0
-    const totalPaid = invoicesResult.data?.reduce((sum, inv) => 
-      sum + (parseFloat(inv.amount_paid) || 0), 0
-    ) || 0
+    const totalRevenue = invoicesResult.data?.reduce((sum, inv) => {
+      const val = parseFloat(inv.total_amount)
+      return sum + (Number.isFinite(val) ? val : 0)
+    }, 0) || 0
+    const totalPaid = invoicesResult.data?.reduce((sum, inv) => {
+      const val = parseFloat(inv.amount_paid)
+      return sum + (Number.isFinite(val) ? val : 0)
+    }, 0) || 0
     const totalPending = totalRevenue - totalPaid
     const paidInvoices = invoicesResult.data?.filter(i => i.status === 'paid').length || 0
     const unpaidInvoices = invoicesResult.data?.filter(i => 

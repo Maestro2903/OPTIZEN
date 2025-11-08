@@ -95,53 +95,81 @@ export function PharmacyItemForm({ children, itemData, mode = "create", onSubmit
 
   // Load categories from master data
   React.useEffect(() => {
+    const abortController = new AbortController()
+    let cancelled = false
+
+    const FALLBACK_CATEGORIES = [
+      { value: "Analgesics", label: "Analgesics" },
+      { value: "Antibiotics", label: "Antibiotics" },
+      { value: "Eye Drops", label: "Eye Drops" },
+      { value: "Eye Ointments", label: "Eye Ointments" },
+      { value: "Antiseptics", label: "Antiseptics" },
+      { value: "Vitamins", label: "Vitamins" },
+      { value: "Anti-inflammatory", label: "Anti-inflammatory" },
+      { value: "Other", label: "Other" },
+    ]
+
     const loadCategories = async () => {
       if (!isOpen) return
       setLoadingCategories(true)
       try {
         const response = await masterDataApi.list({ category: 'medicine_categories', limit: 100 })
+        if (cancelled) return
+
         if (response.success && response.data && response.data.length > 0) {
-          setCategories(
-            response.data.map((item) => ({
-              value: item.name,
-              label: item.name,
-            }))
-          )
+          if (!cancelled) {
+            setCategories(
+              response.data.map((item) => ({
+                value: item.name,
+                label: item.name,
+              }))
+            )
+          }
         } else {
-          // Fallback to default categories if not in master data
-          setCategories([
-            { value: "Analgesics", label: "Analgesics" },
-            { value: "Antibiotics", label: "Antibiotics" },
-            { value: "Eye Drops", label: "Eye Drops" },
-            { value: "Eye Ointments", label: "Eye Ointments" },
-            { value: "Antiseptics", label: "Antiseptics" },
-            { value: "Vitamins", label: "Vitamins" },
-            { value: "Anti-inflammatory", label: "Anti-inflammatory" },
-            { value: "Other", label: "Other" },
-          ])
+          if (!cancelled) {
+            setCategories(FALLBACK_CATEGORIES)
+          }
         }
-      } catch (error) {
-        console.error("Error loading categories:", error)
-        // Use fallback
-        setCategories([
-          { value: "Analgesics", label: "Analgesics" },
-          { value: "Antibiotics", label: "Antibiotics" },
-          { value: "Eye Drops", label: "Eye Drops" },
-          { value: "Eye Ointments", label: "Eye Ointments" },
-          { value: "Other", label: "Other" },
-        ])
+      } catch (error: any) {
+        if (!cancelled) {
+          console.error("Error loading categories:", error)
+          setCategories(FALLBACK_CATEGORIES)
+          if (error?.name !== 'AbortError') {
+            toast({
+              title: "Failed to load categories",
+              description: "Using default categories. " + (error?.message ?? ""),
+              variant: "destructive",
+            })
+          }
+        }
       } finally {
-        setLoadingCategories(false)
+        if (!cancelled) {
+          setLoadingCategories(false)
+        }
       }
     }
+    
     loadCategories()
-  }, [isOpen])
+
+    return () => {
+      cancelled = true
+      abortController.abort()
+    }
+  }, [isOpen, toast])
 
   async function onSubmit(values: z.infer<typeof pharmacyItemSchema>) {
     try {
-      if (onSubmitProp) {
-        await onSubmitProp(values)
+      if (!onSubmitProp) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "No submit handler provided. Please contact support."
+        })
+        return
       }
+
+      await onSubmitProp(values)
+      
       setIsOpen(false)
       form.reset()
       toast({

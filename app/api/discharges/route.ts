@@ -4,14 +4,35 @@ import { createClient } from '@/lib/supabase/server'
 export async function GET(request: NextRequest) {
   try {
     const supabase = createClient()
+
+    // Authentication check
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
     const { searchParams } = new URL(request.url)
 
     // Get query parameters
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '10')
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '10')))
     const search = searchParams.get('search') || ''
-    const sortBy = searchParams.get('sortBy') || 'discharge_date'
+    const sortByParam = searchParams.get('sortBy') || 'discharge_date'
     const sortOrder = searchParams.get('sortOrder') || 'desc'
+
+    // Validate sortBy against whitelist
+    const allowedSortColumns = [
+      'discharge_date',
+      'admission_date',
+      'discharge_type',
+      'status',
+      'created_at',
+      'updated_at'
+    ]
+    const sortBy = allowedSortColumns.includes(sortByParam) ? sortByParam : 'discharge_date'
     const patient_id = searchParams.get('patient_id')
     const case_id = searchParams.get('case_id')
     const status = searchParams.get('status')
@@ -38,10 +59,24 @@ export async function GET(request: NextRequest) {
           diagnosis
         )
       `, { count: 'exact' })
+      .is('deleted_at', null)
 
     // Apply filters
     if (search) {
-      query = query.or(`patients.full_name.ilike.%${search}%, discharge_summary.ilike.%${search}%, instructions.ilike.%${search}%`)
+      // First, find patient IDs that match the search term
+      const { data: matchingPatients } = await supabase
+        .from('patients')
+        .select('id')
+        .ilike('full_name', `%${search}%`)
+
+      const patientIds = matchingPatients?.map(p => p.id) || []
+
+      // Apply search to discharge fields and patient IDs
+      if (patientIds.length > 0) {
+        query = query.or(`discharge_summary.ilike.%${search}%,instructions.ilike.%${search}%,patient_id.in.(${patientIds.join(',')})`)
+      } else {
+        query = query.or(`discharge_summary.ilike.%${search}%,instructions.ilike.%${search}%`)
+      }
     }
 
     if (patient_id) {
@@ -102,7 +137,53 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = createClient()
+
+    // Authentication check
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
     const body = await request.json()
+
+    // Validate required fields
+    const requiredFields = ['patient_id', 'case_id', 'discharge_date']
+    for (const field of requiredFields) {
+      if (!body[field]) {
+        return NextResponse.json(
+          { success: false, error: `${field} is required` },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Validate UUID fields
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(body.patient_id)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid patient_id format' },
+        { status: 400 }
+      )
+    }
+
+    if (!uuidRegex.test(body.case_id)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid case_id format' },
+        { status: 400 }
+      )
+    }
+
+    // Validate discharge_date format (ISO date)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/
+    if (!dateRegex.test(body.discharge_date)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid discharge_date format (expected YYYY-MM-DD)' },
+        { status: 400 }
+      )
+    }
 
     const { data: discharge, error } = await supabase
       .from('discharges')

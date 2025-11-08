@@ -3,24 +3,103 @@ import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   try {
+    // Authentication check
     const supabase = createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
+
+    // Authorization check - verify user has financial access
+    // TODO: Implement proper role-based authorization
+    // For now, requiring any authenticated user
+
     const { searchParams } = new URL(request.url)
 
-    const month = searchParams.get('month')
-    const year = searchParams.get('year')
+    // Get and validate query parameters
+    const rawMonth = searchParams.get('month')
+    const rawYear = searchParams.get('year')
     const date_from = searchParams.get('date_from')
     const date_to = searchParams.get('date_to')
+
+    // Validate month parameter
+    let month: number | null = null
+    if (rawMonth) {
+      const parsedMonth = parseInt(rawMonth)
+      if (Number.isInteger(parsedMonth) && parsedMonth >= 1 && parsedMonth <= 12) {
+        month = parsedMonth
+      } else {
+        return NextResponse.json(
+          { success: false, error: 'Invalid month. Must be between 1 and 12' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Validate year parameter
+    let year: number | null = null
+    if (rawYear) {
+      const parsedYear = parseInt(rawYear)
+      const currentYear = new Date().getFullYear()
+      if (Number.isInteger(parsedYear) && parsedYear >= 1900 && parsedYear <= currentYear + 10) {
+        year = parsedYear
+      } else {
+        return NextResponse.json(
+          { success: false, error: `Invalid year. Must be between 1900 and ${currentYear + 10}` },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Validate date parameters if present
+    let parsedDateFrom: Date | null = null
+    let parsedDateTo: Date | null = null
+
+    if (date_from) {
+      parsedDateFrom = new Date(date_from)
+      if (isNaN(parsedDateFrom.getTime())) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid date_from format. Use ISO date format' },
+          { status: 400 }
+        )
+      }
+    }
+
+    if (date_to) {
+      parsedDateTo = new Date(date_to)
+      if (isNaN(parsedDateTo.getTime())) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid date_to format. Use ISO date format' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Validate date range
+    if (parsedDateFrom && parsedDateTo && parsedDateFrom > parsedDateTo) {
+      return NextResponse.json(
+        { success: false, error: 'date_from must be before or equal to date_to' },
+        { status: 400 }
+      )
+    }
 
     // Build date filters
     let startDate: string
     let endDate: string
-    
-    if (month && year) {
-      startDate = `${year}-${month.padStart(2, '0')}-01`
-      endDate = `${year}-${month.padStart(2, '0')}-31`
-    } else if (date_from && date_to) {
-      startDate = date_from
-      endDate = date_to
+
+    if (month !== null && year !== null) {
+      const monthStr = month.toString().padStart(2, '0')
+      startDate = `${year}-${monthStr}-01`
+      // Calculate last day of month correctly
+      const lastDay = new Date(year, month, 0).getDate()
+      endDate = `${year}-${monthStr}-${lastDay.toString().padStart(2, '0')}`
+    } else if (parsedDateFrom && parsedDateTo) {
+      startDate = date_from!
+      endDate = date_to!
     } else {
       // Default to current month
       const now = new Date()

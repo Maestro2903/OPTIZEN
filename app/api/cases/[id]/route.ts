@@ -221,8 +221,13 @@ export async function DELETE(
       return NextResponse.json({ error: 'Case not found' }, { status: 404 })
     }
 
-    // TODO: Check authorization - user must own the case or have appropriate role
-    // For now, any authenticated user can delete cases
+    // Check authorization - user must own the case or have appropriate role
+    // TODO: Also check for admin role or assigned doctor role
+    if (existingCase.created_by !== session.user.id) {
+      return NextResponse.json({ 
+        error: 'Forbidden: You do not have permission to delete this case' 
+      }, { status: 403 })
+    }
 
     // Soft delete by updating status to cancelled
     const { data: encounter, error } = await supabase

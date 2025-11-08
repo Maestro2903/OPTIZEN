@@ -17,6 +17,25 @@ export type UserRole =
   | 'billing_staff'
   | 'patient'
 
+// Valid user roles for runtime validation
+const VALID_USER_ROLES: readonly UserRole[] = [
+  'super_admin',
+  'hospital_admin',
+  'receptionist',
+  'optometrist',
+  'ophthalmologist',
+  'technician',
+  'billing_staff',
+  'patient'
+] as const
+
+/**
+ * Type guard to validate user role at runtime
+ */
+export function isUserRole(value: unknown): value is UserRole {
+  return typeof value === 'string' && (VALID_USER_ROLES as readonly string[]).includes(value)
+}
+
 export interface RBACContext {
   user_id: string
   role: UserRole
@@ -164,7 +183,7 @@ export const PERMISSIONS: Record<UserRole, {
 }
 
 /**
- * Get user role from database
+ * Get user role from database with runtime validation
  */
 export async function getUserContext(): Promise<RBACContext | null> {
   try {
@@ -187,9 +206,15 @@ export async function getUserContext(): Promise<RBACContext | null> {
       return null
     }
 
+    // Runtime validation of user role
+    if (!isUserRole(user.role)) {
+      console.error('Invalid user role from database - session:', session.user.id.substring(0, 8) + '...')
+      return null
+    }
+
     return {
       user_id: user.id,
-      role: user.role as UserRole,
+      role: user.role,
       email: user.email
     }
   } catch (error) {

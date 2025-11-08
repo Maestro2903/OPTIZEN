@@ -1,6 +1,19 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
+// Allowed master data categories
+const ALLOWED_CATEGORIES = [
+  'departments',
+  'specializations',
+  'insurance_types',
+  'appointment_types',
+  'payment_methods',
+  'document_types',
+  'medication_types',
+  'operation_types',
+  'discharge_types'
+]
+
 // GET /api/master-data - List master data items by category with pagination
 export async function GET(request: NextRequest) {
   try {
@@ -8,7 +21,16 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
 
     // Extract and validate query parameters
-    const category = searchParams.get('category') || ''
+    const categoryParam = searchParams.get('category') || ''
+
+    // Validate category against allowlist
+    const category = ALLOWED_CATEGORIES.includes(categoryParam) ? categoryParam : ''
+
+    if (categoryParam && !category) {
+      return NextResponse.json({
+        error: `Invalid category. Allowed categories: ${ALLOWED_CATEGORIES.join(', ')}`
+      }, { status: 400 })
+    }
     let page = parseInt(searchParams.get('page') || '1', 10)
     let limit = parseInt(searchParams.get('limit') || '100', 10)
     const search = searchParams.get('search') || ''
@@ -46,25 +68,29 @@ export async function GET(request: NextRequest) {
 
     // If no category specified, return all categories with counts
     if (!category) {
-      const { data: categories, error } = await supabase
-        .from('master_data')
-        .select('category, id')
+      // Use database aggregation instead of fetching all rows
+      const { data: categoryCounts, error } = await supabase
+        .rpc('get_category_counts')
 
       if (error) {
-        console.error('Database error:', error)
-        return NextResponse.json({ error: 'Failed to fetch categories' }, { status: 500 })
+        // Fail hard when RPC is missing - requires database function setup
+        console.error('RPC get_category_counts not available - database function setup required:', error)
+        return NextResponse.json({
+          error: 'Database function get_category_counts is not available. Please ensure database setup is complete.',
+          details: 'Required stored procedure missing'
+        }, { status: 500 })
       }
 
-      // Group by category and count
-      const categoryCounts = categories?.reduce((acc: Record<string, number>, item) => {
-        acc[item.category] = (acc[item.category] || 0) + 1
+      // Transform RPC result to expected format
+      const counts = categoryCounts?.reduce((acc: Record<string, number>, item: any) => {
+        acc[item.category] = item.count
         return acc
       }, {}) || {}
 
       return NextResponse.json({
         success: true,
-        data: categoryCounts,
-        categories: Object.keys(categoryCounts).sort()
+        data: counts,
+        categories: Object.keys(counts).sort()
       })
     }
 
@@ -158,6 +184,39 @@ export async function POST(request: NextRequest) {
         { error: 'Missing required fields: category, name' },
         { status: 400 }
       )
+    }
+
+    // Validate category against allowlist
+    if (!ALLOWED_CATEGORIES.includes(category)) {
+      return NextResponse.json(
+        { error: `Invalid category. Allowed categories: ${ALLOWED_CATEGORIES.join(', ')}` },
+        { status: 400 }
+      )
+    }
+
+    // Validate types and constraints
+    if (typeof category !== 'string' || category.length > 100) {
+      return NextResponse.json({ error: 'Invalid category' }, { status: 400 })
+    }
+
+    if (typeof name !== 'string' || name.length < 1 || name.length > 255) {
+      return NextResponse.json({ error: 'Invalid name length' }, { status: 400 })
+    }
+
+    if (description && (typeof description !== 'string' || description.length > 1000)) {
+      return NextResponse.json({ error: 'Invalid description' }, { status: 400 })
+    }
+
+    if (typeof is_active !== 'boolean') {
+      return NextResponse.json({ error: 'Invalid is_active type' }, { status: 400 })
+    }
+
+    if (typeof sort_order !== 'number' || sort_order < 0 || !Number.isInteger(sort_order)) {
+      return NextResponse.json({ error: 'Invalid sort_order' }, { status: 400 })
+    }
+
+    if (metadata !== null && (typeof metadata !== 'object' || Array.isArray(metadata))) {
+      return NextResponse.json({ error: 'Invalid metadata type' }, { status: 400 })
     }
 
     // Get the next sort order if not provided

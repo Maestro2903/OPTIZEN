@@ -1,5 +1,27 @@
 # ❌ UNABLE TO ADD PATIENTS - SOLUTION
 
+## Prerequisites: Environment Setup
+
+Before following this guide, ensure your environment variables are configured:
+
+1. Copy `.env.example` to `.env.local`:
+   ```bash
+   cp .env.example .env.local
+   ```
+
+2. Add your Supabase credentials to `.env.local`:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
+   SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+   ```
+
+3. **Never commit `.env.local` to version control!** (It's already in `.gitignore`)
+
+4. Find your credentials in Supabase Dashboard → Settings → API
+
+---
+
 ## 🎯 Root Cause
 The issue is caused by **authentication requirement** + **database schema mismatch**.
 
@@ -24,8 +46,8 @@ But the API expects:
 Go to your Supabase Dashboard and run the migration:
 
 ```bash
-# Open Supabase Dashboard
-https://supabase.com/dashboard/project/wtrkwqagxphqkwmtbhtd
+# Open Supabase Dashboard (replace YOUR_PROJECT_ID with your actual project reference)
+https://supabase.com/dashboard/project/YOUR_PROJECT_ID
 
 # Navigate to: SQL Editor > New Query
 # Run the migration file: 012_fix_patients_schema.sql
@@ -34,8 +56,8 @@ https://supabase.com/dashboard/project/wtrkwqagxphqkwmtbhtd
 **OR** Use Supabase CLI:
 
 ```bash
-# Link to your project
-supabase link --project-ref wtrkwqagxphqkwmtbhtd
+# Link to your project (replace YOUR_PROJECT_ID with your actual project reference)
+supabase link --project-ref YOUR_PROJECT_ID
 
 # Push migrations
 supabase db push
@@ -52,7 +74,7 @@ supabase db push
 ### Step 2: Create Test User & Login
 
 #### Option A: Create User via Supabase Dashboard
-1. Go to https://supabase.com/dashboard/project/wtrkwqagxphqkwmtbhtd
+1. Go to your Supabase Dashboard: https://supabase.com/dashboard → Select your project
 2. Click **Authentication** → **Users**
 3. Click **Add User** → **Create User**
 4. Enter:
@@ -186,10 +208,10 @@ fi
 
 # Test 3: Supabase connection
 echo "3️⃣ Checking Supabase configuration..."
-if grep -q "wtrkwqagxphqkwmtbhtd" .env.local; then
-  echo "   ✅ Supabase URL configured"
+if grep -q "NEXT_PUBLIC_SUPABASE_URL" .env.local; then
+  echo "   ✅ Supabase URL configured in .env.local"
 else
-  echo "   ❌ Supabase URL not configured"
+  echo "   ❌ Supabase URL not configured - check .env.local"
 fi
 
 echo ""

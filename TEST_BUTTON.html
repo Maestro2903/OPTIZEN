@@ -20,10 +20,10 @@
   
   <form id="testForm">
     <label>Full Name *</label>
-    <input type="text" id="fullName" value="SHREE SHANTH R" required>
+    <input type="text" id="fullName" value="John Doe" required>
     
     <label>Mobile *</label>
-    <input type="text" id="mobile" value="6382765347" required>
+    <input type="text" id="mobile" value="5551234567" required>
     
     <label>Gender *</label>
     <select id="gender" required>
@@ -33,13 +33,13 @@
     </select>
     
     <label>State *</label>
-    <input type="text" id="state" value="Tamil Nadu" required>
+    <input type="text" id="state" value="Karnataka" required>
     
     <label>Email</label>
-    <input type="email" id="email" value="shreeshanthr06@gmail.com">
+    <input type="email" id="email" value="test@example.com">
     
     <label>Date of Birth</label>
-    <input type="date" id="dob" value="2025-11-21">
+    <input type="date" id="dob" value="1990-01-15">
     
     <button type="submit">Test Add Patient</button>
     <button type="button" onclick="checkAuth()">Check if Logged In</button>
@@ -110,11 +110,18 @@
       result.textContent = '⏳ Checking authentication...';
       result.className = '';
       
-      const hasCookie = document.cookie.includes('sb-access-token');
+      // Check for auth cookies without exposing sensitive token values
+      const hasAccessToken = document.cookie.includes('sb-access-token');
+      const hasRefreshToken = document.cookie.includes('sb-refresh-token');
       
-      if (hasCookie) {
+      if (hasAccessToken) {
         result.className = 'success';
-        result.textContent = '✅ You are logged in!\n\nCookies found:\n' + document.cookie.split(';').join('\n');
+        result.textContent = '✅ You are logged in!\n\n';
+        result.textContent += 'Authentication cookies found:\n';
+        result.textContent += '- sb-access-token: ✓ Present\n';
+        result.textContent += '- sb-refresh-token: ' + (hasRefreshToken ? '✓ Present' : '✗ Missing') + '\n\n';
+        result.textContent += '⚠️ For security, actual token values are not displayed.\n';
+        result.textContent += 'Use browser DevTools (F12 → Application → Cookies) to inspect if needed.';
       } else {
         result.className = 'error';
         result.textContent = '❌ NOT LOGGED IN\n\n';

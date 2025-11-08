@@ -74,47 +74,103 @@ export function DischargeForm({ children }: DischargeFormProps) {
 
   // Load data when dialog opens
   React.useEffect(() => {
+    const abortController = new AbortController()
+    let cancelled = false
+
     const loadData = async () => {
       if (!open) return
       
       // Load patients
       setLoadingPatients(true)
       try {
-        const response = await patientsApi.list({ limit: 1000, status: 'active' })
+        const response = await patientsApi.list({ status: 'active' })
+        if (cancelled) return
+        
         if (response.success && response.data) {
-          setPatients(
-            response.data.map((patient) => ({
+          const safePatients = response.data
+            .filter((patient) => patient?.id && patient?.full_name && patient?.patient_id)
+            .map((patient) => ({
               value: patient.id,
               label: `${patient.full_name} (${patient.patient_id})`,
             }))
-          )
+          
+          if (!cancelled) {
+            setPatients(safePatients)
+          }
+        } else {
+          if (!cancelled) {
+            toast({
+              title: "Failed to load patients",
+              description: "Unable to fetch patient list. Please try again.",
+              variant: "destructive",
+            })
+          }
         }
-      } catch (error) {
-        console.error("Error loading patients:", error)
+      } catch (error: any) {
+        if (!cancelled) {
+          console.error("Error loading patients:", error)
+          toast({
+            title: "Failed to load patients",
+            description: error?.message ?? "An unexpected error occurred",
+            variant: "destructive",
+          })
+        }
       } finally {
-        setLoadingPatients(false)
+        if (!cancelled) {
+          setLoadingPatients(false)
+        }
       }
 
       // Load operations
+      if (cancelled) return
       setLoadingOperations(true)
       try {
-        const response = await operationsApi.list({ limit: 500 })
+        const response = await operationsApi.list({})
+        if (cancelled) return
+        
         if (response.success && response.data) {
-          setOperations(
-            response.data.map((operation) => ({
+          const safeOperations = response.data
+            .filter((operation) => operation?.id)
+            .map((operation) => ({
               value: operation.id,
               label: `${operation.operation_name || 'Operation'} - ${operation.operation_date || 'N/A'}`,
             }))
-          )
+          
+          if (!cancelled) {
+            setOperations(safeOperations)
+          }
+        } else {
+          if (!cancelled) {
+            toast({
+              title: "Failed to load operations",
+              description: "Unable to fetch operations list. Please try again.",
+              variant: "destructive",
+            })
+          }
         }
-      } catch (error) {
-        console.error("Error loading operations:", error)
+      } catch (error: any) {
+        if (!cancelled) {
+          console.error("Error loading operations:", error)
+          toast({
+            title: "Failed to load operations",
+            description: error?.message ?? "An unexpected error occurred",
+            variant: "destructive",
+          })
+        }
       } finally {
-        setLoadingOperations(false)
+        if (!cancelled) {
+          setLoadingOperations(false)
+        }
       }
     }
+    
     loadData()
-  }, [open])
+
+    return () => {
+      cancelled = true
+      abortController.abort()
+    }
+  }, [open, toast])
 
   function onSubmit(values: z.infer<typeof dischargeFormSchema>) {
     console.log(values)

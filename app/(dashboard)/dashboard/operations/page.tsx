@@ -39,13 +39,24 @@ const statusColors = {
   'in-progress': "bg-yellow-100 text-yellow-700 border-yellow-200",
   completed: "bg-green-100 text-green-700 border-green-200",
   cancelled: "bg-red-100 text-red-700 border-red-200",
-}
+  unknown: "bg-gray-100 text-gray-700 border-gray-200", // fallback for unexpected status
+} as const
 
 const statusLabels = {
   scheduled: "Scheduled",
   'in-progress': "In Progress",
   completed: "Completed",
   cancelled: "Cancelled",
+  unknown: "Unknown", // fallback for unexpected status
+} as const
+
+// Helper to safely get status color/label
+const getStatusColor = (status: string): string => {
+  return statusColors[status as keyof typeof statusColors] ?? statusColors.unknown
+}
+
+const getStatusLabel = (status: string): string => {
+  return statusLabels[status as keyof typeof statusLabels] ?? statusLabels.unknown
 }
 
 export default function OperationsPage() {
@@ -365,9 +376,9 @@ export default function OperationsPage() {
                       <TableCell>
                         <Badge
                           variant="outline"
-                          className={statusColors[operation.status as keyof typeof statusColors]}
+                          className={getStatusColor(operation.status)}
                         >
-                          {statusLabels[operation.status as keyof typeof statusLabels]}
+                          {getStatusLabel(operation.status)}
                         </Badge>
                       </TableCell>
                       <TableCell>

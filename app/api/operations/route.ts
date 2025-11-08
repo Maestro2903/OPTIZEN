@@ -38,12 +38,41 @@ async function authenticate(request: NextRequest) {
 
 async function authorize(user: any, action: string) {
   // Check if user has appropriate permissions for operations
-  // This should be expanded based on your RBAC system
   const allowedRoles = ['admin', 'doctor', 'nurse']
 
-  // For now, we'll check if user has any role that allows medical operations
-  // In production, implement proper role-based authorization
-  return true // Placeholder - implement proper role checking
+  // Validate user object
+  if (!user) {
+    return false
+  }
+
+  // Get user role(s) - accumulate from all sources
+  let userRoles: string[] = []
+
+  // Check if user has a single role (string)
+  if (user.role && typeof user.role === 'string') {
+    userRoles.push(user.role.toLowerCase())
+  }
+
+  // Check if user has multiple roles (array) - concatenate to existing
+  if (user.roles && Array.isArray(user.roles)) {
+    userRoles = userRoles.concat(user.roles.map((role: string) => role.toLowerCase()))
+  }
+
+  // Check metadata for roles (common in auth providers)
+  if (user.user_metadata?.role && typeof user.user_metadata.role === 'string') {
+    userRoles.push(user.user_metadata.role.toLowerCase())
+  }
+
+  if (user.app_metadata?.role && typeof user.app_metadata.role === 'string') {
+    userRoles.push(user.app_metadata.role.toLowerCase())
+  }
+
+  // Deduplicate roles and normalize allowed roles to lowercase
+  const uniqueUserRoles = [...new Set(userRoles)]
+  const normalizedAllowedRoles = allowedRoles.map(role => role.toLowerCase())
+
+  // Check if user has any allowed role
+  return uniqueUserRoles.some(role => normalizedAllowedRoles.includes(role))
 }
 
 export async function GET(request: NextRequest) {
@@ -69,12 +98,24 @@ export async function GET(request: NextRequest) {
     const supabase = createClient()
     const { searchParams } = new URL(request.url)
 
-    // Get query parameters
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '10')
+    // Get query parameters with safe parsing
+    const pageParam = parseInt(searchParams.get('page') || '1', 10)
+    const limitParam = parseInt(searchParams.get('limit') || '10', 10)
+
+    // Validate and set defaults for NaN values, then clamp to ranges
+    const page = Number.isFinite(pageParam) ? Math.max(1, pageParam) : 1
+    const limit = Number.isFinite(limitParam) ? Math.min(100, Math.max(1, limitParam)) : 10
     const search = searchParams.get('search') || ''
-    const sortBy = searchParams.get('sortBy') || 'operation_date'
-    const sortOrder = searchParams.get('sortOrder') || 'desc'
+
+    // Validate sortBy parameter against whitelist
+    const allowedSorts = ['operation_date', 'operation_name', 'status', 'patient_id', 'case_id', 'begin_time', 'end_time', 'amount', 'created_at', 'updated_at']
+    const rawSortBy = searchParams.get('sortBy') || 'operation_date'
+    const sortBy = allowedSorts.includes(rawSortBy) ? rawSortBy : 'operation_date'
+
+    // Validate sortOrder parameter
+    const rawSortOrder = searchParams.get('sortOrder') || 'desc'
+    const sortOrder = ['asc', 'desc'].includes(rawSortOrder) ? rawSortOrder : 'desc'
+
     const patient_id = searchParams.get('patient_id')
     const case_id = searchParams.get('case_id')
     const status = searchParams.get('status')
@@ -104,7 +145,9 @@ export async function GET(request: NextRequest) {
 
     // Apply filters
     if (search) {
-      query = query.or(`operation_name.ilike.%${search}%, patients.full_name.ilike.%${search}%, operation_notes.ilike.%${search}%`)
+      // Search only in operation table columns to avoid nested relation issues
+      const searchPattern = `%${search}%`
+      query = query.or(`operation_name.ilike.${searchPattern},operation_notes.ilike.${searchPattern},procedure_details.ilike.${searchPattern}`)
     }
 
     if (patient_id) {

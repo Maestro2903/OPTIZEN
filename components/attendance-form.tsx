@@ -48,7 +48,7 @@ interface AttendanceFormProps {
   children: React.ReactNode
   attendanceData?: any
   mode?: "create" | "edit"
-  onSubmit?: (data: any) => Promise<void>
+  onSubmit?: (data: z.infer<typeof attendanceSchema>) => Promise<void>
 }
 
 export function AttendanceForm({ children, attendanceData, mode = "create", onSubmit: onSubmitProp }: AttendanceFormProps) {
@@ -102,9 +102,16 @@ export function AttendanceForm({ children, attendanceData, mode = "create", onSu
 
   async function onSubmit(values: z.infer<typeof attendanceSchema>) {
     try {
-      if (onSubmitProp) {
-        await onSubmitProp(values)
+      if (!onSubmitProp) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "No submission handler provided."
+        })
+        return
       }
+
+      await onSubmitProp(values)
       setIsOpen(false)
       form.reset()
       toast({

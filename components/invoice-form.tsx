@@ -6,7 +6,6 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
 import { patientsApi, casesApi } from "@/lib/services/api"
 import { useToast } from "@/hooks/use-toast"
 import {
@@ -71,11 +70,21 @@ interface InvoiceFormProps {
   onSubmit?: (data: any) => void
 }
 
+interface PatientOption {
+  value: string
+  label: string
+}
+
+interface CaseOption {
+  value: string
+  label: string
+}
+
 export function InvoiceForm({ children, invoiceData, mode = "add", onSubmit: onSubmitCallback }: InvoiceFormProps) {
   const { toast } = useToast()
   const [open, setOpen] = React.useState(false)
-  const [patients, setPatients] = React.useState<SearchableSelectOption[]>([])
-  const [patientCases, setPatientCases] = React.useState<any[]>([])
+  const [patients, setPatients] = React.useState<PatientOption[]>([])
+  const [patientCases, setPatientCases] = React.useState<CaseOption[]>([])
   const [loadingPatients, setLoadingPatients] = React.useState(false)
   const [loadingCases, setLoadingCases] = React.useState(false)
 
@@ -102,74 +111,121 @@ export function InvoiceForm({ children, invoiceData, mode = "add", onSubmit: onS
 
   // Load patients
   React.useEffect(() => {
+    const abortController = new AbortController()
+    let cancelled = false
+
     const loadPatients = async () => {
       if (!open) return
       setLoadingPatients(true)
       try {
-        const response = await patientsApi.list({ limit: 1000, status: 'active' })
+        const response = await patientsApi.list({ status: 'active' })
+        if (cancelled) return
+
         if (response.success && response.data) {
-          setPatients(
-            response.data.map((patient) => ({
+          const safePatients = response.data
+            .filter((patient) => patient?.id && patient?.full_name && patient?.patient_id)
+            .map((patient) => ({
               value: patient.id,
               label: `${patient.full_name} (${patient.patient_id})`,
             }))
-          )
+          
+          if (!cancelled) {
+            setPatients(safePatients)
+          }
+        } else {
+          if (!cancelled) {
+            toast({
+              title: "Failed to load patients",
+              description: "Unable to fetch patient list. Please try again.",
+              variant: "destructive",
+            })
+          }
         }
-      } catch (error) {
-        console.error("Error loading patients:", error)
+      } catch (error: any) {
+        if (!cancelled) {
+          console.error("Error loading patients:", error)
+          toast({
+            title: "Failed to load patients",
+            description: error?.message ?? "An unexpected error occurred",
+            variant: "destructive",
+          })
+        }
       } finally {
-        setLoadingPatients(false)
+        if (!cancelled) {
+          setLoadingPatients(false)
+        }
       }
     }
+    
     loadPatients()
-  }, [open])
+
+    return () => {
+      cancelled = true
+      abortController.abort()
+    }
+  }, [open, toast])
 
   // Watch patient selection
   const selectedPatientId = form.watch("patient_id")
 
   // Auto-load cases when patient selected
   React.useEffect(() => {
+    const abortController = new AbortController()
+    let cancelled = false
+
     const loadPatientCases = async () => {
       if (!selectedPatientId) {
         setPatientCases([])
-        form.setValue("case_id", "")
         return
       }
       
       setLoadingCases(true)
       try {
         const response = await casesApi.list({ patient_id: selectedPatientId })
+        if (cancelled) return
+
         if (response.success && response.data && response.data.length > 0) {
-          setPatientCases(response.data)
+          const safeCases = response.data
+            .filter((caseItem) => caseItem?.id && caseItem?.case_no)
+            .map((caseItem) => ({
+              value: caseItem.id,
+              label: `${caseItem.case_no} - ${caseItem.diagnosis || 'No diagnosis'}`,
+            }))
           
-          // Auto-select the most recent case
-          const mostRecentCase = response.data[0]
-          form.setValue("case_id", mostRecentCase.case_no)
-          
-          toast({
-            title: "Case auto-selected",
-            description: `Case ${mostRecentCase.case_no} has been automatically selected.`
-          })
+          if (!cancelled) {
+            setPatientCases(safeCases)
+          }
         } else {
+          if (!cancelled) {
+            setPatientCases([])
+          }
+        }
+      } catch (error: any) {
+        if (!cancelled) {
+          console.error("Error loading cases:", error)
           setPatientCases([])
-          form.setValue("case_id", "")
           toast({
-            title: "No cases found",
-            description: "This patient has no registered cases yet."
+            title: "Failed to load cases",
+            description: error?.message ?? "An unexpected error occurred",
+            variant: "destructive",
           })
         }
-      } catch (error) {
-        console.error("Error loading cases:", error)
-        setPatientCases([])
       } finally {
-        setLoadingCases(false)
+        if (!cancelled) {
+          setLoadingCases(false)
+        }
       }
     }
     
     if (selectedPatientId) {
       loadPatientCases()
     }
-  }, [selectedPatientId, form, toast])
+
+    return () => {
+      cancelled = true
+      abortController.abort()
+    }
+  }, [selectedPatientId, toast])
 
   const watchItems = form.watch("items")
   const watchDiscount = form.watch("discount_percent")
@@ -243,16 +299,24 @@ export function InvoiceForm({ children, invoiceData, mode = "add", onSubmit: onS
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Patient *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loadingPatients}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select patient" />
+                          <SelectValue placeholder={loadingPatients ? "Loading patients..." : "Select patient"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="PAT001">AARAV MEHTA</SelectItem>
-                        <SelectItem value="PAT002">NISHANT KAREKAR</SelectItem>
-                        <SelectItem value="PAT003">PRIYA NAIR</SelectItem>
+                        {loadingPatients ? (
+                          <SelectItem value="loading" disabled>Loading patients...</SelectItem>
+                        ) : patients.length === 0 ? (
+                          <SelectItem value="none" disabled>No patients available</SelectItem>
+                        ) : (
+                          patients.map((patient) => (
+                            <SelectItem key={patient.value} value={patient.value}>
+                              {patient.label}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -265,15 +329,30 @@ export function InvoiceForm({ children, invoiceData, mode = "add", onSubmit: onS
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Case (Optional)</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loadingCases || !selectedPatientId}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select case" />
+                          <SelectValue placeholder={
+                            !selectedPatientId 
+                              ? "Select a patient first" 
+                              : loadingCases 
+                              ? "Loading cases..." 
+                              : "Select case"
+                          } />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="CASE001">OPT250001</SelectItem>
-                        <SelectItem value="CASE002">OPT250002</SelectItem>
+                        {loadingCases ? (
+                          <SelectItem value="loading" disabled>Loading cases...</SelectItem>
+                        ) : patientCases.length === 0 ? (
+                          <SelectItem value="none" disabled>No cases available</SelectItem>
+                        ) : (
+                          patientCases.map((caseItem) => (
+                            <SelectItem key={caseItem.value} value={caseItem.value}>
+                              {caseItem.label}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />

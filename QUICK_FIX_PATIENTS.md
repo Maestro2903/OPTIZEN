@@ -65,11 +65,73 @@ CREATE INDEX idx_patients_status ON patients(status);
 -- Enable RLS
 ALTER TABLE patients ENABLE ROW LEVEL SECURITY;
 
--- Create policies (allows all authenticated users)
-CREATE POLICY "Allow authenticated read" ON patients FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Allow authenticated insert" ON patients FOR INSERT TO authenticated WITH CHECK (true);
-CREATE POLICY "Allow authenticated update" ON patients FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Allow authenticated delete" ON patients FOR DELETE TO authenticated USING (true);
+-- Create restrictive policies (least-privilege principle)
+-- Users can only view patients they created OR if they have admin/staff role
+CREATE POLICY "Users can view own patients" ON patients 
+  FOR SELECT 
+  TO authenticated 
+  USING (
+    created_by = auth.uid() 
+    OR EXISTS (
+      SELECT 1 FROM user_roles 
+      WHERE user_id = auth.uid() 
+      AND role IN ('admin', 'doctor', 'nurse', 'receptionist')
+    )
+  );
+
+-- Users can only insert patients if they have appropriate role
+CREATE POLICY "Staff can insert patients" ON patients 
+  FOR INSERT 
+  TO authenticated 
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM user_roles 
+      WHERE user_id = auth.uid() 
+      AND role IN ('admin', 'doctor', 'nurse', 'receptionist')
+    )
+  );
+
+-- Users can only update patients they created OR if they have staff role
+CREATE POLICY "Users can update own patients" ON patients 
+  FOR UPDATE 
+  TO authenticated 
+  USING (
+    created_by = auth.uid() 
+    OR EXISTS (
+      SELECT 1 FROM user_roles 
+      WHERE user_id = auth.uid() 
+      AND role IN ('admin', 'doctor', 'nurse', 'receptionist')
+    )
+  )
+  WITH CHECK (
+    created_by = auth.uid() 
+    OR EXISTS (
+      SELECT 1 FROM user_roles 
+      WHERE user_id = auth.uid() 
+      AND role IN ('admin', 'doctor', 'nurse', 'receptionist')
+    )
+  );
+
+-- Only admins can delete patients
+CREATE POLICY "Only admins can delete patients" ON patients 
+  FOR DELETE 
+  TO authenticated 
+  USING (
+    EXISTS (
+      SELECT 1 FROM user_roles 
+      WHERE user_id = auth.uid() 
+      AND role = 'admin'
+    )
+  );
+
+-- Note: These policies require the user_roles table from migration 006_security_and_constraints.sql
+-- If you haven't run that migration yet, use these simpler owner-only policies instead:
+/*
+CREATE POLICY "Users can view own patients" ON patients FOR SELECT TO authenticated USING (created_by = auth.uid());
+CREATE POLICY "Users can insert own patients" ON patients FOR INSERT TO authenticated WITH CHECK (created_by = auth.uid());
+CREATE POLICY "Users can update own patients" ON patients FOR UPDATE TO authenticated USING (created_by = auth.uid()) WITH CHECK (created_by = auth.uid());
+CREATE POLICY "Users can delete own patients" ON patients FOR DELETE TO authenticated USING (created_by = auth.uid());
+*/
 
 -- Add trigger
 CREATE TRIGGER update_patients_updated_at 
@@ -149,7 +211,7 @@ EXECUTE FUNCTION update_updated_at_column();
 
 ### Problem: Dev server not running
 ```bash
-cd /Users/shreeshanthr/EYECARE
+cd /path/to/EYECARE  # Replace with your actual project path
 npm run dev
 ```
 

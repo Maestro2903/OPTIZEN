@@ -13,10 +13,11 @@ async function checkDatabaseSchema() {
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  if (!supabaseUrl || !supabaseServiceKey) {
+  if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
     console.error('❌ Missing Supabase environment variables')
-    console.error('Required: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY')
+    console.error('Required: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, NEXT_PUBLIC_SUPABASE_ANON_KEY')
     process.exit(1)
   }
 
@@ -36,7 +37,7 @@ async function checkDatabaseSchema() {
       if (error.message.includes('does not exist')) {
         console.log('   ❌ patients table does not exist')
         console.log('   📝 Solution: Run migration 012_fix_patients_schema.sql')
-        console.log('   🔗 Go to: https://supabase.com/dashboard/project/wtrkwqagxphqkwmtbhtd/editor')
+        console.log('   🔗 Visit your Supabase project dashboard SQL editor to apply migrations')
       } else {
         console.log('   ❌ Error:', error.message)
       }
@@ -63,15 +64,12 @@ async function checkDatabaseSchema() {
 
     // Check RLS policies
     console.log('\n🔐 Checking Row Level Security...')
-    const { data: rlsData, error: rlsError } = await supabase
-      .rpc('check_rls_enabled', { table_name: 'patients' })
-      .catch(() => null)
-
-    // Simple check: try to insert with anon key (should fail with proper error)
-    const anonSupabase = createClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+    
+    // Simple check: try to query with anon key (should fail with proper error)
+    const anonSupabase = createClient(supabaseUrl, supabaseAnonKey)
     const { error: anonError } = await anonSupabase
       .from('patients')
-      .select('id')
+      .select('patient_id')
       .limit(1)
 
     if (anonError && anonError.message.includes('not authenticated')) {

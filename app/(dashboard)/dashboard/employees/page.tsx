@@ -87,6 +87,8 @@ export default function EmployeesPage() {
   const { deleteItem, loading: deleteLoading } = useApiDelete()
 
   // Handle search with debouncing
+  // Note: search function excluded from dependencies as it's not stable/memoized by the hook
+  // We only want the effect to debounce on searchTerm changes
   React.useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (searchTerm.trim()) {
@@ -97,16 +99,21 @@ export default function EmployeesPage() {
     }, 300)
 
     return () => clearTimeout(timeoutId)
-  }, [searchTerm, search])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm])
 
   // Handle page changes
+  // Note: changePage/changePageSize functions excluded as they cause infinite re-renders if not stable
+  // We rely on the primitive values (currentPage, pageSize) to trigger the effects
   React.useEffect(() => {
     changePage(currentPage)
-  }, [currentPage, changePage])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage])
 
   React.useEffect(() => {
     changePageSize(pageSize)
-  }, [pageSize, changePageSize])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageSize])
 
   const handleAddEmployee = async (employeeData: any) => {
     try {
@@ -204,12 +211,15 @@ export default function EmployeesPage() {
   }
 
   const viewOptionsConfig: ViewOptionsConfig = {
+    // Note: Counts removed as they only reflect current page data, not total dataset
+    // TODO: Fetch aggregate counts from API separately for accurate totals
+    // If API provides total counts per filter, add them back here
     filters: [
-      { id: "active", label: "Active", count: employees.filter(e => e.status === "active").length },
-      { id: "inactive", label: "Inactive", count: employees.filter(e => e.status === "inactive").length },
-      { id: "doctor", label: "Doctors", count: employees.filter(e => e.role === "doctor").length },
-      { id: "nurse", label: "Nurses", count: employees.filter(e => e.role === "nurse").length },
-      { id: "technician", label: "Technicians", count: employees.filter(e => e.role === "technician").length },
+      { id: "active", label: "Active" },
+      { id: "inactive", label: "Inactive" },
+      { id: "doctor", label: "Doctors" },
+      { id: "nurse", label: "Nurses" },
+      { id: "technician", label: "Technicians" },
     ],
     sortOptions: [
       { id: "full_name", label: "Name" },

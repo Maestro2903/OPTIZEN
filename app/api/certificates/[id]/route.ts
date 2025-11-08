@@ -60,17 +60,63 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient()
-    const { id } = params
+    
+    // Check authentication
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    
+    const { id } = await params
     const body = await request.json()
+
+    // Get user role from users table (secure authorization)
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user?.id)
+      .eq('is_active', true)
+      .single()
+
+    if (userError || !userData) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    // Check if certificate exists and get ownership info
+    const { data: certAuth, error: fetchError } = await supabase
+      .from('certificates')
+      .select('user_id')
+      .eq('certificate_number', id)
+      .single()
+
+    if (fetchError || !certAuth) {
+      return NextResponse.json({ error: 'Certificate not found' }, { status: 404 })
+    }
+
+    // Check if user owns the certificate or is admin
+    const isAuthorized = certAuth.user_id === user?.id ||
+                        userData.role === 'super_admin' ||
+                        userData.role === 'hospital_admin'
+
+    if (!isAuthorized) {
+      return NextResponse.json({ error: 'Forbidden - insufficient permissions' }, { status: 403 })
+    }
+
+    // Whitelist allowed fields to prevent mass assignment
+    const allowedFields = ['type', 'purpose', 'status', 'issue_date', 'patient_id']
+    const updateData = Object.keys(body)
+      .filter(key => allowedFields.includes(key))
+      .reduce((obj, key) => ({ ...obj, [key]: body[key] }), {})
 
     const { data: certificate, error } = await supabase
       .from('certificates')
       .update({
-        ...body,
+        ...updateData,
         updated_at: new Date().toISOString()
       })
       .eq('certificate_number', id)
@@ -123,11 +169,51 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient()
-    const { id } = params
+    
+    // Check authentication
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    
+    const { id } = await params
+
+    // Get user role from users table (secure authorization)
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user?.id)
+      .eq('is_active', true)
+      .single()
+
+    if (userError || !userData) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    // Authorization check - verify ownership or admin role
+    const { data: certificate, error: fetchError } = await supabase
+      .from('certificates')
+      .select('user_id')
+      .eq('certificate_number', id)
+      .single()
+
+    if (fetchError || !certificate) {
+      return NextResponse.json({ error: 'Certificate not found' }, { status: 404 })
+    }
+
+    // Check if user owns the certificate or is admin
+    const isAuthorized = certificate.user_id === user?.id ||
+                        userData.role === 'super_admin' ||
+                        userData.role === 'hospital_admin'
+
+    if (!isAuthorized) {
+      return NextResponse.json({ error: 'Forbidden - insufficient permissions' }, { status: 403 })
+    }
 
     const { error } = await supabase
       .from('certificates')
