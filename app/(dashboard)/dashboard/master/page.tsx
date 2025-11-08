@@ -384,6 +384,12 @@ export default function MasterDataPage() {
     { key: 'visit_types', label: 'Visit Types', title: 'Visit Type' },
     { key: 'sac_status', label: 'SAC Status', title: 'SAC Status' },
     { key: 'iop_ranges', label: 'IOP Ranges', title: 'IOP Range' },
+    { key: 'iop_methods', label: 'IOP Methods', title: 'IOP Method' },
+    { key: 'fundus_findings', label: 'Fundus Findings', title: 'Fundus Finding' },
+    { key: 'cornea_findings', label: 'Cornea Findings', title: 'Cornea Finding' },
+    { key: 'conjunctiva_findings', label: 'Conjunctiva', title: 'Conjunctiva Finding' },
+    { key: 'iris_findings', label: 'Iris Findings', title: 'Iris Finding' },
+    { key: 'anterior_segment_findings', label: 'Anterior Segment', title: 'Anterior Segment Finding' },
     { key: 'lens_options', label: 'Lens', title: 'Lens Option' },
     { key: 'payment_methods', label: 'Payment', title: 'Payment Method' },
     { key: 'insurance_providers', label: 'Insurance', title: 'Insurance Provider' },
@@ -403,49 +409,6 @@ export default function MasterDataPage() {
             Manage all dropdown options for the system
           </p>
         </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Complaints</CardTitle>
-            <Database className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{categories.complaints || 0}</div>
-            <p className="text-xs text-muted-foreground">entries</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Medicines</CardTitle>
-            <Database className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{categories.medicines || 0}</div>
-            <p className="text-xs text-muted-foreground">entries</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Surgeries</CardTitle>
-            <Database className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{categories.surgeries || 0}</div>
-            <p className="text-xs text-muted-foreground">entries</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Categories</CardTitle>
-            <Database className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{categoryConfigs.length}</div>
-            <p className="text-xs text-muted-foreground">categories</p>
-          </CardContent>
-        </Card>
       </div>
 
       <Card>
@@ -499,7 +462,7 @@ export default function MasterDataPage() {
               ))}
             </TabsList>
             <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 gap-1 mt-2">
-              {categoryConfigs.slice(12).map(cat => (
+              {categoryConfigs.slice(12, 18).map(cat => (
                 <TabsTrigger key={cat.key} value={cat.key}>
                   {cat.label}
                   {categories[cat.key] && (
@@ -510,6 +473,32 @@ export default function MasterDataPage() {
                 </TabsTrigger>
               ))}
             </TabsList>
+            <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 gap-1 mt-2">
+              {categoryConfigs.slice(18, 24).map(cat => (
+                <TabsTrigger key={cat.key} value={cat.key}>
+                  {cat.label}
+                  {categories[cat.key] && (
+                    <Badge variant="secondary" className="ml-1 text-xs">
+                      {categories[cat.key]}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            {categoryConfigs.length > 24 && (
+              <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 gap-1 mt-2">
+                {categoryConfigs.slice(24).map(cat => (
+                  <TabsTrigger key={cat.key} value={cat.key}>
+                    {cat.label}
+                    {categories[cat.key] && (
+                      <Badge variant="secondary" className="ml-1 text-xs">
+                        {categories[cat.key]}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            )}
 
             {categoryConfigs.map(cat => (
               <TabsContent key={cat.key} value={cat.key}>

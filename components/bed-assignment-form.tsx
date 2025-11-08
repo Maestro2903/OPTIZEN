@@ -114,10 +114,10 @@ export function BedAssignmentForm({ children, assignmentData, mode = "create" }:
       setLoadingPatients(true)
       try {
         const response = await patientsApi.list({ limit: 1000, status: 'active' })
-        if (response?.success === true && Array.isArray(response.data)) {
+        if (response.success && response.data) {
           setPatients(
             response.data.map((patient) => ({
-              value: patient?.id || '',
+              value: patient.id,
               label: `${patient?.full_name || 'Unknown'} (${patient?.patient_id || 'N/A'})`,
             })).filter(item => item.value) // Filter out invalid entries
           )
@@ -136,13 +136,17 @@ export function BedAssignmentForm({ children, assignmentData, mode = "create" }:
       // Load doctors
       setLoadingDoctors(true)
       try {
-        const response = await employeesApi.list({ role: 'Doctor', limit: 500 })
-        if (response?.success === true && Array.isArray(response.data)) {
+        const response = await employeesApi.list({ 
+          limit: 1000, 
+          status: 'active',
+          role: 'ophthalmologist,optometrist'
+        })
+        if (response.success && response.data) {
           setDoctors(
-            response.data.map((doctor) => ({
-              value: doctor?.id || '',
-              label: `Dr. ${doctor?.full_name || 'Unknown'} (${doctor?.employee_id || 'N/A'})`,
-            })).filter(item => item.value) // Filter out invalid entries
+            response.data.map((emp) => ({
+              value: emp.id,
+              label: `${emp.full_name} (${emp.role})`,
+            }))
           )
         }
       } catch (error) {
@@ -159,13 +163,13 @@ export function BedAssignmentForm({ children, assignmentData, mode = "create" }:
       // Load surgery types
       setLoadingSurgeryTypes(true)
       try {
-        const response = await masterDataApi.list({ category: 'surgery_types', limit: 100 })
-        if (response?.success === true && Array.isArray(response.data)) {
+        const response = await masterDataApi.list({ category: 'surgery_types' })
+        if (response.success && response.data) {
           setSurgeryTypes(
             response.data.map((item) => ({
-              value: item?.name || '',
-              label: item?.name || 'Unknown',
-            })).filter(item => item.value) // Filter out invalid entries
+              value: item.name,
+              label: item.name,
+            }))
           )
         }
       } catch (error) {

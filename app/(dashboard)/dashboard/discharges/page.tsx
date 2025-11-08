@@ -25,6 +25,7 @@ import {
 import { DischargeForm } from "@/components/discharge-form"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
 import { ViewEditDialog } from "@/components/view-edit-dialog"
+import { DischargePrint } from "@/components/discharge-print"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Textarea } from "@/components/ui/textarea"
 
@@ -143,49 +144,6 @@ export default function DischargesPage() {
             Add Discharge
           </Button>
         </DischargeForm>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Discharges</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-xs text-muted-foreground">all time</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">This Month</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.thisMonth}</div>
-            <p className="text-xs text-muted-foreground">discharges</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">This Week</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.thisWeek}</div>
-            <p className="text-xs text-muted-foreground">discharges</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Stay</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.avgStay}</div>
-            <p className="text-xs text-muted-foreground">days</p>
-          </CardContent>
-        </Card>
       </div>
 
       <Card>
@@ -317,9 +275,11 @@ export default function DischargesPage() {
                           <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit">
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => window.print()} title="Print">
-                            <Printer className="h-4 w-4" />
-                          </Button>
+                          <DischargePrint discharge={discharge}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" title="Print Discharge Summary">
+                              <Printer className="h-4 w-4" />
+                            </Button>
+                          </DischargePrint>
                           <DeleteConfirmDialog
                             title="Delete Discharge"
                             description="Are you sure you want to delete this discharge record? This action cannot be undone."

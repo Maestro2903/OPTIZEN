@@ -14,6 +14,7 @@ import {
   Trash2,
   ShoppingCart,
   Calendar,
+  Printer,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -29,6 +30,7 @@ import {
 } from "@/components/ui/table"
 import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
+import { PharmacyPrint } from "@/components/pharmacy-print"
 import { useApiList, useApiForm, useApiDelete } from "@/lib/hooks/useApi"
 import { pharmacyApi, type PharmacyItem, type PharmacyFilters } from "@/lib/services/api"
 import { useToast } from "@/hooks/use-toast"
@@ -296,7 +298,7 @@ export default function PharmacyPage() {
       { id: "unit_price", label: "Price" },
       { id: "expiry_date", label: "Expiry Date" },
     ],
-    showExport: true,
+    showExport: false,
     showSettings: true,
   }
 
@@ -541,49 +543,6 @@ export default function PharmacyPage() {
         </Dialog>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Items</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{pagination?.total || 0}</div>
-            <p className="text-xs text-muted-foreground">in inventory</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Low Stock Items</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{lowStockItems.length}</div>
-            <p className="text-xs text-muted-foreground">on this page</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Value</CardTitle>
-            <TrendingDown className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹{totalValue.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">current page only</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Categories</CardTitle>
-            <Pill className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{Array.from(new Set(pharmacyItems.map(i => i.category))).length}</div>
-            <p className="text-xs text-muted-foreground">on this page</p>
-          </CardContent>
-        </Card>
-      </div>
-
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -696,6 +655,33 @@ export default function PharmacyPage() {
                           <Button variant="ghost" size="icon" className="h-8 w-8">
                             <ShoppingCart className="h-4 w-4" />
                           </Button>
+                          <PharmacyPrint
+                            pharmacy={{
+                              id: item.id,
+                              patient_name: 'Stock Report',
+                              date: new Date().toISOString(),
+                              items: [{
+                                medicine_name: item.item_name,
+                                dosage: item.generic_name || 'Standard',
+                                quantity: item.current_stock,
+                                instructions: `Stock: ${item.current_stock} | Reorder: ${item.reorder_level}`,
+                                price: item.selling_price
+                              }],
+                              total_amount: item.current_stock * item.selling_price,
+                              pharmacy_location: 'Main Inventory',
+                              pharmacist_name: 'Inventory Manager',
+                              notes: `Batch: ${item.batch_number || 'N/A'} | Expiry: ${item.expiry_date ? new Date(item.expiry_date).toLocaleDateString('en-GB') : 'N/A'}`
+                            }}
+                          >
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              title="Print inventory record"
+                            >
+                              <Printer className="h-4 w-4" />
+                            </Button>
+                          </PharmacyPrint>
                           <DeleteConfirmDialog
                             title="Delete Item"
                             description={`Are you sure you want to delete ${item.item_name}? This action cannot be undone.`}

@@ -13,6 +13,7 @@ import {
   Eye,
   UserCheck,
   AlertCircle,
+  Printer,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -29,6 +30,7 @@ import {
 import { AppointmentForm } from "@/components/appointment-form"
 import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
 import { ViewEditDialog } from "@/components/view-edit-dialog"
+import { AppointmentPrint } from "@/components/appointment-print"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useApiList, useApiForm, useApiDelete } from "@/lib/hooks/useApi"
@@ -205,7 +207,7 @@ export default function AppointmentsPage() {
       { id: "appointment_type", label: "Type" },
       { id: "status", label: "Status" },
     ],
-    showExport: true,
+    showExport: false,
     showSettings: false,
   }
 
@@ -224,52 +226,6 @@ export default function AppointmentsPage() {
             Schedule Appointment
           </Button>
         </AppointmentForm>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Appointments</CardTitle>
-            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{pagination?.total || 0}</div>
-            <p className="text-xs text-muted-foreground">all time</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Today&apos;s Appointments</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {/* TODO: Replace with API aggregate count (total_today) instead of filtering current page */}
-            <div className="text-2xl font-bold">{appointments.filter(a => a.appointment_date === new Date().toISOString().split('T')[0]).length}</div>
-            <p className="text-xs text-muted-foreground">on this page</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Confirmed</CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {/* TODO: Replace with API aggregate count (total_completed) instead of filtering current page */}
-            <div className="text-2xl font-bold">{appointments.filter(a => a.status === "completed").length}</div>
-            <p className="text-xs text-muted-foreground">on this page</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending</CardTitle>
-            <AlertCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {/* TODO: Replace with API aggregate count (total_pending) instead of filtering current page */}
-            <div className="text-2xl font-bold">{appointments.filter(a => a.status === "scheduled").length}</div>
-            <p className="text-xs text-muted-foreground">on this page</p>
-          </CardContent>
-        </Card>
       </div>
 
       <Card>
@@ -391,6 +347,27 @@ export default function AppointmentsPage() {
                           >
                             <CheckCircle className="h-4 w-4" />
                           </Button>
+                          <AppointmentPrint appointment={{
+                            id: appointment.id,
+                            patient_name: appointment.patients?.full_name || '-',
+                            patient_id: appointment.patient_id,
+                            date: appointment.appointment_date,
+                            time: appointment.appointment_time,
+                            type: appointment.appointment_type,
+                            status: appointment.status,
+                            doctor: appointment.doctors?.full_name,
+                            notes: appointment.notes,
+                            created_at: appointment.created_at
+                          }}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              title="Print Appointment"
+                            >
+                              <Printer className="h-4 w-4" />
+                            </Button>
+                          </AppointmentPrint>
                           <Button
                             variant="ghost"
                             size="icon"

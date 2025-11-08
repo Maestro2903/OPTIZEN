@@ -30,6 +30,7 @@ import { ViewEditDialog } from "@/components/view-edit-dialog"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { CertificatePrint } from "@/components/certificate-print"
 
 interface Certificate {
   id: string
@@ -118,53 +119,6 @@ export default function CertificatesPage() {
             Generate Certificate
           </Button>
         </CertificateForms>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Certificates</CardTitle>
-            <Award className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{certificatesList.length}</div>
-            <p className="text-xs text-muted-foreground">all time</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">This Month</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {/* TODO: Filter by certificate date/issuedAt field for current month
-                Current: Shows total count instead of month-filtered count */}
-            <div className="text-lg font-bold">-</div>
-            <p className="text-xs text-muted-foreground">filtering not implemented</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Most Requested</CardTitle>
-            <Award className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-bold">-</div>
-            <p className="text-xs text-muted-foreground">no data</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">This Week</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {/* TODO: Filter by certificate date/issuedAt field for current week
-                Current: Shows total count instead of week-filtered count */}
-            <div className="text-lg font-bold">-</div>
-            <p className="text-xs text-muted-foreground">filtering not implemented</p>
-          </CardContent>
-        </Card>
       </div>
 
       <Card>
@@ -667,9 +621,11 @@ export default function CertificatesPage() {
                             <Edit className="h-4 w-4" />
                           </Button>
                         </ViewEditDialog>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => window.print()} title="Print">
-                          <Printer className="h-4 w-4" />
-                        </Button>
+                        <CertificatePrint certificate={cert}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" title="Print Certificate">
+                            <Printer className="h-4 w-4" />
+                          </Button>
+                        </CertificatePrint>
                         <DeleteConfirmDialog
                           title="Delete Certificate"
                           description={`Are you sure you want to delete certificate ${cert.id}? This action cannot be undone.`}

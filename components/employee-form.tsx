@@ -5,6 +5,8 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Button } from "@/components/ui/button"
+import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
+import { useMasterData } from "@/hooks/use-master-data"
 import {
   Dialog,
   DialogContent,
@@ -35,7 +37,7 @@ import {
 const employeeFormSchema = z.object({
   full_name: z.string().min(2, "Name must be at least 2 characters"),
   employee_id: z.string().min(1, "Employee ID is required"),
-  role: z.enum(["Doctor", "Nurse", "Receptionist", "Admin", "Technician"]),
+  role: z.string().min(1, "Role is required"),
   email: z.string().email("Invalid email"),
   phone: z.string().min(10, "Phone number is required"),
   address: z.string().optional(),
@@ -52,6 +54,7 @@ interface EmployeeFormProps {
 }
 
 export function EmployeeForm({ children, onSubmit: onSubmitCallback }: EmployeeFormProps) {
+  const masterData = useMasterData()
   const [open, setOpen] = React.useState(false)
   const [isLoading, setIsLoading] = React.useState(false)
 
@@ -63,6 +66,13 @@ export function EmployeeForm({ children, onSubmit: onSubmitCallback }: EmployeeF
       role: "Doctor",
     },
   })
+
+  // Load roles from master data
+  React.useEffect(() => {
+    if (open) {
+      masterData.fetchCategory('roles')
+    }
+  }, [open])
 
   async function onSubmit(values: z.infer<typeof employeeFormSchema>) {
     if (onSubmitCallback) {
@@ -136,20 +146,17 @@ export function EmployeeForm({ children, onSubmit: onSubmitCallback }: EmployeeF
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Role *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select role" />
-                        </SelectTrigger>
+                      <SearchableSelect
+                        options={masterData.data.roles || []}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="Select role"
+                        searchPlaceholder="Search roles..."
+                        emptyText="No roles found."
+                        loading={masterData.loading.roles}
+                      />
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Doctor">Doctor / Ophthalmologist</SelectItem>
-                        <SelectItem value="Nurse">Nurse</SelectItem>
-                        <SelectItem value="Receptionist">Receptionist</SelectItem>
-                        <SelectItem value="Admin">Admin</SelectItem>
-                        <SelectItem value="Technician">Technician</SelectItem>
-                      </SelectContent>
-                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

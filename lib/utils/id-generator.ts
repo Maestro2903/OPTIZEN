@@ -23,50 +23,24 @@ function generateRandomString(length: number = 6): string {
 }
 
 /**
- * Generate a unique patient ID - ATOMIC (prevents TOCTOU race)
+ * Generate a unique patient ID
  * Format: PAT-YYYYMMDD-XXXXXX
  * Where XXXXXX is a random alphanumeric string
  * 
- * Uses atomic insert-or-fail to prevent race conditions under concurrent load.
- * Retries on unique constraint violations (Postgres error code 23505).
+ * Uses cryptographically secure random generation.
+ * Collision probability is extremely low (~1 in 2 billion with 6 chars).
+ * 
+ * Note: The actual uniqueness is enforced by the database unique constraint
+ * on patients.patient_id, which will cause the insert to fail if a collision
+ * occurs (handled by the API route with retry logic).
  */
 export async function generatePatientId(): Promise<string> {
-  const supabase = createClient()
-  const maxAttempts = 5
-  
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const date = new Date()
     const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '')
     const random = generateRandomString(6)
     const patientId = `PAT-${dateStr}-${random}`
     
-    // Atomic approach: attempt insert into a reservation/lock table
-    // or directly into patients table with only the patient_id column
-    // This requires a unique constraint on patients.patient_id
-    const { data, error } = await supabase
-      .from('patients')
-      .insert([{ patient_id: patientId }])
-      .select('patient_id')
-      .single()
-    
-    if (!error) {
-      // Successfully inserted - ID is guaranteed unique
       return patientId
-    }
-    
-    // Check if error is unique constraint violation (Postgres code 23505)
-    if (error.code === '23505' || error.message.includes('duplicate') || error.message.includes('unique')) {
-      console.warn(`Patient ID collision detected: ${patientId}, attempt ${attempt + 1}/${maxAttempts}`)
-      // Retry with new random ID
-      continue
-    }
-    
-    // Other database error - fail immediately
-    console.error('Error generating patient ID:', error)
-    throw new Error(`Failed to generate patient ID: ${error.message}`)
-  }
-  
-  throw new Error('Failed to generate unique patient ID after maximum attempts')
 }
 
 /**

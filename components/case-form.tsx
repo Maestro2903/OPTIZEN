@@ -6,6 +6,10 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Button } from "@/components/ui/button"
 import { useMasterData } from "@/contexts/master-data-context"
+import { useMasterData as useMasterDataAPI } from "@/hooks/use-master-data"
+import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
+import { patientsApi } from "@/lib/services/api"
+import { useToast } from "@/hooks/use-toast"
 import {
   Dialog,
   DialogContent,
@@ -39,40 +43,7 @@ import dynamic from "next/dynamic"
 
 const EyeDrawingTool = dynamic(() => import("@/components/eye-drawing-tool").then(m => m.EyeDrawingTool), { ssr: false })
 
-// Options sourced from user-provided lists
-const COMPLAINT_OPTIONS = [
-  "Detail","foreignbody sensation","dimness of vision","diplopia","SUDDEN LOSS OF VISION","FLASHES OF LIGHT",
-  "REDNESS OF EYES","STIKENESS","HEADACHE","ITHCING IN EYES","BLEPHAROSPASM","FOREIGN BODY IN EYE",
-  "PTOSIS","Iridocyclitis","IOP","I CARE IOP","Right Eye","Left Eye","Both Eye","Complaints",
-  "Itching Of Eye","Sudden Loss of Vision","Redness of Eyes","Stikeness and Discharge","Blepharospasm",
-  "Foreign Body in Eye","Ptosis","Iridocyclitis","Itching of Eye","Headache","Fundus","Diabetic Retinopathy",
-  "Maculopathy","NAD","Haemorrage","Glucoma","Optic Atrophy","0.5 cup","0.6 cup","0.7 cup","0.8 cup","0.9 cup",
-  "Pachy","NCT","NO","Burning of Eyes","Watering of Eyes","Foreignbody Sensation","Dimness of Vision","Diplopia",
-  "0.6 Cupping","0.8 Cupping","AMRD","Drussen","No Diabitic Retinopathy","DONE","TOPO DONE","A SCAN DONE","DILATE",
-  "TORIC FIT","LEFT EYE","POST LASIK","Dryness of eyes","OCT DONE","Old R D","Old RD","PERIMETRY DONE","Asteroid Hylosis",
-  "Dry AMD","Lid Edema","CORNEA","Subepithelial Infilitrate","Flashes of Light","YAG LASER DONE","Pain","CME",
-  "Myopic Deganretion","Venous Toruosity","Dimness of vision","Vitreous Floaters","Disc and Macula appear normal",
-  "Within normal limits","Fine ERM over Macula","PVD noted","Myopic Fundus","Chorioretinal Patch On Macula",
-  "BE white without pressure areas in peripherial retina","Routine eye check up","Routine Eye Checkup","Ciliary Congestion",
-  "KPs,Flare,Cells,","Iris Nodules","Koppes's Nodules","Posterior Synechiae","Irregular Pupil","Fibrinous exudate",
-  "GAT IOP","NCT IOP","SCLERITIS","Pseudomembrane Formation","Diffuse","Nodular","Sclero - Uveitis","Sclero - Keratitis",
-  "Conjunctiva","Papillary Hyperplasia","Cobblestone Appearance","Pigmentation of Conjunctiva","Lattice Degeneration",
-  "Inferior Notch","Superior Notch","Peripallary Atrophy","Heavyness","CNVM","Atrophic Patch around the Macula","PVD",
-  "FINT SEEN","Limbal thickning","Conjuctival pigmentation","Mucoid Discharge","Periocular Pigmentation","Swelling Arount the eye",
-  "Pain, Redness","Watch sign for Pain on eye movment","Swelling around eye","Redness,Dimness of vision,Headache",
-  "Vitreomacular traction","Macular Odema","Multiple retinal heamorrahges with hard exudates over macula","Inferior Lattice",
-  "Post operative","BE- Tessellated Fundus","Proliferative diabetic retinopathy","Non Proliferative diabetic retinopathy",
-  "For LASIK","No peripheral retinal lesions noted","Pterygium","LMH- lamellar macular hole","Night time Glair","Limbitis",
-  "Congestion","Next visit Dilate For refrection","Corneal Degeneration","Salzmanns Nodules","post lasik epithelial ingrowth.",
-  "sevire MGD","Para centeral Corneal Irregularity","Choroidal Coloboma",
-  "Small UL stye(no tenderness)Diffuse congestision , endothelial dusting+, AC appears quiet,  lens clear","Lid Margin keratinization +",
-  "IRIS","Koeppe's Nodules","Busacca's Nodules","Large Physiological Cup","ANTERIOR SEGMENT WNL","BE- Papilloedema","Guttae",
-  "Punctate epithelial erosions","Opacity","Ulcer","Infiltrate","Abscess","Thinning","Vascularisation","Oedema",
-  "Microcystic oedema","DM folds","Striate keratopathy","Degeneration","Dystrophy","Chronic CME","Capsular Phirmosis",
-  "CONCRETION","Colour Vision Normal","Exophthalmos","EXOPHORIA","Floater","Limbitis","hypopyon","AC cells+",
-  "Ocular movements normal","Congenital NLD Block","Papillae+","Conjunctival congestion","Anterior Segment Normal",
-  "Peripheral Retina Not Seen","Conjunctival congestion ++, Discharge+, Follicles+","No Hypertensive Retinopathy",
-]
+// Removed hardcoded COMPLAINT_OPTIONS - now using master data API via useMasterData hook
 
 const DIAGNOSIS_OPTIONS = [
   "PANOPHTHALMITIS","ACUTE CONJUNCTIVITS","ACUTE DACRYOCYSTITIS","ADENOVIRUS CONJUNCTIVITIS",
@@ -468,6 +439,9 @@ interface CaseFormProps {
 export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitCallback }: CaseFormProps) {
   const [open, setOpen] = React.useState(false)
   const [currentStep, setCurrentStep] = React.useState("register")
+  const [patients, setPatients] = React.useState<SearchableSelectOption[]>([])
+  const [loadingPatients, setLoadingPatients] = React.useState(false)
+  const { toast } = useToast()
 
   // State for complaint form inputs
   const [newComplaint, setNewComplaint] = React.useState("")
@@ -487,6 +461,45 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
   const [newSurgeryName, setNewSurgeryName] = React.useState("")
   const [newSurgeryAnesthesia, setNewSurgeryAnesthesia] = React.useState("")
   const { masterData } = useMasterData()
+  const masterDataAPI = useMasterDataAPI()
+
+  // Load master data when dialog opens
+  React.useEffect(() => {
+    if (open) {
+      // Fetch treatments, medicines, dosages, and visit types for dropdowns
+      masterDataAPI.fetchMultiple(['treatments', 'medicines', 'dosages', 'visitTypes'])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  // Load patients when dialog opens
+  React.useEffect(() => {
+    const loadPatients = async () => {
+      if (!open) return
+      setLoadingPatients(true)
+      try {
+        const response = await patientsApi.list({ limit: 1000, status: 'active' })
+        if (response.success && response.data) {
+          setPatients(
+            response.data.map((patient) => ({
+              value: patient.id,
+              label: `${patient.full_name} (${patient.patient_id})`,
+            }))
+          )
+        }
+      } catch (error) {
+        console.error("Error loading patients:", error)
+        toast({
+          title: "Failed to load patients",
+          description: "Please try again",
+          variant: "destructive",
+        })
+      } finally {
+        setLoadingPatients(false)
+      }
+    }
+    loadPatients()
+  }, [open, toast])
 
   function SimpleCombobox({
     options,
@@ -821,14 +834,7 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
   }
 
   // Dynamic patient options derived from master data
-  const patientOptions = React.useMemo<{ id: string; label: string }[]>(() => {
-    const patients = ((masterData as any)?.patients || []) as Array<{ id: string; name: string }>
-    return patients.map((p) => ({ id: p.id, label: `${p.id} - ${p.name}` }))
-  }, [masterData])
-
-  const patientLabelById = React.useMemo(() => {
-    return Object.fromEntries(patientOptions.map((o: any) => [o.id, o.label])) as Record<string, string>
-  }, [patientOptions])
+  // Removed patientOptions - now using patients state loaded from API
 
   function onSubmit(values: z.infer<typeof caseFormSchema>) {
     if (onSubmitCallback) {
@@ -911,12 +917,17 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Visit No *</FormLabel>
-                        <SimpleCombobox
-                          options={masterData.visitTypes}
-                          value={field.value}
-                          onChange={field.onChange}
-                          placeholder="First"
-                        />
+                        <FormControl>
+                          <SearchableSelect
+                            options={masterDataAPI.data.visitTypes || []}
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            placeholder="Select visit number"
+                            searchPlaceholder="Search visit types..."
+                            emptyText="No visit types found."
+                            loading={masterDataAPI.loading.visitTypes}
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -926,18 +937,18 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                     name="patient_id"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Patient</FormLabel>
-                        <div className="flex gap-2">
-                          <SimpleCombobox
-                            options={patientOptions.map((o) => o.label)}
-                            value={field.value ? (patientLabelById[field.value] || "") : ""}
-                            onChange={(label) => {
-                              const selected = patientOptions.find((o) => o.label === label)
-                              field.onChange(selected?.id || "")
-                            }}
-                            placeholder="Select Patient"
+                        <FormLabel>Patient *</FormLabel>
+                        <FormControl>
+                          <SearchableSelect
+                            options={patients}
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            placeholder="Select patient"
+                            searchPlaceholder="Search patients..."
+                            emptyText="No patients found."
+                            loading={loadingPatients}
                           />
-                        </div>
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -995,9 +1006,20 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                           treatmentFields.map((fieldItem, index) => (
                             <tr key={fieldItem.id}>
                               <td className="p-3">
-                                <Input
-                                  placeholder="Enter treatment"
-                                  {...form.register(`past_history_treatments.${index}.treatment` as const)}
+                                <FormField
+                                  control={form.control}
+                                  name={`past_history_treatments.${index}.treatment` as const}
+                                  render={({ field }) => (
+                                    <SearchableSelect
+                                      options={masterDataAPI.data.treatments}
+                                      value={field.value}
+                                      onValueChange={field.onChange}
+                                      placeholder="Select treatment"
+                                      searchPlaceholder="Search treatments..."
+                                      emptyText="No treatments found."
+                                      loading={masterDataAPI.loading.treatments}
+                                    />
+                                  )}
                                 />
                               </td>
                               <td className="p-3">
@@ -1050,13 +1072,53 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                           medicineFields.map((fieldItem, index) => (
                             <tr key={fieldItem.id}>
                               <td className="p-3">
-                                <Input placeholder="R/L/B" {...form.register(`past_history_medicines.${index}.eye` as const)} />
+                                <Select
+                                  value={form.watch(`past_history_medicines.${index}.eye` as const)}
+                                  onValueChange={(value) => form.setValue(`past_history_medicines.${index}.eye` as const, value as "R" | "L" | "B")}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="R">Right</SelectItem>
+                                    <SelectItem value="L">Left</SelectItem>
+                                    <SelectItem value="B">Both</SelectItem>
+                                  </SelectContent>
+                                </Select>
                               </td>
                               <td className="p-3">
-                                <Input placeholder="Medicine name" {...form.register(`past_history_medicines.${index}.medicine_name` as const)} />
+                                <FormField
+                                  control={form.control}
+                                  name={`past_history_medicines.${index}.medicine_name` as const}
+                                  render={({ field }) => (
+                                    <SearchableSelect
+                                      options={masterDataAPI.data.medicines}
+                                      value={field.value}
+                                      onValueChange={field.onChange}
+                                      placeholder="Select medicine"
+                                      searchPlaceholder="Search medicines..."
+                                      emptyText="No medicines found."
+                                      loading={masterDataAPI.loading.medicines}
+                                    />
+                                  )}
+                                />
                               </td>
                               <td className="p-3">
-                                <Input placeholder="Type" {...form.register(`past_history_medicines.${index}.type` as const)} />
+                                <FormField
+                                  control={form.control}
+                                  name={`past_history_medicines.${index}.type` as const}
+                                  render={({ field }) => (
+                                    <SearchableSelect
+                                      options={masterDataAPI.data.dosages}
+                                      value={field.value}
+                                      onValueChange={field.onChange}
+                                      placeholder="Select dosage"
+                                      searchPlaceholder="Search dosages..."
+                                      emptyText="No dosages found."
+                                      loading={masterDataAPI.loading.dosages}
+                                    />
+                                  )}
+                                />
                               </td>
                               <td className="p-3">
                                 <Input placeholder="Advice" {...form.register(`past_history_medicines.${index}.advice` as const)} />

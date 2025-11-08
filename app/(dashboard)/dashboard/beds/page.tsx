@@ -10,6 +10,8 @@ import {
   AlertCircle,
   Wrench,
   TrendingUp,
+  Printer,
+  Eye,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -35,6 +37,7 @@ import { BedCard } from "@/components/bed-card"
 import { BedAssignmentForm } from "@/components/bed-assignment-form"
 import { BedDetailsSheet } from "@/components/bed-details-sheet"
 import { BedForm } from "@/components/bed-form"
+import { BedPrint } from "@/components/bed-print"
 
 // Sample data removed for production - should be fetched from API
 interface BedData {
@@ -225,70 +228,6 @@ export default function BedsPage() {
             </Button>
           </BedAssignmentForm>
         </div>
-      </div>
-
-      {/* Statistics Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Beds</CardTitle>
-            <Bed className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalBeds}</div>
-            <p className="text-xs text-muted-foreground">all floors</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Occupied</CardTitle>
-            <AlertCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{occupiedBeds}</div>
-            <p className="text-xs text-muted-foreground">{occupancyRate}% occupancy</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Available</CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{availableBeds}</div>
-            <p className="text-xs text-muted-foreground">ready to use</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Maintenance</CardTitle>
-            <Wrench className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{maintenanceBeds}</div>
-            <p className="text-xs text-muted-foreground">under maintenance</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Occupancy Rate</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{occupancyRate}%</div>
-            <p className="text-xs text-muted-foreground">current rate</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Surgeries Today</CardTitle>
-            <AlertCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{bedsWithSurgeryToday}</div>
-            <p className="text-xs text-muted-foreground">scheduled</p>
-          </CardContent>
-        </Card>
       </div>
 
       <Tabs defaultValue="kanban" className="space-y-4">
@@ -533,6 +472,7 @@ export default function BedsPage() {
                       <TableHead>SURGERY TIME</TableHead>
                       <TableHead>DOCTOR</TableHead>
                       <TableHead>DAILY RATE</TableHead>
+                      <TableHead>ACTIONS</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -595,6 +535,48 @@ export default function BedsPage() {
                           {assignment?.doctor_name || <span className="text-muted-foreground">-</span>}
                         </TableCell>
                         <TableCell className="font-semibold">₹{bed.daily_rate.toLocaleString()}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleBedClick({ bed, assignment })
+                              }}
+                              title="View bed details"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <BedPrint
+                              bed={{
+                                id: bed.id,
+                                bed_number: bed.bed_number,
+                                room_number: bed.room_number,
+                                ward: bed.ward_name,
+                                bed_type: bed.ward_type,
+                                status: bed.status,
+                                patient_name: assignment?.patient_name,
+                                patient_id: assignment?.patient_mrn,
+                                admission_date: assignment?.admission_date,
+                                daily_rate: bed.daily_rate,
+                                assigned_nurse: assignment?.doctor_name,
+                                notes: assignment?.admission_reason
+                              }}
+                            >
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={(e) => e.stopPropagation()}
+                                title="Print bed information"
+                              >
+                                <Printer className="h-4 w-4" />
+                              </Button>
+                            </BedPrint>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

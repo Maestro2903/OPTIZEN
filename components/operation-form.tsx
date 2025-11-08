@@ -27,6 +27,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
 import { useToast } from "@/hooks/use-toast"
 import { patientsApi, casesApi, masterDataApi, operationsApi } from "@/lib/services/api"
+import { useMasterData } from "@/hooks/use-master-data"
 import { Checkbox } from "@/components/ui/checkbox"
 
 const operationFormSchema = z.object({
@@ -81,6 +82,7 @@ interface OperationFormProps {
 
 export function OperationForm({ children, onSubmit, operationData, mode = "create" }: OperationFormProps) {
   const { toast } = useToast()
+  const masterData = useMasterData()
   const [open, setOpen] = React.useState(false)
   const [patients, setPatients] = React.useState<SearchableSelectOption[]>([])
   const [cases, setCases] = React.useState<SearchableSelectOption[]>([])
@@ -144,39 +146,30 @@ export function OperationForm({ children, onSubmit, operationData, mode = "creat
   // Load patients
   React.useEffect(() => {
     const loadPatients = async () => {
+      if (!open) return
       setLoadingPatients(true)
       try {
-        const response = await patientsApi.list({})
+        const response = await patientsApi.list({ limit: 1000, status: 'active' })
         if (response.success && response.data) {
           setPatients(
-            response.data
-              .filter((patient) => patient?.id && patient?.full_name && patient?.patient_id)
-              .map((patient) => ({
-                value: patient.id,
-                label: `${patient.full_name} (${patient.patient_id})`,
-              }))
+            response.data.map((patient) => ({
+              value: patient.id,
+              label: `${patient.full_name} (${patient.patient_id})`,
+            }))
           )
-        } else {
-          toast({
-            title: "Failed to load patients",
-            description: "Unable to fetch patient list. Please try again.",
-            variant: "destructive",
-          })
         }
       } catch (error: any) {
         console.error("Error loading patients:", error)
         toast({
           title: "Failed to load patients",
-          description: error?.message ?? "An unexpected error occurred",
+          description: error?.message ?? "Please try again",
           variant: "destructive",
         })
       } finally {
         setLoadingPatients(false)
       }
     }
-    if (open) {
-      loadPatients()
-    }
+    loadPatients()
   }, [open, toast])
 
   // Load cases for selected patient
@@ -220,6 +213,13 @@ export function OperationForm({ children, onSubmit, operationData, mode = "creat
       loadCases()
     }
   }, [selectedPatientId, open, toast])
+
+  // Load master data (diagnosis, anesthesia) when dialog opens
+  React.useEffect(() => {
+    if (open) {
+      masterData.fetchMultiple(['diagnosis', 'anesthesiaTypes'])
+    }
+  }, [open])
 
   // Load surgery types from master data
   React.useEffect(() => {
@@ -457,7 +457,15 @@ export function OperationForm({ children, onSubmit, operationData, mode = "creat
                   <FormItem>
                     <FormLabel>Diagnosis</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter diagnosis" {...field} />
+                      <SearchableSelect
+                        options={masterData.data.diagnosis || []}
+                        value={field.value || ""}
+                        onValueChange={field.onChange}
+                        placeholder="Select diagnosis"
+                        searchPlaceholder="Search diagnosis..."
+                        emptyText="No diagnosis found."
+                        loading={masterData.loading.diagnosis}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -472,15 +480,13 @@ export function OperationForm({ children, onSubmit, operationData, mode = "creat
                     <FormLabel>Anesthesia</FormLabel>
                     <FormControl>
                       <SearchableSelect
-                        options={[
-                          { value: "Local", label: "Local" },
-                          { value: "General", label: "General" },
-                          { value: "Topical", label: "Topical" },
-                          { value: "Regional", label: "Regional" },
-                        ]}
+                        options={masterData.data.anesthesiaTypes || []}
                         value={field.value || ""}
                         onValueChange={field.onChange}
                         placeholder="Select anesthesia type"
+                        searchPlaceholder="Search anesthesia..."
+                        emptyText="No anesthesia types found."
+                        loading={masterData.loading.anesthesiaTypes}
                       />
                     </FormControl>
                     <FormMessage />

@@ -1,20 +1,20 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { requirePermission } from '@/lib/middleware/rbac'
 
 // GET /api/employees/[id] - Get a specific employee by ID
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Authorization check
+  const authCheck = await requirePermission('employees', 'view')
+  if (!authCheck.authorized) return authCheck.response
+  const { context } = authCheck
+
   try {
     const supabase = createClient()
     const { id } = await params
-
-    // Check authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
 
     // Validate and sanitize ID parameter
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -22,32 +22,9 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid employee ID format' }, { status: 400 })
     }
 
-    // Authorization check - allow if user is accessing their own record, admin, or manager
-    const isOwnRecord = session.user.id === id
-    const userRole = session.user.user_metadata?.role || session.user.app_metadata?.role
-    const isAdmin = userRole === 'admin'
-    const isManager = userRole === 'manager'
-
-    if (!isOwnRecord && !isAdmin && !isManager) {
-      // For managers, check if they manage this employee (if employee table has manager_id field)
-      if (userRole === 'manager') {
-        const { data: employeeCheck } = await supabase
-          .from('employees')
-          .select('manager_id')
-          .eq('id', id)
-          .single()
-
-        if (employeeCheck?.manager_id !== session.user.id) {
-          return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-        }
-      } else {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-      }
-    }
-
     // Fetch employee by ID
     const { data: employee, error } = await supabase
-      .from('employees')
+      .from('users')
       .select('*')
       .eq('id', id)
       .single()
@@ -76,15 +53,14 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Authorization check
+  const authCheck = await requirePermission('employees', 'edit')
+  if (!authCheck.authorized) return authCheck.response
+  const { context } = authCheck
+
   try {
     const supabase = createClient()
     const { id } = await params
-
-    // Check authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
 
     // Validate ID parameter
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -133,12 +109,13 @@ export async function PUT(
       ...updateData
     } = body
 
-    // Add updated_at timestamp
+    // Add audit fields
     updateData.updated_at = new Date().toISOString()
+    updateData.updated_by = context.user_id
 
     // Update employee
     const { data: employee, error } = await supabase
-      .from('employees')
+      .from('users')
       .update(updateData)
       .eq('id', id)
       .select()
@@ -183,56 +160,22 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Authorization check
+  const authCheck = await requirePermission('employees', 'delete')
+  if (!authCheck.authorized) return authCheck.response
+  const { context } = authCheck
+
   try {
     const supabase = createClient()
     const { id } = await params
 
-    // Check authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Fetch employee first for authorization check
-    const { data: targetEmployee, error: fetchError } = await supabase
-      .from('employees')
-      .select('id, status, employee_id')
-      .eq('id', id)
-      .single()
-
-    if (fetchError) {
-      if (fetchError.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Employee not found' }, { status: 404 })
-      }
-      console.error('Error fetching employee:', fetchError)
-      return NextResponse.json({ error: 'Failed to fetch employee' }, { status: 500 })
-    }
-
-    // Authorization check - only admins, managers, or self-deactivation allowed
-    const userRole = session.user.user_metadata?.role || session.user.app_metadata?.role
-    const isAdmin = userRole === 'admin'
-    const isManager = userRole === 'manager'
-    const isSelfDeactivation = String(session.user.id) === String(id)
-
-    if (!isAdmin && !isManager && !isSelfDeactivation) {
-      return NextResponse.json({
-        error: 'Forbidden: You do not have permission to deactivate this employee'
-      }, { status: 403 })
-    }
-
-    // For non-admins/non-managers, only allow self-deactivation
-    if (!isAdmin && !isManager && !isSelfDeactivation) {
-      return NextResponse.json({
-        error: 'Forbidden: You can only deactivate your own account'
-      }, { status: 403 })
-    }
-
     // Soft delete by updating status to inactive
     const { data: employee, error } = await supabase
-      .from('employees')
+      .from('users')
       .update({
         status: 'inactive',
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        updated_by: context.user_id
       })
       .eq('id', id)
       .select()

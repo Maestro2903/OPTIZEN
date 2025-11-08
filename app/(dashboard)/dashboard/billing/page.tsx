@@ -15,6 +15,7 @@ import {
   Download,
   CheckCircle,
   XCircle,
+  Printer,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -32,6 +33,7 @@ import { InvoiceForm } from "@/components/invoice-form"
 import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
 import { ViewEditDialog } from "@/components/view-edit-dialog"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
+import { BillingPrint } from "@/components/billing-print"
 import { useApiList, useApiForm, useApiDelete } from "@/lib/hooks/useApi"
 import { invoicesApi, type Invoice, type InvoiceFilters } from "@/lib/services/api"
 import { useToast } from "@/hooks/use-toast"
@@ -211,7 +213,7 @@ export default function BillingPage() {
       { id: "status", label: "Status" },
       { id: "due_date", label: "Due Date" },
     ],
-    showExport: true,
+    showExport: false,
     showSettings: true,
   }
 
@@ -237,49 +239,6 @@ export default function BillingPage() {
             Create Invoice
           </Button>
         </InvoiceForm>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹{totalRevenue.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">current page only</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Amount Received</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹{paidAmount.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">current page only</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Amount</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹{pendingAmount.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">current page only</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Invoices</CardTitle>
-            <Receipt className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{pagination?.total || 0}</div>
-            <p className="text-xs text-muted-foreground">generated</p>
-          </CardContent>
-        </Card>
       </div>
 
       <Card>
@@ -411,6 +370,32 @@ export default function BillingPage() {
                           >
                             <Download className="h-4 w-4" />
                           </Button>
+                          <BillingPrint
+                            billing={{
+                              id: invoice.id,
+                              invoice_no: invoice.invoice_number,
+                              patient_name: invoice.patients?.full_name || 'Unknown Patient',
+                              patient_id: invoice.patient_id,
+                              date: invoice.invoice_date,
+                              total_amount: invoice.total_amount,
+                              payment_status: invoice.payment_status,
+                              subtotal: invoice.subtotal,
+                              tax_amount: invoice.tax_amount,
+                              discount_amount: invoice.discount_amount,
+                              payment_method: invoice.payment_method,
+                              due_date: invoice.due_date,
+                              notes: invoice.notes
+                            }}
+                          >
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              title="Print Invoice"
+                            >
+                              <Printer className="h-4 w-4" />
+                            </Button>
+                          </BillingPrint>
                           <Button
                             variant="ghost"
                             size="icon"

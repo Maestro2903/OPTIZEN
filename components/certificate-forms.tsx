@@ -7,6 +7,7 @@ import * as z from "zod"
 import { Button } from "@/components/ui/button"
 import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
 import { patientsApi } from "@/lib/services/api"
+import { useMasterData } from "@/hooks/use-master-data"
 import {
   Dialog,
   DialogContent,
@@ -75,29 +76,8 @@ interface CertificateFormsProps {
   children: React.ReactNode
 }
 
-// Visual acuity options
-const visualAcuityOptions: SearchableSelectOption[] = [
-  { value: "6/4", label: "6/4" },
-  { value: "6/4P", label: "6/4P" },
-  { value: "6/5", label: "6/5" },
-  { value: "6/5P", label: "6/5P" },
-  { value: "6/6", label: "6/6" },
-  { value: "6/6P", label: "6/6P" },
-  { value: "6/9", label: "6/9" },
-  { value: "6/9P", label: "6/9P" },
-  { value: "6/12", label: "6/12" },
-  { value: "6/12P", label: "6/12P" },
-  { value: "6/18", label: "6/18" },
-  { value: "6/24", label: "6/24" },
-  { value: "6/36", label: "6/36" },
-  { value: "6/60", label: "6/60" },
-  { value: "FC 1M", label: "FC 1M" },
-  { value: "FC 3M", label: "FC 3M" },
-  { value: "HM", label: "Hand Movements" },
-  { value: "PL+", label: "Perception of Light" },
-]
-
 export function CertificateForms({ children }: CertificateFormsProps) {
+  const masterData = useMasterData()
   const [open, setOpen] = React.useState(false)
   const [certType, setCertType] = React.useState("fitness")
   const [patients, setPatients] = React.useState<SearchableSelectOption[]>([])
@@ -133,14 +113,18 @@ export function CertificateForms({ children }: CertificateFormsProps) {
       if (!open) return
       setLoadingPatients(true)
       try {
-        const response = await patientsApi.list({ limit: 1000, status: 'active' })
+        console.log("Fetching patients for certificates...")
+        const response = await patientsApi.list({ limit: 1000 })
+        console.log("Patients response:", response)
         if (response.success && response.data) {
-          setPatients(
-            response.data.map((patient) => ({
-              value: patient.id,
-              label: `${patient.full_name} (${patient.patient_id})`,
-            }))
-          )
+          const patientOptions = response.data.map((patient) => ({
+            value: patient.id,
+            label: `${patient.full_name} (${patient.patient_id})`,
+          }))
+          console.log("Patient options:", patientOptions)
+          setPatients(patientOptions)
+        } else {
+          console.error("Failed to load patients:", response.error)
         }
       } catch (error) {
         console.error("Error loading patients:", error)
@@ -149,6 +133,13 @@ export function CertificateForms({ children }: CertificateFormsProps) {
       }
     }
     loadPatients()
+  }, [open])
+
+  // Load master data for certificates
+  React.useEffect(() => {
+    if (open) {
+      masterData.fetchMultiple(['visualAcuity', 'colorVisionTypes', 'drivingFitnessTypes', 'diagnosis'])
+    }
   }, [open])
 
   function onSubmitFitness(values: z.infer<typeof fitnessCertSchema>) {
@@ -287,17 +278,16 @@ export function CertificateForms({ children }: CertificateFormsProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Patient *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select patient" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="PAT001">AARAV MEHTA</SelectItem>
-                          <SelectItem value="PAT002">NISHANT KAREKAR</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <SearchableSelect
+                          options={patients}
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          placeholder="Select patient"
+                          searchPlaceholder="Search patients..."
+                          loading={loadingPatients}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -309,7 +299,14 @@ export function CertificateForms({ children }: CertificateFormsProps) {
                     <FormItem>
                       <FormLabel>Diagnosis *</FormLabel>
                       <FormControl>
-                        <Input placeholder="Medical diagnosis..." {...field} />
+                        <SearchableSelect
+                          options={masterData.data.diagnosis || []}
+                          value={field.value || ""}
+                          onValueChange={field.onChange}
+                          placeholder="Select diagnosis"
+                          searchPlaceholder="Search diagnosis..."
+                          loading={masterData.loading.diagnosis}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -360,17 +357,16 @@ export function CertificateForms({ children }: CertificateFormsProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Patient *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select patient" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="PAT001">AARAV MEHTA</SelectItem>
-                          <SelectItem value="PAT002">NISHANT KAREKAR</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <SearchableSelect
+                          options={patients}
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          placeholder="Select patient"
+                          searchPlaceholder="Search patients..."
+                          loading={loadingPatients}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -384,11 +380,12 @@ export function CertificateForms({ children }: CertificateFormsProps) {
                         <FormLabel>Visual Acuity - Right</FormLabel>
                         <FormControl>
                           <SearchableSelect
-                            options={visualAcuityOptions}
+                            options={masterData.data.visualAcuity || []}
                             value={field.value || ""}
                             onValueChange={field.onChange}
                             placeholder="Select visual acuity"
                             searchPlaceholder="Search acuity..."
+                            loading={masterData.loading.visualAcuity}
                           />
                         </FormControl>
                         <FormMessage />
@@ -403,11 +400,12 @@ export function CertificateForms({ children }: CertificateFormsProps) {
                         <FormLabel>Visual Acuity - Left</FormLabel>
                         <FormControl>
                           <SearchableSelect
-                            options={visualAcuityOptions}
+                            options={masterData.data.visualAcuity || []}
                             value={field.value || ""}
                             onValueChange={field.onChange}
                             placeholder="Select visual acuity"
                             searchPlaceholder="Search acuity..."
+                            loading={masterData.loading.visualAcuity}
                           />
                         </FormControl>
                         <FormMessage />
@@ -422,7 +420,14 @@ export function CertificateForms({ children }: CertificateFormsProps) {
                     <FormItem>
                       <FormLabel>Color Vision</FormLabel>
                       <FormControl>
-                        <Input placeholder="Normal" {...field} />
+                        <SearchableSelect
+                          options={masterData.data.colorVisionTypes || []}
+                          value={field.value || ""}
+                          onValueChange={field.onChange}
+                          placeholder="Select color vision"
+                          searchPlaceholder="Search..."
+                          loading={masterData.loading.colorVisionTypes}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -435,7 +440,14 @@ export function CertificateForms({ children }: CertificateFormsProps) {
                     <FormItem>
                       <FormLabel>Driving Fitness</FormLabel>
                       <FormControl>
-                        <Textarea rows={2} placeholder="Fit for driving" {...field} />
+                        <SearchableSelect
+                          options={masterData.data.drivingFitnessTypes || []}
+                          value={field.value || ""}
+                          onValueChange={field.onChange}
+                          placeholder="Select driving fitness"
+                          searchPlaceholder="Search..."
+                          loading={masterData.loading.drivingFitnessTypes}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -460,17 +472,16 @@ export function CertificateForms({ children }: CertificateFormsProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Patient *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select patient" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="PAT001">AARAV MEHTA</SelectItem>
-                          <SelectItem value="PAT002">NISHANT KAREKAR</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <SearchableSelect
+                          options={patients}
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          placeholder="Select patient"
+                          searchPlaceholder="Search patients..."
+                          loading={loadingPatients}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -548,17 +559,16 @@ export function CertificateForms({ children }: CertificateFormsProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Patient *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select patient" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="PAT001">AARAV MEHTA</SelectItem>
-                          <SelectItem value="PAT002">NISHANT KAREKAR</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <SearchableSelect
+                          options={patients}
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          placeholder="Select patient"
+                          searchPlaceholder="Search patients..."
+                          loading={loadingPatients}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}

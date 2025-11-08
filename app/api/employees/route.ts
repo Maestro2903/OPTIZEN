@@ -1,9 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { parseArrayParam, validateArrayParam, applyArrayFilter } from '@/lib/utils/query-params'
+import { requirePermission } from '@/lib/middleware/rbac'
 
 // GET /api/employees - List employees with pagination, filtering, and sorting
 export async function GET(request: NextRequest) {
+  // Authorization check
+  const authCheck = await requirePermission('employees', 'view')
+  if (!authCheck.authorized) return authCheck.response
+  const { context } = authCheck
+
   try {
     const supabase = createClient()
     const { searchParams } = new URL(request.url)
@@ -42,18 +48,12 @@ export async function GET(request: NextRequest) {
       sortBy = 'created_at'
     }
 
-    // Check authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     // Calculate offset for pagination
     const offset = (page - 1) * limit
 
-    // Build query
+    // Build query - employees are stored in the users table
     let query = supabase
-      .from('employees')
+      .from('users')
       .select('*', { count: 'exact' })
 
     // Apply search filter with sanitized input
@@ -132,15 +132,13 @@ export async function GET(request: NextRequest) {
 
 // POST /api/employees - Create a new employee
 export async function POST(request: NextRequest) {
+  // Authorization check
+  const authCheck = await requirePermission('employees', 'create')
+  if (!authCheck.authorized) return authCheck.response
+  const { context } = authCheck
+
   try {
     const supabase = createClient()
-
-    // Check authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const body = await request.json()
 
     // Validate required fields
@@ -168,9 +166,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Insert new employee
+    // Insert new employee - employees are stored in the users table
     const { data: employee, error } = await supabase
-      .from('employees')
+      .from('users')
       .insert([
         {
           employee_id,
@@ -187,7 +185,7 @@ export async function POST(request: NextRequest) {
           qualifications,
           license_number,
           status,
-          created_by: session.user.id
+          created_by: context.user_id
         }
       ])
       .select()

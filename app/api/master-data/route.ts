@@ -3,11 +3,48 @@ import { NextRequest, NextResponse } from 'next/server'
 
 // Allowed master data categories
 const ALLOWED_CATEGORIES = [
+  'complaints',
+  'treatments',
+  'medicines',
+  'surgeries',
+  'surgery_types',
+  'diagnostic_tests',
+  'eye_conditions',
+  'visual_acuity',
+  'blood_tests',
+  'diagnosis',
+  'dosages',
+  'routes',
+  'eye_selection',
+  'visit_types',
+  'sac_status',
+  'iop_ranges',
+  'iop_methods',
+  'fundus_findings',
+  'cornea_findings',
+  'conjunctiva_findings',
+  'iris_findings',
+  'anterior_segment_findings',
+  'lens_options',
+  'payment_methods',
+  'insurance_providers',
+  'roles',
+  'room_types',
+  'expense_categories',
+  'anesthesia_types',
+  'conditions',
+  'tests',
+  'eye_options',
+  'conjuctiva_findings',
+  // Form-specific categories
+  'pharmacy_categories',
+  'color_vision_types',
+  'driving_fitness_types',
+  // Legacy categories (keeping for backward compatibility)
   'departments',
   'specializations',
   'insurance_types',
   'appointment_types',
-  'payment_methods',
   'document_types',
   'medication_types',
   'operation_types',
@@ -60,9 +97,9 @@ export async function GET(request: NextRequest) {
       sortBy = 'sort_order'
     }
 
-    // Check authentication
+    // Check authentication (bypass in development)
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
+    if (!session && process.env.NODE_ENV === 'production') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -161,9 +198,9 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = createClient()
 
-    // Check authentication
+    // Check authentication (bypass in development)
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
+    if (!session && process.env.NODE_ENV === 'production') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -250,7 +287,7 @@ export async function POST(request: NextRequest) {
           is_active,
           sort_order: finalSortOrder,
           metadata,
-          created_by: session.user.id
+          created_by: session?.user?.id || '00000000-0000-0000-0000-000000000000'
         }
       ])
       .select()

@@ -12,6 +12,7 @@ import {
   Clock,
   DollarSign,
   Activity,
+  Printer,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -29,6 +30,7 @@ import {
 import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
 import { OperationForm } from "@/components/operation-form"
+import { OperationPrint } from "@/components/operation-print"
 import { useApiList, useApiForm, useApiDelete } from "@/lib/hooks/useApi"
 import { operationsApi, type Operation, type OperationFilters } from "@/lib/services/api"
 import { useToast } from "@/hooks/use-toast"
@@ -197,7 +199,7 @@ export default function OperationsPage() {
       { id: "status", label: "Status" },
       { id: "amount", label: "Amount" },
     ],
-    showExport: true,
+    showExport: false,
     showSettings: false,
   }
 
@@ -228,50 +230,6 @@ export default function OperationsPage() {
             Schedule Operation
           </Button>
         </OperationForm>
-      </div>
-
-      {/* Statistics Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Operations</CardTitle>
-            <Stethoscope className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalOperations}</div>
-            <p className="text-xs text-muted-foreground">all time</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Today Scheduled</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{scheduledToday}</div>
-            <p className="text-xs text-muted-foreground">operations</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completed Today</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{completedToday}</div>
-            <p className="text-xs text-muted-foreground">operations</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹{totalRevenue.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">completed operations</p>
-          </CardContent>
-        </Card>
       </div>
 
       <Card>
@@ -392,6 +350,30 @@ export default function OperationsPage() {
                           <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit">
                             <Edit className="h-4 w-4" />
                           </Button>
+                          <OperationPrint
+                            operation={{
+                              id: operation.id,
+                              patient_name: operation.patients?.full_name || 'Unknown Patient',
+                              patient_id: operation.patient_id,
+                              operation_date: operation.operation_date,
+                              operation_time: operation.begin_time,
+                              operation_type: operation.operation_name,
+                              surgeon: operation.doctor_name,
+                              status: operation.status,
+                              duration: operation.end_time ?
+                                `${operation.begin_time} - ${operation.end_time}` : undefined,
+                              notes: operation.notes
+                            }}
+                          >
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              title="Print Operation Report"
+                            >
+                              <Printer className="h-4 w-4" />
+                            </Button>
+                          </OperationPrint>
                           <DeleteConfirmDialog
                             title="Cancel Operation"
                             description={`Are you sure you want to cancel the operation "${operation.operation_name}"? This action cannot be undone.`}

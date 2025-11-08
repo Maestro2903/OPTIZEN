@@ -12,6 +12,7 @@ import {
   Edit,
   Clock,
   Trash2,
+  Printer,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -26,6 +27,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { AttendanceForm } from "@/components/attendance-form"
+import { AttendancePrint } from "@/components/attendance-print"
 import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
 import { useApiList, useApiForm, useApiDelete } from "@/lib/hooks/useApi"
@@ -238,7 +240,7 @@ export default function AttendancePage() {
       { id: "status", label: "Status" },
       { id: "working_hours", label: "Hours" },
     ],
-    showExport: true,
+    showExport: false,
     showSettings: true,
   }
 
@@ -266,49 +268,6 @@ export default function AttendancePage() {
             Mark Attendance
           </Button>
         </AttendanceForm>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Staff</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{attendanceSummary.total_staff}</div>
-            <p className="text-xs text-muted-foreground">all staff members</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Present Today</CardTitle>
-            <UserCheck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{attendanceSummary.present}</div>
-            <p className="text-xs text-muted-foreground">currently on duty</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">On Leave</CardTitle>
-            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{attendanceSummary.on_leave}</div>
-            <p className="text-xs text-muted-foreground">{thisMonthLeaves} this month</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Attendance Rate</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{attendanceSummary.attendance_percentage.toFixed(1)}%</div>
-            <p className="text-xs text-muted-foreground">today&apos;s attendance</p>
-          </CardContent>
-        </Card>
       </div>
 
       <Card>
@@ -453,6 +412,22 @@ export default function AttendancePage() {
                               <Edit className="h-4 w-4" />
                             </Button>
                           </AttendanceForm>
+                          <AttendancePrint attendance={{
+                            id: record.id,
+                            employee_name: record.employees?.full_name || 'N/A',
+                            employee_id: record.employee_id,
+                            date: record.attendance_date,
+                            check_in_time: record.check_in_time,
+                            check_out_time: record.check_out_time,
+                            status: record.status,
+                            hours_worked: record.working_hours ? `${record.working_hours}h` : undefined,
+                            department: record.employees?.role,
+                            notes: record.notes
+                          }}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" title="Print Attendance">
+                              <Printer className="h-4 w-4" />
+                            </Button>
+                          </AttendancePrint>
                           <DeleteConfirmDialog
                             title="Delete Attendance Record"
                             description="Are you sure you want to delete this attendance record? This action cannot be undone."
@@ -483,55 +458,6 @@ export default function AttendancePage() {
           />
         </CardContent>
       </Card>
-
-      {/* Quick Stats */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>This Month Summary</CardTitle>
-            <CardDescription>Attendance overview for current month</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Total Working Days</span>
-              <span className="font-semibold">-</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Average Attendance</span>
-              <span className="font-semibold">{attendanceSummary.attendance_percentage.toFixed(1)}%</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Total Leaves Taken</span>
-              <span className="font-semibold">{thisMonthLeaves}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Absent Days</span>
-              <span className="font-semibold">{thisMonthAbsent}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>Bulk attendance operations</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <Button variant="outline" className="w-full justify-start">
-              <UserCheck className="mr-2 h-4 w-4" />
-              Mark All Present
-            </Button>
-            <Button variant="outline" className="w-full justify-start">
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              Apply Bulk Leave
-            </Button>
-            <Button variant="outline" className="w-full justify-start">
-              <TrendingUp className="mr-2 h-4 w-4" />
-              Generate Report
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   )
 }

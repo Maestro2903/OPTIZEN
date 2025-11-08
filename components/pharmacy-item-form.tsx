@@ -113,7 +113,7 @@ export function PharmacyItemForm({ children, itemData, mode = "create", onSubmit
       if (!isOpen) return
       setLoadingCategories(true)
       try {
-        const response = await masterDataApi.list({ category: 'medicine_categories', limit: 100 })
+        const response = await masterDataApi.list({ category: 'pharmacy_categories', limit: 100 })
         if (cancelled) return
 
         if (response.success && response.data && response.data.length > 0) {

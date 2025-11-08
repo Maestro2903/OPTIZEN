@@ -15,6 +15,7 @@ import {
   Phone,
   Mail,
   MapPin,
+  Printer,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -32,6 +33,7 @@ import { EmployeeForm } from "@/components/employee-form"
 import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
 import { ViewEditDialog } from "@/components/view-edit-dialog"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
+import { EmployeePrint } from "@/components/employee-print"
 import { useApiList, useApiForm, useApiDelete } from "@/lib/hooks/useApi"
 import { employeesApi, type Employee, type EmployeeFilters } from "@/lib/services/api"
 import { useToast } from "@/hooks/use-toast"
@@ -227,7 +229,7 @@ export default function EmployeesPage() {
       { id: "hire_date", label: "Hire Date" },
       { id: "department", label: "Department" },
     ],
-    showExport: true,
+    showExport: false,
     showSettings: true,
   }
 
@@ -246,49 +248,6 @@ export default function EmployeesPage() {
             Add Employee
           </Button>
         </EmployeeForm>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Staff</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{pagination?.total || 0}</div>
-            <p className="text-xs text-muted-foreground">employees</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Staff</CardTitle>
-            <UserCheck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{employees.filter(e => e.status === "active").length}</div>
-            <p className="text-xs text-muted-foreground">currently working</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Doctors</CardTitle>
-            <UserPlus className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{employees.filter(e => e.role === "doctor").length}</div>
-            <p className="text-xs text-muted-foreground">medical professionals</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Support Staff</CardTitle>
-            <UserX className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{employees.filter(e => e.role !== "doctor").length}</div>
-            <p className="text-xs text-muted-foreground">nursing & admin</p>
-          </CardContent>
-        </Card>
       </div>
 
       <Card>
@@ -400,9 +359,9 @@ export default function EmployeesPage() {
                           >
                             <Phone className="h-4 w-4" />
                           </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="h-8 w-8"
                             onClick={() => {
                               window.location.href = `mailto:${employee.email}`
@@ -412,6 +371,34 @@ export default function EmployeesPage() {
                           >
                             <Mail className="h-4 w-4" />
                           </Button>
+                          <EmployeePrint
+                            employee={{
+                              id: employee.id,
+                              employee_id: employee.employee_id,
+                              full_name: employee.full_name,
+                              email: employee.email,
+                              phone: employee.phone,
+                              position: employee.role,
+                              department: employee.department,
+                              hire_date: employee.hire_date,
+                              salary: employee.salary,
+                              status: employee.status,
+                              address: employee.address,
+                              emergency_contact: employee.emergency_contact,
+                              emergency_phone: employee.emergency_phone,
+                              qualifications: employee.qualifications,
+                              created_at: employee.created_at || new Date().toISOString()
+                            }}
+                          >
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              title="Print employee record"
+                            >
+                              <Printer className="h-4 w-4" />
+                            </Button>
+                          </EmployeePrint>
                           <DeleteConfirmDialog
                             title="Remove Employee"
                             description={`Are you sure you want to remove ${employee.full_name} from the system? This action cannot be undone.`}

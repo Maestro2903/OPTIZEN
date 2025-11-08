@@ -170,3 +170,6 @@ html {
   width: 1.5rem;
   height: 1rem;
 }
+
+/* Import print styles */
+@import url('../styles/print.css');

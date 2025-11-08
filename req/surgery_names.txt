@@ -1,0 +1,186 @@
+FOREIGNBODY
+GLAUCOMA
+ANIRIDIA
+COLOBOMA OF IRIS
+PTOSIS
+BLEPHAROSPASM
+CHALAZION
+BLEPHARITIS
+LENS INDUCED GLAUCOMA
+PINGUECULUM
+PTERYGIUM
+PHLYCTENULAR KERATOCONJUNCTIVITIS
+SYMBLEPHARON
+MEGALOCORNEA
+MICRO CORNEA
+KERATOCONUS
+CORNEAL ULCER
+INTERSTITIAL KERATITIS
+RETINO BLASTOMA
+ECTOPIA LENTIS
+RETINITIS PIGMENTOSA
+OPTIC ATROPHY
+HORDEOLUM-EXTERNAL
+CATARACT IN RIGHT EYE
+CATARACT IN LEFT EYE
+AMBLYLAOPIA
+CORNEAL FOLDS
+POOR ENDOTHELIAL COUNT
+NLD BLOCK
+CATARACT IN BOTH EYE
+GLAUCOMMATOUS DAMAGE
+CLEAR
+Post Subcapsular Cataract
+POST POLAR
+Cortical Age Related Cataract
+NUCLEAR SCL -1
+NUCLEAR SCL -2
+NUCLEAR SCL -3
+NUCLEAR SCL -4
+IOL
+Mature Cataract  age related
+CONJUCTIVITIS
+ALLERGIC CONJUCTIVITIS
+IRIDOCYCLITIS
+SCH
+PCO
+FILAMENTARY KERATITIS
+YAG LASER
+STYE
+ENDOPHTHALMTIS
+SPK
+EPITHELIAL DEFECT
+THIRD NERVE PALSY
+EARLY PCO
+HERPES
+VIRAL KERETITIES
+FUNGAL KERATITIES
+SUTURAL CATARACT
+CORNEAL SCAR
+SEASONAL ALLERGIC
+DRY EYE
+VERNAL CONJUCTIVITIS
+UVETIC GLAUCOMA
+EARLY CATARACT
+APHAKIA
+CORNEAL OPACITY
+PXF
+CSR {MACULA}
+OTPIC NEURITIS
+POST HERPETIC SECONDARY GLAUCOMA
+MGD
+MIGRAINE
+DIABETIC
+SCLERITIS
+HIGH MYOPIA
+MICRO SPORIDIAL KERATITIS
+BELL'S PALSY (FACIAL NERVE)
+DACRYOCYSTITIS
+SQUINT EYE
+MYOPIA
+LR PALSY (SIXTH NERVE)
+PSC + NS
+ADVICE PHACO SURGERY WITH IOL IMPLANTATION
+YAG LASER
+LASIK
+STYE
+ADENOVIRUS CONJUNCTIVITIS
+MYATRO EYE DROPS
+Diplopia
+cortical cataract
+PTERYGIUM DONE
+PTERYGIUM DONE
+Dacrycystitis with Lacrimal Sac Abscess
+Income Tax Officer
+Flotter in Eyes
+YAG LASER DONE
+CONCRETION
+White Mature Cataract
+Early PSC
+CORTICAL +PSC
+EPISCLERITIS
+ALTERNATE EXOTROPIA
+PSC+CORTICAL
+PBK
+PUK
+EXOPHORIA
+Covid History
+CME
+Macular Degenration
+Barrage Laser Done
+Senile Ectropion
+MULTIPLE LATTICE
+EXOTROPIA
+PSEUDOPHAKIA
+UPPER LID CYST
+EARLY CATARACT
+ITCHING
+ENTROPION
+ECTROPION
+Mild NPDR
+Diabetic Macular Edema
+Post Op CME
+Choroidal NEO Vascular Membrane (CNVM)
+Advice Intra Vitreal Anti Vegf Inj
+Neo Vascular Glaucoma
+Advice Right eye PRP Laser
+Advice Left eye PRP Laser
+Keratitis
+psc
+Ptosis Scleral
+Papilledema
+Primary Open Angle Glucoma
+Lattice Degeneration
+C3R
+C3R
+SICS
+NUCLEAR SCL- 5
+C3R DONE
+C3R DONE
+C3R DONE
+Ocular Hypertension
+PPC- Posterior Polar Cataract
+Flickering of Eyes
+Forme Fruste Keratoconus
+Advance Keratoconus
+S/P Trabeculectomy
+Microbial Keratitis - Pseudomonas
+Hyper Mature Cataract
+Hyper Mature Cataract
+Haemorrhage Conjuctivitis
+Lattice Degeneration with Holes
+S/P YAG Capsulotomy
+Intermittent Exotropia
+Epidemic Keratoconjunctivitis
+Epidemic Keratoconjunctivitis
+Retrobulbar Neuritis
+Blue Dot Cataract
+CCC- Chronic Cicatrizing Conjunctivitis
+Macular Retinal Scar
+Subluxated IOL
+Twitching
+Twitching
+Hypermetropia
+S/P Scleral Buckle
+FHI- Fuchs Heretochromic Iridocyclitis
+Homonymous Hemianopia
+PPCD - Posterior Polymorphous Corneal dystrophy
+Positive Dysphotopsia
+Viral Conjunctivitis
+Choroidal Granuloma
+Fuch Distrophy
+ADVICE BOTH EYE LASIK SURGERY
+PRP Laser
+Sixth Nerve palsy
+Developmental cataract
+Advice Injection IVTA
+Advice Injection IVTA Given
+Injection IVTA Given
+Intra Vitreal Anti Vegf Inj Given
+Advice  ICL Surgery
+Drry Eye Disease : Aqueous Def > Evaporative
+BRAO- Branched Retinal Artery Occl
+CATARACT ( PHACOEMULSIFICATION) + IOL
+DCR- EXTERNAL
+LEFT EYE
+RIGHT EYE

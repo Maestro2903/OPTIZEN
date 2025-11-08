@@ -13,6 +13,7 @@ import {
   Eye,
   Edit,
   Trash2,
+  Printer,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -29,11 +30,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ExpenseForm } from "@/components/expense-form"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
-import {
-  RevenueVsExpenseChart,
-  RevenueByPaymentMethod,
-  RevenueByServiceType,
-} from "@/components/revenue-charts"
+import { RevenuePrint } from "@/components/revenue-print"
 import { ViewEditDialog } from "@/components/view-edit-dialog"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -158,93 +155,11 @@ export default function RevenuePage() {
         </div>
       </div>
 
-      {/* Financial Overview Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹{(thisMonthRevenue / 100000).toFixed(2)}L</div>
-            <div className="flex items-center gap-1 text-xs">
-              {revenueChange >= 0 ? (
-                <>
-                  <ArrowUpRight className="h-3 w-3 text-green-600" />
-                  <span className="text-green-600">+{revenueChange.toFixed(1)}%</span>
-                </>
-              ) : (
-                <>
-                  <ArrowDownRight className="h-3 w-3 text-red-600" />
-                  <span className="text-red-600">{revenueChange.toFixed(1)}%</span>
-                </>
-              )}
-              <span className="text-muted-foreground">vs last month</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹{(thisMonthExpenses / 100000).toFixed(2)}L</div>
-            <div className="flex items-center gap-1 text-xs">
-              {expensesChange >= 0 ? (
-                <>
-                  <ArrowUpRight className="h-3 w-3 text-red-600" />
-                  <span className="text-red-600">+{expensesChange.toFixed(1)}%</span>
-                </>
-              ) : (
-                <>
-                  <ArrowDownRight className="h-3 w-3 text-green-600" />
-                  <span className="text-green-600">{expensesChange.toFixed(1)}%</span>
-                </>
-              )}
-              <span className="text-muted-foreground">vs last month</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹{(netProfit / 100000).toFixed(2)}L</div>
-            <p className="text-xs text-muted-foreground">this month</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Profit Margin</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{profitMargin.toFixed(1)}%</div>
-            <p className="text-xs text-muted-foreground">profit margin</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Tabs defaultValue="overview" className="space-y-4">
+      <Tabs defaultValue="expenses" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="expenses">Expenses</TabsTrigger>
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <RevenueVsExpenseChart />
-            <RevenueByPaymentMethod />
-          </div>
-          <RevenueByServiceType />
-        </TabsContent>
 
         <TabsContent value="expenses" className="space-y-4">
           <Card>
@@ -459,6 +374,28 @@ export default function RevenuePage() {
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </DeleteConfirmDialog>
+                            <RevenuePrint
+                              revenue={{
+                                id: expense.id,
+                                report_period: 'Expense Detail',
+                                date_from: expense.date,
+                                date_to: expense.date,
+                                total_revenue: 0,
+                                total_expenses: expense.amount,
+                                net_profit: -expense.amount,
+                                generated_by: 'Finance Department',
+                                notes: `Expense: ${expense.description} | Vendor: ${expense.vendor} | Payment: ${expense.payment_method}`
+                              }}
+                            >
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                title="Print expense report"
+                              >
+                                <Printer className="h-4 w-4" />
+                              </Button>
+                            </RevenuePrint>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -472,6 +409,26 @@ export default function RevenuePage() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Total Expenses (Showing {expensesList.length} records)</span>
                   <span className="text-lg font-bold">₹{totalExpenses.toLocaleString()}</span>
+                </div>
+                <div className="mt-4 flex justify-end">
+                  <RevenuePrint
+                    revenue={{
+                      id: 'RPT-' + new Date().getTime(),
+                      report_period: 'Current Period',
+                      date_from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+                      date_to: new Date().toISOString(),
+                      total_revenue: thisMonthRevenue,
+                      total_expenses: thisMonthExpenses,
+                      net_profit: netProfit,
+                      generated_by: 'System Administrator',
+                      notes: 'Current period financial summary based on recorded transactions and expenses.'
+                    }}
+                  >
+                    <Button variant="outline" className="gap-2">
+                      <Printer className="h-4 w-4" />
+                      Print Revenue Report
+                    </Button>
+                  </RevenuePrint>
                 </div>
               </div>
             </CardContent>

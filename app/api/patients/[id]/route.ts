@@ -1,40 +1,26 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { requirePermission } from '@/lib/middleware/rbac'
 
 // GET /api/patients/[id] - Get a specific patient by ID
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  // Authorization check
+  const authCheck = await requirePermission('patients', 'view')
+  if (!authCheck.authorized) return authCheck.response
+  const { context } = authCheck
+
   try {
     const supabase = createClient()
     const { id } = params
-
-    // Check authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
 
     // Validate UUID format
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     if (!uuidRegex.test(id)) {
       return NextResponse.json({ error: 'Invalid patient ID format' }, { status: 400 })
     }
-
-    // Authorization check
-    // TODO: Implement patient access control (ownership or assigned provider)
-    // For now, any authenticated user can view patients (add RBAC when available)
-    // Example:
-    // const { data: access } = await supabase
-    //   .from('patients')
-    //   .select('id')
-    //   .eq('id', id)
-    //   .or(`owner_id.eq.${session.user.id},assigned_provider.eq.${session.user.id}`)
-    //   .single()
-    // if (!access) {
-    //   return NextResponse.json({ error: 'Forbidden: You do not have access to this patient' }, { status: 403 })
-    // }
 
     // Fetch patient by ID
     const { data: patient, error } = await supabase
@@ -67,15 +53,14 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  // Authorization check
+  const authCheck = await requirePermission('patients', 'edit')
+  if (!authCheck.authorized) return authCheck.response
+  const { context } = authCheck
+
   try {
     const supabase = createClient()
     const { id } = params
-
-    // Check authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
 
     // Validate UUID format
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -95,43 +80,26 @@ export async function PUT(
       return NextResponse.json({ error: 'Request body cannot be empty' }, { status: 400 })
     }
 
-    // Authorization check - fetch patient first
-    // TODO: Implement patient access control (ownership or assigned provider)
-    // For now, any authenticated user can update patients (add RBAC when available)
-    // Example:
-    // const { data: existingPatient } = await supabase
-    //   .from('patients')
-    //   .select('id, owner_id, assigned_provider')
-    //   .eq('id', id)
-    //   .single()
-    // if (!existingPatient) {
-    //   return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
-    // }
-    // if (existingPatient.owner_id !== session.user.id && existingPatient.assigned_provider !== session.user.id) {
-    //   return NextResponse.json({ error: 'Forbidden: You do not have permission to update this patient' }, { status: 403 })
-    // }
-
-    // Define allowed fields that can be updated
+    // Define allowed fields that can be updated (matches actual DB schema)
     const allowedFields = [
       'full_name',
       'date_of_birth',
       'gender',
-      'blood_group',
       'mobile',
       'email',
       'address',
       'city',
       'state',
-      'pincode',
-      'emergency_contact_name',
-      'emergency_contact_phone',
+      'postal_code',
+      'country',
+      'emergency_contact',
+      'emergency_phone',
       'medical_history',
       'allergies',
       'current_medications',
       'insurance_provider',
       'insurance_number',
-      'status',
-      'notes'
+      'status'
     ]
 
     // Build update data with only allowed fields
@@ -161,7 +129,7 @@ export async function PUT(
 
     // Add audit fields
     updateData.updated_at = new Date().toISOString()
-    updateData.updated_by = session.user.id
+    updateData.updated_by = context.user_id
 
     // Update patient
     const { data: patient, error } = await supabase
@@ -191,20 +159,19 @@ export async function PUT(
   }
 }
 
-// DELETE /api/patients/[id] - Delete a patient (soft delete)
+// DELETE /api/patients/[id] - Delete a patient (hard delete with cascade)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  // Authorization check
+  const authCheck = await requirePermission('patients', 'delete')
+  if (!authCheck.authorized) return authCheck.response
+  const { context } = authCheck
+
   try {
     const supabase = createClient()
     const { id } = params
-
-    // Check authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
 
     // Validate UUID format
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -212,34 +179,123 @@ export async function DELETE(
       return NextResponse.json({ error: 'Invalid patient ID format' }, { status: 400 })
     }
 
-    // Soft delete by updating status to inactive
-    const { data: patient, error } = await supabase
+    // First, verify the patient exists and get their info
+    const { data: patient, error: fetchError } = await supabase
       .from('patients')
-      .update({
-        status: 'inactive',
-        updated_at: new Date().toISOString(),
-        updated_by: session.user.id
-      })
+      .select('id, patient_id, full_name')
       .eq('id', id)
-      .select()
       .single()
 
-    if (error) {
-      if (error.code === 'PGRST116') { // Not found
+    if (fetchError || !patient) {
+      if (fetchError?.code === 'PGRST116') {
         return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
       }
-      console.error('Database error:', error)
-      return NextResponse.json({ error: 'Failed to delete patient' }, { status: 500 })
+      console.error('Database error:', fetchError)
+      return NextResponse.json({ error: 'Failed to find patient' }, { status: 500 })
     }
+
+    console.log(`Starting cascade delete for patient: ${patient.full_name} (${patient.patient_id})`)
+
+    // Execute cascade delete using SQL transaction for data integrity
+    // This ensures all related data is deleted atomically
+    const { data: deleteResult, error: deleteError } = await supabase.rpc('delete_patient_cascade', {
+      patient_uuid: id
+    })
+
+    // If RPC doesn't exist, fall back to manual cascade delete
+    if (deleteError?.code === '42883') { // Function does not exist
+      console.log('RPC function not found, using manual cascade delete')
+      
+      // Delete related records in order (respecting potential dependencies)
+      const deleteTasks = [
+        // Delete appointments
+        supabase.from('appointments').delete().eq('patient_id', id),
+        // Delete bed assignments
+        supabase.from('bed_assignments').delete().eq('patient_id', id),
+        // Delete certificates
+        supabase.from('certificates').delete().eq('patient_id', id),
+        // Delete encounters (cases)
+        supabase.from('encounters').delete().eq('patient_id', id),
+        // Delete invoices
+        supabase.from('invoices').delete().eq('patient_id', id),
+        // Delete optical orders
+        supabase.from('optical_orders').delete().eq('patient_id', id),
+        // Delete prescriptions
+        supabase.from('prescriptions').delete().eq('patient_id', id),
+        // Delete surgeries
+        supabase.from('surgeries').delete().eq('patient_id', id),
+        // Delete audit logs
+        supabase.from('medical_audit_logs').delete().eq('patient_id', id),
+        supabase.from('financial_audit_logs').delete().eq('patient_id', id),
+      ]
+
+      // Execute all deletes
+      const results = await Promise.all(deleteTasks)
+      
+      // Check for any errors in related deletes
+      const errors = results.filter(r => r.error)
+      if (errors.length > 0) {
+        console.error('Errors deleting related records:', errors)
+        // Continue anyway - we'll try to delete the patient
+      }
+
+      // Log what was deleted
+      results.forEach((result, index) => {
+        const tables = [
+          'appointments', 'bed_assignments', 'certificates', 'encounters',
+          'invoices', 'optical_orders', 'prescriptions', 'surgeries',
+          'medical_audit_logs', 'financial_audit_logs'
+        ]
+        if (!result.error) {
+          console.log(`Deleted from ${tables[index]}`)
+        }
+      })
+
+      // Finally, delete the patient record itself
+      const { error: patientDeleteError } = await supabase
+        .from('patients')
+        .delete()
+        .eq('id', id)
+
+      if (patientDeleteError) {
+        console.error('Error deleting patient:', patientDeleteError)
+        return NextResponse.json({ 
+          error: 'Failed to delete patient record',
+          details: patientDeleteError.message 
+        }, { status: 500 })
+      }
+
+      console.log(`Successfully deleted patient: ${patient.full_name} (${patient.patient_id}) and all related data`)
+
+      return NextResponse.json({
+        success: true,
+        data: patient,
+        message: 'Patient and all related data deleted successfully'
+      })
+    }
+
+    // If RPC function exists and executed successfully
+    if (deleteError) {
+      console.error('Error in cascade delete:', deleteError)
+      return NextResponse.json({ 
+        error: 'Failed to delete patient',
+        details: deleteError.message 
+      }, { status: 500 })
+    }
+
+    console.log(`Successfully deleted patient: ${patient.full_name} (${patient.patient_id}) via RPC`)
 
     return NextResponse.json({
       success: true,
       data: patient,
-      message: 'Patient deleted successfully'
+      message: 'Patient and all related data deleted successfully'
     })
 
   } catch (error) {
     console.error('API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
   }
 }

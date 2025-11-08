@@ -1,20 +1,20 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { requirePermission } from '@/lib/middleware/rbac'
 
 // GET /api/appointments/[id] - Get a specific appointment by ID
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Authorization check
+  const authCheck = await requirePermission('appointments', 'view')
+  if (!authCheck.authorized) return authCheck.response
+  const { context } = authCheck
+
   try {
     const supabase = createClient()
     const { id } = await params
-
-    // Check authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
 
     // Fetch appointment with patient information
     const { data: appointment, error } = await supabase
@@ -47,19 +47,6 @@ export async function GET(
       return NextResponse.json({ error: 'Appointment not found' }, { status: 404 })
     }
 
-    // Authorization check: Check if user has access to this appointment
-    // TODO: Also check for admin role or staff role in production
-    const isAuthorized = 
-      appointment.created_by === session.user.id ||
-      appointment.patient_id === session.user.id ||
-      appointment.doctor_id === session.user.id
-
-    if (!isAuthorized) {
-      return NextResponse.json({ 
-        error: 'Forbidden: You do not have permission to view this appointment' 
-      }, { status: 403 })
-    }
-
     return NextResponse.json({
       success: true,
       data: appointment
@@ -76,15 +63,14 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Authorization check
+  const authCheck = await requirePermission('appointments', 'edit')
+  if (!authCheck.authorized) return authCheck.response
+  const { context } = authCheck
+
   try {
     const supabase = createClient()
     const { id } = await params
-
-    // Check authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
 
     const body = await request.json()
 
@@ -153,34 +139,6 @@ export async function PUT(
       }
     }
 
-    // Authorization check - fetch appointment first
-    const { data: existingAppointment, error: fetchError } = await supabase
-      .from('appointments')
-      .select('id, patient_id, doctor_id, created_by, status')
-      .eq('id', id)
-      .single()
-
-    if (fetchError) {
-      if (fetchError.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Appointment not found' }, { status: 404 })
-      }
-      console.error('Error fetching appointment:', fetchError)
-      return NextResponse.json({ error: 'Failed to fetch appointment' }, { status: 500 })
-    }
-
-    // Check authorization - user must be creator, patient, doctor, or admin
-    // TODO: Also check for admin role or staff role in production
-    const isAuthorized = 
-      existingAppointment.created_by === session.user.id ||
-      existingAppointment.patient_id === session.user.id ||
-      existingAppointment.doctor_id === session.user.id
-
-    if (!isAuthorized) {
-      return NextResponse.json({ 
-        error: 'Forbidden: You do not have permission to update this appointment' 
-      }, { status: 403 })
-    }
-
     // Update appointment
     const { data: appointment, error } = await supabase
       .from('appointments')
@@ -224,17 +182,16 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Authorization check
+  const authCheck = await requirePermission('appointments', 'delete')
+  if (!authCheck.authorized) return authCheck.response
+  const { context } = authCheck
+
   try {
     const supabase = createClient()
     const { id } = await params
 
-    // Check authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Fetch current appointment with all needed fields for validation and authorization
+    // Fetch current appointment with all needed fields for validation
     const { data: currentAppointment, error: fetchError } = await supabase
       .from('appointments')
       .select('id, status, appointment_date, appointment_time, patient_id, doctor_id, created_by')
@@ -260,19 +217,6 @@ export async function DELETE(
 
     if (currentAppointment.status === 'completed') {
       return NextResponse.json({ error: 'Cannot cancel completed appointment' }, { status: 400 })
-    }
-
-    // Authorization check - user must be creator, patient, doctor, or admin
-    // TODO: Also check for admin role or staff role in production
-    const isAuthorized = 
-      currentAppointment.created_by === session.user.id ||
-      currentAppointment.patient_id === session.user.id ||
-      currentAppointment.doctor_id === session.user.id
-
-    if (!isAuthorized) {
-      return NextResponse.json({ 
-        error: 'Forbidden: You do not have permission to cancel this appointment' 
-      }, { status: 403 })
     }
 
     // Optional: Check if appointment is in the past

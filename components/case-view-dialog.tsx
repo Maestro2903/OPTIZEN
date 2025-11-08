@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { CasePrint } from "@/components/case-print"
 
 interface CaseViewDialogProps {
   children: React.ReactNode
@@ -38,10 +39,12 @@ export function CaseViewDialog({ children, caseData }: CaseViewDialogProps) {
                 Complete case information for {caseData.patient_name}
               </DialogDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={handlePrint}>
-              <Printer className="h-4 w-4 mr-2" />
-              Print
-            </Button>
+            <CasePrint caseData={caseData}>
+              <Button variant="outline" size="sm">
+                <Printer className="h-4 w-4 mr-2" />
+                Print Case
+              </Button>
+            </CasePrint>
           </div>
         </DialogHeader>
 

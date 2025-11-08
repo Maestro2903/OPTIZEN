@@ -6,7 +6,9 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
 import { patientsApi, casesApi } from "@/lib/services/api"
+import { useMasterData } from "@/hooks/use-master-data"
 import { useToast } from "@/hooks/use-toast"
 import {
   Dialog,
@@ -59,7 +61,7 @@ const invoiceFormSchema = z.object({
   discount_percent: z.string().optional(),
   tax_percent: z.string().optional(),
   amount_paid: z.string().optional(),
-  payment_method: z.enum(["Cash", "Card", "UPI", "Insurance", "Online"]),
+  payment_method: z.string().min(1, "Payment method is required"),
   notes: z.string().optional(),
 })
 
@@ -82,6 +84,7 @@ interface CaseOption {
 
 export function InvoiceForm({ children, invoiceData, mode = "add", onSubmit: onSubmitCallback }: InvoiceFormProps) {
   const { toast } = useToast()
+  const masterData = useMasterData()
   const [open, setOpen] = React.useState(false)
   const [patients, setPatients] = React.useState<PatientOption[]>([])
   const [patientCases, setPatientCases] = React.useState<CaseOption[]>([])
@@ -118,19 +121,17 @@ export function InvoiceForm({ children, invoiceData, mode = "add", onSubmit: onS
       if (!open) return
       setLoadingPatients(true)
       try {
-        const response = await patientsApi.list({ status: 'active' })
+        const response = await patientsApi.list({ limit: 1000, status: 'active' })
         if (cancelled) return
 
         if (response.success && response.data) {
-          const safePatients = response.data
-            .filter((patient) => patient?.id && patient?.full_name && patient?.patient_id)
-            .map((patient) => ({
+          if (!cancelled) {
+            setPatients(
+              response.data.map((patient) => ({
               value: patient.id,
               label: `${patient.full_name} (${patient.patient_id})`,
             }))
-          
-          if (!cancelled) {
-            setPatients(safePatients)
+            )
           }
         } else {
           if (!cancelled) {
@@ -164,6 +165,13 @@ export function InvoiceForm({ children, invoiceData, mode = "add", onSubmit: onS
       abortController.abort()
     }
   }, [open, toast])
+
+  // Load payment methods
+  React.useEffect(() => {
+    if (open) {
+      masterData.fetchCategory('paymentMethods')
+    }
+  }, [open])
 
   // Watch patient selection
   const selectedPatientId = form.watch("patient_id")
@@ -512,20 +520,17 @@ export function InvoiceForm({ children, invoiceData, mode = "add", onSubmit: onS
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Payment Method *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select payment method" />
-                          </SelectTrigger>
+                        <SearchableSelect
+                          options={masterData.data.paymentMethods || []}
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          placeholder="Select payment method"
+                          searchPlaceholder="Search payment methods..."
+                          emptyText="No payment methods found."
+                          loading={masterData.loading.paymentMethods}
+                        />
                         </FormControl>
-                        <SelectContent>
-                          <SelectItem value="Cash">Cash</SelectItem>
-                          <SelectItem value="Card">Card</SelectItem>
-                          <SelectItem value="UPI">UPI</SelectItem>
-                          <SelectItem value="Insurance">Insurance</SelectItem>
-                          <SelectItem value="Online">Online</SelectItem>
-                        </SelectContent>
-                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}

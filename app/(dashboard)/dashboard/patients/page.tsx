@@ -10,10 +10,6 @@ import {
   Edit,
   Trash2,
   Printer,
-  Users,
-  UserPlus,
-  TrendingUp,
-  Calendar,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -66,6 +62,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
 import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
 import { ViewEditDialog } from "@/components/view-edit-dialog"
+import { PatientPrint, QuickPatientPrint } from "@/components/patient-print"
 import { Pagination } from "@/components/ui/pagination"
 import { useToast } from "@/hooks/use-toast"
 import { useApiList, useApiForm, useApiDelete } from "@/lib/hooks/useApi"
@@ -264,7 +261,7 @@ export default function PatientsPage() {
       { id: "created_at", label: "Registration Date" },
       { id: "state", label: "State" },
     ],
-    showExport: true,
+    showExport: false,
     showSettings: false,
   }
 
@@ -381,7 +378,10 @@ export default function PatientsPage() {
           }
         }}>
           <DialogTrigger asChild>
-            <Button className="gap-2">
+            <Button className="gap-2" onClick={() => {
+              setEditingPatient(null)
+              form.reset()
+            }}>
               <Plus className="h-4 w-4" />
               Add Patient
             </Button>
@@ -562,49 +562,6 @@ export default function PatientsPage() {
             </Form>
           </DialogContent>
         </Dialog>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Patients</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{pagination?.total || 0}</div>
-            <p className="text-xs text-muted-foreground">all time</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">New This Month</CardTitle>
-            <UserPlus className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">124</div>
-            <p className="text-xs text-muted-foreground">+12.5% from last month</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Patients</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">1,234</div>
-            <p className="text-xs text-muted-foreground">in last 6 months</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Today&apos;s Visits</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">32</div>
-            <p className="text-xs text-muted-foreground">scheduled today</p>
-          </CardContent>
-        </Card>
       </div>
 
       <Card>
@@ -855,21 +812,22 @@ export default function PatientsPage() {
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => window.print()}
-                          title="Print"
-                        >
-                          <Printer className="h-4 w-4" />
-                        </Button>
+                        <PatientPrint patient={patient}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            title="Print Patient Record"
+                          >
+                            <Printer className="h-4 w-4" />
+                          </Button>
+                        </PatientPrint>
                         <DeleteConfirmDialog
-                          title="Delete Patient"
-                          description={`Are you sure you want to delete ${patient.full_name}? This action cannot be undone.`}
+                          title="Delete Patient Permanently"
+                          description={`Are you sure you want to permanently delete ${patient.full_name}? This will delete ALL related data including appointments, cases, invoices, certificates, operations, and medical records. This action cannot be undone.`}
                           onConfirm={() => handleDelete(patient.id)}
                         >
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" title="Delete">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" title="Delete Permanently">
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </DeleteConfirmDialog>

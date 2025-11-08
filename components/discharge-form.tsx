@@ -7,6 +7,7 @@ import * as z from "zod"
 import { Button } from "@/components/ui/button"
 import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
 import { patientsApi, operationsApi } from "@/lib/services/api"
+import { useMasterData } from "@/hooks/use-master-data"
 import { useToast } from "@/hooks/use-toast"
 import {
   Dialog,
@@ -57,6 +58,7 @@ interface DischargeFormProps {
 
 export function DischargeForm({ children }: DischargeFormProps) {
   const { toast } = useToast()
+  const masterData = useMasterData()
   const [open, setOpen] = React.useState(false)
   const [patients, setPatients] = React.useState<SearchableSelectOption[]>([])
   const [operations, setOperations] = React.useState<SearchableSelectOption[]>([])
@@ -72,6 +74,13 @@ export function DischargeForm({ children }: DischargeFormProps) {
     },
   })
 
+  // Load master data when dialog opens
+  React.useEffect(() => {
+    if (open) {
+      masterData.fetchMultiple(['diagnosis', 'anesthesiaTypes', 'treatments', 'medicines'])
+    }
+  }, [open])
+
   // Load data when dialog opens
   React.useEffect(() => {
     const abortController = new AbortController()
@@ -83,19 +92,17 @@ export function DischargeForm({ children }: DischargeFormProps) {
       // Load patients
       setLoadingPatients(true)
       try {
-        const response = await patientsApi.list({ status: 'active' })
+        const response = await patientsApi.list({ limit: 1000, status: 'active' })
         if (cancelled) return
         
         if (response.success && response.data) {
-          const safePatients = response.data
-            .filter((patient) => patient?.id && patient?.full_name && patient?.patient_id)
-            .map((patient) => ({
-              value: patient.id,
-              label: `${patient.full_name} (${patient.patient_id})`,
-            }))
-          
           if (!cancelled) {
-            setPatients(safePatients)
+            setPatients(
+              response.data.map((patient) => ({
+                value: patient.id,
+                label: `${patient.full_name} (${patient.patient_id})`,
+              }))
+            )
           }
         } else {
           if (!cancelled) {
@@ -313,7 +320,15 @@ export function DischargeForm({ children }: DischargeFormProps) {
                 <FormItem>
                   <FormLabel>Diagnosis</FormLabel>
                   <FormControl>
-                    <Textarea rows={2} placeholder="Final diagnosis..." {...field} />
+                    <SearchableSelect
+                      options={masterData.data.diagnosis || []}
+                      value={field.value || ""}
+                      onValueChange={field.onChange}
+                      placeholder="Select diagnosis"
+                      searchPlaceholder="Search diagnosis..."
+                      emptyText="No diagnosis found."
+                      loading={masterData.loading.diagnosis}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -341,7 +356,15 @@ export function DischargeForm({ children }: DischargeFormProps) {
                 <FormItem>
                   <FormLabel>Anesthesia</FormLabel>
                   <FormControl>
-                    <Textarea rows={2} placeholder="Anesthesia details..." {...field} />
+                    <SearchableSelect
+                      options={masterData.data.anesthesiaTypes || []}
+                      value={field.value || ""}
+                      onValueChange={field.onChange}
+                      placeholder="Select anesthesia type"
+                      searchPlaceholder="Search anesthesia..."
+                      emptyText="No anesthesia types found."
+                      loading={masterData.loading.anesthesiaTypes}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -355,7 +378,15 @@ export function DischargeForm({ children }: DischargeFormProps) {
                 <FormItem>
                   <FormLabel>Treatment Given</FormLabel>
                   <FormControl>
-                    <Textarea rows={3} placeholder="Treatment details..." {...field} />
+                    <SearchableSelect
+                      options={masterData.data.treatments || []}
+                      value={field.value || ""}
+                      onValueChange={field.onChange}
+                      placeholder="Select treatment"
+                      searchPlaceholder="Search treatments..."
+                      emptyText="No treatments found."
+                      loading={masterData.loading.treatments}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -383,7 +414,15 @@ export function DischargeForm({ children }: DischargeFormProps) {
                 <FormItem>
                   <FormLabel>Medicines Prescribed</FormLabel>
                   <FormControl>
-                    <Textarea rows={4} placeholder="List of medicines with dosage..." {...field} />
+                    <SearchableSelect
+                      options={masterData.data.medicines || []}
+                      value={field.value || ""}
+                      onValueChange={field.onChange}
+                      placeholder="Select medicine"
+                      searchPlaceholder="Search medicines..."
+                      emptyText="No medicines found."
+                      loading={masterData.loading.medicines}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
