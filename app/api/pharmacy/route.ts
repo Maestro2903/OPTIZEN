@@ -69,11 +69,10 @@ export async function GET(request: NextRequest) {
       query = query.eq('category', category)
     }
 
-    // Apply low stock filter
-    // Note: PostgREST doesn't support column-to-column comparison directly
-    // TODO: Create a computed field or database view for is_low_stock
-    // For now, fetch and filter in application code when low_stock is requested
-    // A better approach would be to add a computed column or use an RPC function
+    // Apply low stock filter using computed column (from migration 014)
+    if (low_stock) {
+      query = query.eq('is_low_stock', true)
+    }
 
     // Apply sorting
     query = query.order(sortBy, { ascending: sortOrder === 'asc' })

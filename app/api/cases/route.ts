@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { parseArrayParam, validateArrayParam, applyArrayFilter } from '@/lib/utils/query-params'
 
 // GET /api/cases - List cases with pagination, filtering, and sorting
 export async function GET(request: NextRequest) {
@@ -8,13 +9,17 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
 
     // Extract query parameters
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '50')
+    let page = parseInt(searchParams.get('page') || '1')
+    let limit = parseInt(searchParams.get('limit') || '50')
     const search = searchParams.get('search') || ''
-    const sortBy = searchParams.get('sortBy') || 'created_at'
-    const sortOrder = searchParams.get('sortOrder') || 'desc'
+    let sortBy = searchParams.get('sortBy') || 'created_at'
+    let sortOrder = searchParams.get('sortOrder') || 'desc'
     const status = searchParams.get('status') || ''
     const patient_id = searchParams.get('patient_id') || ''
+
+    // Validate and constrain page and limit
+    page = isNaN(page) || page < 1 ? 1 : page
+    limit = isNaN(limit) || limit < 1 ? 50 : Math.min(limit, 100)
 
     // Check authentication
     const { data: { session } } = await supabase.auth.getSession()
@@ -45,9 +50,17 @@ export async function GET(request: NextRequest) {
       query = query.or(`case_no.ilike.%${search}%,patients.full_name.ilike.%${search}%,patients.email.ilike.%${search}%,patients.mobile.ilike.%${search}%`)
     }
 
-    // Apply status filter
-    if (status) {
-      query = query.eq('status', status)
+    // Parse and validate status parameter (supports arrays)
+    const allowedStatuses = ['active', 'completed', 'cancelled', 'pending']
+    const statusValues = status ? validateArrayParam(
+      parseArrayParam(status),
+      allowedStatuses,
+      false
+    ) : []
+
+    // Apply status filter (supports multiple values)
+    if (statusValues.length > 0) {
+      query = applyArrayFilter(query, 'status', statusValues)
     }
 
     // Apply patient filter

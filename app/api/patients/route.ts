@@ -2,9 +2,16 @@ import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { parseArrayParam, validateArrayParam, applyArrayFilter } from '@/lib/utils/query-params'
+import { requirePermission } from '@/lib/middleware/rbac'
+import { generatePatientId } from '@/lib/utils/id-generator'
 
 // GET /api/patients - List patients with pagination, filtering, and sorting
 export async function GET(request: NextRequest) {
+  // Authorization check
+  const authCheck = await requirePermission('patients', 'view')
+  if (!authCheck.authorized) return authCheck.response
+  const { context } = authCheck
+
   try {
     const supabase = createClient()
     const { searchParams } = new URL(request.url)
@@ -40,12 +47,6 @@ export async function GET(request: NextRequest) {
     ]
     if (!allowedSortColumns.includes(sortBy)) {
       sortBy = 'created_at'
-    }
-
-    // Check authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Calculate offset for pagination
@@ -136,20 +137,17 @@ export async function GET(request: NextRequest) {
 
 // POST /api/patients - Create a new patient
 export async function POST(request: NextRequest) {
+  // Authorization check
+  const authCheck = await requirePermission('patients', 'create')
+  if (!authCheck.authorized) return authCheck.response
+  const { context } = authCheck
+
   try {
     const supabase = createClient()
-
-    // Check authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const body = await request.json()
 
-    // Validate required fields
+    // Validate required fields (patient_id is now generated server-side)
     const {
-      patient_id,
       full_name,
       email,
       mobile,
@@ -169,10 +167,22 @@ export async function POST(request: NextRequest) {
       status = 'active'
     } = body
 
-    if (!patient_id || !full_name || !mobile || !gender) {
+    if (!full_name || !mobile || !gender) {
       return NextResponse.json(
-        { error: 'Missing required fields: patient_id, full_name, mobile, gender' },
+        { error: 'Missing required fields: full_name, mobile, gender' },
         { status: 400 }
+      )
+    }
+
+    // Generate patient ID server-side to prevent collisions
+    let patient_id: string
+    try {
+      patient_id = await generatePatientId()
+    } catch (error) {
+      console.error('Error generating patient ID:', error)
+      return NextResponse.json(
+        { error: 'Failed to generate patient ID' },
+        { status: 500 }
       )
     }
 
@@ -249,7 +259,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Insert new patient
+    // Insert new patient (use authenticated user as creator)
     const { data: patient, error } = await supabase
       .from('patients')
       .insert([
@@ -260,6 +270,7 @@ export async function POST(request: NextRequest) {
           mobile,
           gender,
           date_of_birth,
+          created_by: context.user_id,
           address,
           city,
           state,
