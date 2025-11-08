@@ -174,19 +174,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generate patient ID server-side to prevent collisions
-    let patient_id: string
-    try {
-      patient_id = await generatePatientId()
-    } catch (error) {
-      console.error('Error generating patient ID:', error)
-      return NextResponse.json(
-        { error: 'Failed to generate patient ID' },
-        { status: 500 }
-      )
-    }
-
-    // Validate email format if provided
+    // Validate email format if provided (do this before attempting insert)
     if (email && email.trim() !== '') {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
       if (!emailRegex.test(email)) {
@@ -259,49 +247,119 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Insert new patient (use authenticated user as creator)
-    const { data: patient, error } = await supabase
-      .from('patients')
-      .insert([
-        {
-          patient_id,
-          full_name,
-          email: email || null,
-          mobile,
-          gender,
-          date_of_birth,
-          created_by: context.user_id,
-          address,
-          city,
-          state,
-          postal_code,
-          emergency_contact,
-          emergency_phone,
-          medical_history,
-          current_medications,
-          allergies,
-          insurance_provider,
-          insurance_number,
-          status,
-          created_by: session.user.id
+    // Insert new patient with retry logic for ID collisions
+    // This handles the TOCTOU race condition in ID generation
+    const maxAttempts = 3
+    let lastError: any = null
+    
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        // Generate patient ID (may collide under concurrent load)
+        const patient_id = await generatePatientId()
+        
+        // Attempt insert with generated ID
+        const { data: patient, error } = await supabase
+          .from('patients')
+          .insert([
+            {
+              patient_id,
+              full_name,
+              email: email || null,
+              mobile,
+              gender,
+              date_of_birth,
+              created_by: context.user_id,
+              address,
+              city,
+              state,
+              postal_code,
+              emergency_contact,
+              emergency_phone,
+              medical_history,
+              current_medications,
+              allergies,
+              insurance_provider,
+              insurance_number,
+              status
+            }
+          ])
+          .select()
+          .single()
+
+        // Check for unique constraint violation (patient_id collision)
+        if (error) {
+          // PostgreSQL error code for unique_violation
+          if (error.code === '23505' && error.message?.includes('patient_id')) {
+            lastError = error
+            console.warn(
+              `Patient ID collision detected: ${patient_id} (attempt ${attempt + 1}/${maxAttempts})`,
+              { error: error.message }
+            )
+            
+            // Retry with new ID if not last attempt
+            if (attempt < maxAttempts - 1) {
+              // Small exponential backoff to reduce collision probability
+              await new Promise(resolve => setTimeout(resolve, 50 * Math.pow(2, attempt)))
+              continue
+            }
+            
+            // Max attempts reached
+            console.error('Failed to generate unique patient ID after max attempts', {
+              attempts: maxAttempts,
+              lastError: error.message
+            })
+            return NextResponse.json(
+              { 
+                error: 'Failed to create patient: Unable to generate unique ID. Please try again.',
+                details: 'Maximum retry attempts exceeded'
+              },
+              { status: 503 } // Service Unavailable
+            )
+          }
+          
+          // Other database errors (not collision)
+          console.error('Database error creating patient:', error)
+          return NextResponse.json(
+            { error: 'Failed to create patient', details: error.message },
+            { status: 500 }
+          )
         }
-      ])
-      .select()
-      .single()
 
-    if (error) {
-      console.error('Database error:', error)
-      if (error.code === '23505') { // Unique constraint violation
-        return NextResponse.json({ error: 'Patient ID already exists' }, { status: 409 })
+        // Success! Patient created
+        console.info('Patient created successfully', { 
+          patient_id: patient?.patient_id,
+          attempt: attempt + 1
+        })
+        
+        return NextResponse.json({
+          success: true,
+          data: patient,
+          message: 'Patient created successfully'
+        }, { status: 201 })
+        
+      } catch (error) {
+        lastError = error
+        console.error(`Error on attempt ${attempt + 1}:`, error)
+        
+        // If last attempt, fall through to error response
+        if (attempt === maxAttempts - 1) {
+          break
+        }
+        
+        // Otherwise retry with backoff
+        await new Promise(resolve => setTimeout(resolve, 50 * Math.pow(2, attempt)))
       }
-      return NextResponse.json({ error: 'Failed to create patient' }, { status: 500 })
     }
-
-    return NextResponse.json({
-      success: true,
-      data: patient,
-      message: 'Patient created successfully'
-    }, { status: 201 })
+    
+    // If we get here, all attempts failed
+    console.error('All patient creation attempts failed', { lastError })
+    return NextResponse.json(
+      { 
+        error: 'Failed to create patient after multiple attempts',
+        details: lastError instanceof Error ? lastError.message : 'Unknown error'
+      },
+      { status: 500 }
+    )
 
   } catch (error) {
     console.error('API error:', error)

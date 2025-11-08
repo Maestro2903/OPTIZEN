@@ -101,44 +101,46 @@ export async function generateCaseNumber(): Promise<string> {
 }
 
 /**
- * Generate a unique invoice number
+ * Generate a unique invoice number using database sequence (ATOMIC)
  * Format: INV-YYYYMM-NNNNNN
  * Where NNNNNN is a sequential number for the month
+ * 
+ * Uses PostgreSQL sequence via RPC for atomic generation.
+ * Prevents race conditions under concurrent load.
+ * Requires migration 015_fix_invoice_sequence.sql
  */
 export async function generateInvoiceNumber(): Promise<string> {
   const supabase = createClient()
   const date = new Date()
   const yearMonth = date.toISOString().slice(0, 7).replace('-', '')
-  const prefix = `INV-${yearMonth}-`
   
-  // Get the highest invoice number for this month
-  const { data, error } = await supabase
-    .from('invoices')
-    .select('invoice_number')
-    .ilike('invoice_number', `${prefix}%`)
-    .order('invoice_number', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  
-  if (error) {
-    console.error('Error fetching last invoice number:', error)
-    throw new Error('Failed to generate invoice number')
-  }
-  
-  let nextNumber = 1
-  
-  if (data && data.invoice_number) {
-    // Extract the sequence number from the last invoice
-    const lastNumber = data.invoice_number.split('-')[2]
-    if (lastNumber) {
-      nextNumber = parseInt(lastNumber, 10) + 1
+  try {
+    // Call database function for atomic sequence generation
+    const { data, error } = await supabase
+      .rpc('get_next_invoice_number', { year_month: yearMonth })
+    
+    if (error) {
+      console.error('Error generating invoice number via RPC:', error)
+      throw new Error(`Failed to generate invoice number: ${error.message}`)
     }
+    
+    if (!data) {
+      throw new Error('Database function returned null invoice number')
+    }
+    
+    // Validate format INV-YYYYMM-NNNNNN
+    const invoiceRegex = /^INV-\d{6}-\d{6}$/
+    if (!invoiceRegex.test(data)) {
+      throw new Error(`Invalid invoice number format from database: ${data}`)
+    }
+    
+    return data
+  } catch (error) {
+    console.error('Fatal error in generateInvoiceNumber:', error)
+    throw error instanceof Error 
+      ? error 
+      : new Error('Unknown error generating invoice number')
   }
-  
-  // Pad with zeros to 6 digits
-  const sequenceNumber = nextNumber.toString().padStart(6, '0')
-  
-  return `${prefix}${sequenceNumber}`
 }
 
 /**

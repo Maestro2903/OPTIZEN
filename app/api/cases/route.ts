@@ -21,6 +21,25 @@ export async function GET(request: NextRequest) {
     page = isNaN(page) || page < 1 ? 1 : page
     limit = isNaN(limit) || limit < 1 ? 50 : Math.min(limit, 100)
 
+    // Validate sortOrder
+    if (sortOrder !== 'asc' && sortOrder !== 'desc') {
+      sortOrder = 'desc'
+    }
+
+    // Validate sortBy against allowlist (prevent column enumeration)
+    const allowedSortColumns = [
+      'created_at',
+      'updated_at',
+      'case_no',
+      'encounter_date',
+      'status',
+      'visit_type',
+      'patient_id'
+    ]
+    if (!allowedSortColumns.includes(sortBy)) {
+      sortBy = 'created_at'
+    }
+
     // Check authentication
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) {

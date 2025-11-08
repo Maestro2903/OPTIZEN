@@ -204,40 +204,59 @@ Client-side ID generation (`PAT-${timestamp}-${random}`) risked collisions from:
 
 ### Solution
 **ID Generator Utility:** `lib/utils/id-generator.ts` (newly created)
-- Server-side generation with collision detection
+- Server-side generation with collision **detection** (not prevention)
 - Cryptographically secure random strings
 - Retry logic (5 attempts) with logging
 - Functions for all ID types:
-  - `generatePatientId()` - PAT-YYYYMMDD-XXXXXX
-  - `generateCaseNumber()` - CASE-YYYY-XXXXXXXXXX
-  - `generateInvoiceNumber()` - INV-YYYYMM-NNNNNN (sequential)
-  - `generateEmployeeId()` - EMP-YYYY-XXXX
-  - `generateOperationId()` - OP-YYYYMMDD-XXXX
+  - `generatePatientId()` - PAT-YYYYMMDD-XXXXXX (has TOCTOU race condition)
+  - `generateCaseNumber()` - CASE-YYYY-XXXXXXXXXX (has TOCTOU race condition)
+  - `generateInvoiceNumber()` - INV-YYYYMM-NNNNNN (**FIXED** - uses database sequence)
+  - `generateEmployeeId()` - EMP-YYYY-XXXX (has TOCTOU race condition)
+  - `generateOperationId()` - OP-YYYYMMDD-XXXX (has TOCTOU race condition)
 
-**Updated Route:** `app/api/patients/route.ts`
+**Updated Routes:**
+
+1. **`app/api/patients/route.ts`** - Added retry logic with constraint violation handling
 ```typescript
-// Before:
-const { patient_id, full_name, ... } = body
-if (!patient_id || !full_name || ...) { ... }
+// Retry loop handles race conditions
+for (let attempt = 0; attempt < maxAttempts; attempt++) {
+  const patient_id = await generatePatientId()
+  const { data, error } = await supabase.from('patients').insert([{ patient_id, ... }])
+  
+  if (error?.code === '23505') { // unique_violation
+    continue // Retry with new ID
+  }
+  return success
+}
+```
 
-// After:
-const { full_name, ... } = body // no patient_id from client
-if (!full_name || ...) { ... }
-
-const patient_id = await generatePatientId() // generated server-side
+2. **`lib/utils/id-generator.ts`** - Invoice generation uses atomic database sequence
+```typescript
+// Uses PostgreSQL sequence for atomic generation
+const { data } = await supabase.rpc('get_next_invoice_number', { year_month })
+return data // No race condition possible
 ```
 
 **Pattern for Other Routes:**
-- Cases: Use `generateCaseNumber()` in POST /api/cases
-- Invoices: Use `generateInvoiceNumber()` in POST /api/invoices
-- Employees: Use `generateEmployeeId()` in POST /api/employees
-- Operations: Use `generateOperationId()` in POST /api/operations
+- ⚠️ Cases: Use `generateCaseNumber()` + add retry logic (see patients route pattern)
+- ✅ Invoices: Use `generateInvoiceNumber()` (atomic, no retry needed)
+- ⚠️ Employees: Use `generateEmployeeId()` + add retry logic
+- ⚠️ Operations: Use `generateOperationId()` + add retry logic
 
 **Result:**
-- No more ID collisions
-- Cryptographically secure generation
-- Proper error handling
-- Audit trail of collision attempts
+- ⚠️ **Reduced (but not eliminated) collision risk** for patient/case/employee/operation IDs
+- ✅ **Eliminated collision risk** for invoice numbers (database sequence)
+- ✅ Cryptographically secure generation
+- ✅ Proper error handling with exponential backoff
+- ✅ Audit trail of collision attempts
+- ⚠️ **Calling code must handle unique constraint violations** (implemented in patients route)
+- ✅ Database unique constraints provide final protection layer
+
+**Critical Notes:**
+1. **Database constraints are the actual protection mechanism**
+2. ID generators reduce but don't eliminate collision risk under concurrent load
+3. Invoice generation is the only truly collision-proof implementation (uses DB sequence)
+4. Other routes should implement retry logic similar to patients route before production
 
 ---
 
