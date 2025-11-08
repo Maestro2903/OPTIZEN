@@ -28,9 +28,12 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
+import { employeesApi } from "@/lib/services/api"
+import { useToast } from "@/hooks/use-toast"
 
 const attendanceSchema = z.object({
   user_id: z.string().min(1, "Staff member is required"),
@@ -45,20 +48,14 @@ interface AttendanceFormProps {
   children: React.ReactNode
   attendanceData?: any
   mode?: "create" | "edit"
+  onSubmit?: (data: any) => Promise<void>
 }
 
-// Mock staff list - in real app, fetch from users table
-const staffMembers = [
-  { id: "1", name: "Dr. Sarah Martinez", role: "Ophthalmologist" },
-  { id: "2", name: "Dr. James Wilson", role: "Ophthalmologist" },
-  { id: "3", name: "Nurse Priya Sharma", role: "Nurse" },
-  { id: "4", name: "Rajesh Kumar", role: "Receptionist" },
-  { id: "5", name: "Dr. Anita Desai", role: "Optometrist" },
-  { id: "6", name: "Vikram Singh", role: "Technician" },
-]
-
-export function AttendanceForm({ children, attendanceData, mode = "create" }: AttendanceFormProps) {
+export function AttendanceForm({ children, attendanceData, mode = "create", onSubmit: onSubmitProp }: AttendanceFormProps) {
+  const { toast } = useToast()
   const [isOpen, setIsOpen] = React.useState(false)
+  const [staffMembers, setStaffMembers] = React.useState<SearchableSelectOption[]>([])
+  const [loadingStaff, setLoadingStaff] = React.useState(false)
 
   const form = useForm<z.infer<typeof attendanceSchema>>({
     resolver: zodResolver(attendanceSchema),
@@ -74,10 +71,54 @@ export function AttendanceForm({ children, attendanceData, mode = "create" }: At
 
   const selectedStatus = form.watch("status")
 
-  function onSubmit(values: z.infer<typeof attendanceSchema>) {
-    console.log(mode === "edit" ? "Update:" : "Mark:", values)
-    setIsOpen(false)
-    form.reset()
+  // Load staff members from employees API
+  React.useEffect(() => {
+    const loadStaff = async () => {
+      if (!isOpen) return
+      setLoadingStaff(true)
+      try {
+        const response = await employeesApi.list({ status: 'active', limit: 1000 })
+        if (response.success && response.data) {
+          setStaffMembers(
+            response.data.map((employee) => ({
+              value: employee.id,
+              label: `${employee.full_name} - ${employee.role} (${employee.employee_id})`,
+            }))
+          )
+        }
+      } catch (error) {
+        console.error("Error loading staff:", error)
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load staff list."
+        })
+      } finally {
+        setLoadingStaff(false)
+      }
+    }
+    loadStaff()
+  }, [isOpen, toast])
+
+  async function onSubmit(values: z.infer<typeof attendanceSchema>) {
+    try {
+      if (onSubmitProp) {
+        await onSubmitProp(values)
+      }
+      setIsOpen(false)
+      form.reset()
+      toast({
+        title: "Success",
+        description: mode === "edit" ? "Attendance updated successfully." : "Attendance marked successfully."
+      })
+    } catch (error) {
+      console.error("Error submitting attendance:", error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to save attendance. Please try again."
+      })
+    }
   }
 
   return (
@@ -99,20 +140,16 @@ export function AttendanceForm({ children, attendanceData, mode = "create" }: At
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Staff Member *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select staff" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {staffMembers.map((staff) => (
-                          <SelectItem key={staff.id} value={staff.id}>
-                            {staff.name} - {staff.role}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <SearchableSelect
+                        options={staffMembers}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="Select staff member"
+                        searchPlaceholder="Search staff..."
+                        loading={loadingStaff}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

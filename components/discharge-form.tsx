@@ -5,6 +5,9 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Button } from "@/components/ui/button"
+import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
+import { patientsApi, operationsApi } from "@/lib/services/api"
+import { useToast } from "@/hooks/use-toast"
 import {
   Dialog,
   DialogContent,
@@ -53,7 +56,12 @@ interface DischargeFormProps {
 }
 
 export function DischargeForm({ children }: DischargeFormProps) {
+  const { toast } = useToast()
   const [open, setOpen] = React.useState(false)
+  const [patients, setPatients] = React.useState<SearchableSelectOption[]>([])
+  const [operations, setOperations] = React.useState<SearchableSelectOption[]>([])
+  const [loadingPatients, setLoadingPatients] = React.useState(false)
+  const [loadingOperations, setLoadingOperations] = React.useState(false)
 
   const form = useForm<z.infer<typeof dischargeFormSchema>>({
     resolver: zodResolver(dischargeFormSchema),
@@ -63,6 +71,50 @@ export function DischargeForm({ children }: DischargeFormProps) {
       discharge_date: new Date().toISOString().split("T")[0],
     },
   })
+
+  // Load data when dialog opens
+  React.useEffect(() => {
+    const loadData = async () => {
+      if (!open) return
+      
+      // Load patients
+      setLoadingPatients(true)
+      try {
+        const response = await patientsApi.list({ limit: 1000, status: 'active' })
+        if (response.success && response.data) {
+          setPatients(
+            response.data.map((patient) => ({
+              value: patient.id,
+              label: `${patient.full_name} (${patient.patient_id})`,
+            }))
+          )
+        }
+      } catch (error) {
+        console.error("Error loading patients:", error)
+      } finally {
+        setLoadingPatients(false)
+      }
+
+      // Load operations
+      setLoadingOperations(true)
+      try {
+        const response = await operationsApi.list({ limit: 500 })
+        if (response.success && response.data) {
+          setOperations(
+            response.data.map((operation) => ({
+              value: operation.id,
+              label: `${operation.operation_name || 'Operation'} - ${operation.operation_date || 'N/A'}`,
+            }))
+          )
+        }
+      } catch (error) {
+        console.error("Error loading operations:", error)
+      } finally {
+        setLoadingOperations(false)
+      }
+    }
+    loadData()
+  }, [open])
 
   function onSubmit(values: z.infer<typeof dischargeFormSchema>) {
     console.log(values)
@@ -103,18 +155,16 @@ export function DischargeForm({ children }: DischargeFormProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Patient *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select patient" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="PAT001">AARAV MEHTA</SelectItem>
-                        <SelectItem value="PAT002">NISHANT KAREKAR</SelectItem>
-                        <SelectItem value="PAT003">PRIYA NAIR</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <SearchableSelect
+                        options={patients}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="Select patient"
+                        searchPlaceholder="Search patients..."
+                        loading={loadingPatients}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -127,17 +177,16 @@ export function DischargeForm({ children }: DischargeFormProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Related Operation</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select operation (optional)" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="OP001">FOREIGNBODY - 15/10/2025</SelectItem>
-                      <SelectItem value="OP002">Cataract Surgery - 12/10/2025</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <FormControl>
+                    <SearchableSelect
+                      options={operations}
+                      value={field.value || ""}
+                      onValueChange={field.onChange}
+                      placeholder="Select operation (optional)"
+                      searchPlaceholder="Search operations..."
+                      loading={loadingOperations}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

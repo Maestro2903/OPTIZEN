@@ -68,175 +68,204 @@ import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
 import { ViewEditDialog } from "@/components/view-edit-dialog"
 import { Pagination } from "@/components/ui/pagination"
 import { useToast } from "@/hooks/use-toast"
+import { useApiList, useApiForm, useApiDelete } from "@/lib/hooks/useApi"
+import { patientsApi, type Patient, type PatientFilters } from "@/lib/services/api"
+import { PhoneNumberInput } from "@/components/ui/phone-input"
+import { SearchableSelect } from "@/components/ui/searchable-select"
+import { countries, getStatesForCountry } from "@/lib/utils/countries"
 
 const patientFormSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  age: z.string().min(1, "Age is required"),
+  full_name: z.string().min(2, "Name must be at least 2 characters"),
+  date_of_birth: z.string().optional(),
   email: z.string().email("Invalid email").optional().or(z.literal("")),
   mobile: z.string().min(10, "Mobile number is required"),
-  gender: z.enum(["Male", "Female", "Other"]),
+  gender: z.enum(["male", "female", "other"]),
+  country: z.string().min(1, "Country is required"),
   state: z.string().min(1, "State is required"),
   address: z.string().optional(),
+  city: z.string().optional(),
+  postal_code: z.string().optional(),
+  emergency_contact: z.string().optional(),
+  emergency_phone: z.string().optional(),
+  medical_history: z.string().optional(),
+  current_medications: z.string().optional(),
+  allergies: z.string().optional(),
+  insurance_provider: z.string().optional(),
+  insurance_number: z.string().optional(),
 })
 
-interface Patient {
-  id: number
-  name: string
-  age: number
-  email?: string
-  mobile: string
-  gender: "Male" | "Female" | "Other"
-  state: string
-  last_visit: string
-  status: string
-  address?: string
-}
-
-const initialPatients: Patient[] = [
-  {
-    id: 1,
-    name: "AARAV MEHTA",
-    age: 45,
-    email: "aarav.m@email.com",
-    mobile: "9856452114",
-    gender: "Male",
-    state: "Gujarat",
-    last_visit: "08/02/2025",
-    status: "Active",
-  },
-  {
-    id: 2,
-    name: "NISHANT KAREKAR",
-    age: 28,
-    email: "nishant.k@email.com",
-    mobile: "9319018067",
-    gender: "Male",
-    state: "Maharashtra",
-    last_visit: "26/09/2025",
-    status: "Active",
-  },
-  {
-    id: 3,
-    name: "PRIYA NAIR",
-    age: 34,
-    email: "priya.n@email.com",
-    mobile: "9868412848",
-    gender: "Female",
-    state: "Maharashtra",
-    last_visit: "19/08/2025",
-    status: "Active",
-  },
-  {
-    id: 4,
-    name: "AISHABEN THAKIR",
-    age: 39,
-    email: "aisha.t@email.com",
-    mobile: "6456445154",
-    gender: "Female",
-    state: "Gujarat",
-    last_visit: "15/08/2025",
-    status: "Active",
-  },
-]
 
 export default function PatientsPage() {
   const { toast } = useToast()
-  const [patients, setPatients] = React.useState(initialPatients)
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
-  const [editingPatient, setEditingPatient] = React.useState<any>(null)
+  const [editingPatient, setEditingPatient] = React.useState<Patient | null>(null)
   const [currentView, setCurrentView] = React.useState("list")
   const [appliedFilters, setAppliedFilters] = React.useState<string[]>([])
-  const [currentSort, setCurrentSort] = React.useState("name")
+  const [currentSort, setCurrentSort] = React.useState("full_name")
   const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('asc')
   const [searchTerm, setSearchTerm] = React.useState("")
   const [currentPage, setCurrentPage] = React.useState(1)
   const [pageSize, setPageSize] = React.useState(10)
 
+  // API hooks
+  const {
+    data: patients,
+    loading,
+    error,
+    pagination,
+    search,
+    sort,
+    filter,
+    changePage,
+    changePageSize,
+    addItem,
+    updateItem,
+    removeItem,
+    refresh
+  } = useApiList<Patient>(patientsApi.list, {
+    page: currentPage,
+    limit: pageSize,
+    sortBy: currentSort,
+    sortOrder: sortDirection
+  })
+
+  const { submitForm: createPatient, loading: createLoading } = useApiForm<Patient>()
+  const { submitForm: updatePatient, loading: updateLoading } = useApiForm<Patient>()
+  const { deleteItem, loading: deleteLoading } = useApiDelete()
+
   const form = useForm<z.infer<typeof patientFormSchema>>({
     resolver: zodResolver(patientFormSchema),
     defaultValues: {
-      name: "",
-      age: "",
+      full_name: "",
+      date_of_birth: "",
       email: "",
       mobile: "",
-      gender: "Male",
+      gender: "male",
+      country: "India",
       state: "",
       address: "",
+      city: "",
+      postal_code: "",
+      emergency_contact: "",
+      emergency_phone: "",
+      medical_history: "",
+      current_medications: "",
+      allergies: "",
+      insurance_provider: "",
+      insurance_number: "",
     },
   })
 
-  function onSubmit(values: z.infer<typeof patientFormSchema>) {
-    if (editingPatient) {
-      // Update existing patient
-      setPatients(prev => prev.map(p => 
-        p.id === editingPatient.id 
-          ? { ...p, ...values, age: Number(values.age) }
-          : p
-      ))
-      toast({
-        title: "Patient Updated",
-        description: `${values.name} has been updated successfully.`,
-      })
-    } else {
-      // Add new patient
-      const newPatient = {
-        id: Math.max(...patients.map(p => p.id), 0) + 1,
-        ...values,
-        age: Number(values.age),
-        last_visit: new Date().toLocaleDateString('en-GB'),
-        status: "Active",
+  // Watch country to update states
+  const selectedCountry = form.watch("country")
+
+  async function onSubmit(values: z.infer<typeof patientFormSchema>) {
+    try {
+      if (editingPatient) {
+        // Update existing patient
+        const result = await updatePatient(
+          () => patientsApi.update(editingPatient.id, {
+            ...values,
+            patient_id: editingPatient.patient_id,
+            status: editingPatient.status
+          }),
+          {
+            successMessage: `${values.full_name} has been updated successfully.`,
+            onSuccess: (updatedPatient) => {
+              updateItem(editingPatient.id, updatedPatient)
+            }
+          }
+        )
+        if (result) {
+          setIsDialogOpen(false)
+          setEditingPatient(null)
+          form.reset()
+        }
+      } else {
+        // Create new patient
+        // Generate collision-resistant patient ID
+        const timestamp = Date.now()
+        const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase()
+        const patientId = `PAT-${timestamp}-${randomSuffix}`
+        
+        const result = await createPatient(
+          () => patientsApi.create({
+            ...values,
+            patient_id: patientId,
+            status: 'active'
+          }),
+          {
+            successMessage: `${values.full_name} has been added successfully.`,
+            onSuccess: (newPatient) => {
+              addItem(newPatient)
+            }
+          }
+        )
+        if (result) {
+          setIsDialogOpen(false)
+          form.reset()
+        }
       }
-      setPatients(prev => [newPatient, ...prev])
-      toast({
-        title: "Patient Added",
-        description: `${values.name} has been added successfully.`,
-      })
+    } catch (error) {
+      console.error('Error submitting patient form:', error)
     }
-    setIsDialogOpen(false)
-    setEditingPatient(null)
-    form.reset()
   }
 
-  const handleEdit = (patient: any) => {
+  const handleEdit = (patient: Patient) => {
     setEditingPatient(patient)
     form.reset({
-      name: patient.name,
-      age: patient.age.toString(),
-      email: patient.email,
+      full_name: patient.full_name,
+      date_of_birth: patient.date_of_birth || "",
+      email: patient.email || "",
       mobile: patient.mobile,
       gender: patient.gender,
-      state: patient.state,
-      address: "",
+      country: (patient as any).country || "India",
+      state: patient.state || "",
+      address: patient.address || "",
+      city: patient.city || "",
+      postal_code: patient.postal_code || "",
+      emergency_contact: patient.emergency_contact || "",
+      emergency_phone: patient.emergency_phone || "",
+      medical_history: patient.medical_history || "",
+      current_medications: patient.current_medications || "",
+      allergies: patient.allergies || "",
+      insurance_provider: patient.insurance_provider || "",
+      insurance_number: patient.insurance_number || "",
     })
     setIsDialogOpen(true)
   }
 
-  const handleDelete = (patientId: number) => {
+  const handleDelete = async (patientId: string) => {
     const patient = patients.find(p => p.id === patientId)
-    setPatients(prev => prev.filter(p => p.id !== patientId))
-    toast({
-      title: "Patient Deleted",
-      description: `${patient?.name} has been deleted successfully.`,
-      variant: "destructive",
-    })
+    if (!patient) return
+
+    const success = await deleteItem(
+      () => patientsApi.delete(patientId),
+      {
+        successMessage: `${patient.full_name} has been deleted successfully.`,
+        onSuccess: () => {
+          removeItem(patientId)
+        }
+      }
+    )
   }
 
   const viewOptionsConfig: ViewOptionsConfig = {
     filters: [
-      { id: "active", label: "Active Patients", count: patients.filter(p => p.status === "Active").length },
-      { id: "male", label: "Male", count: patients.filter(p => p.gender === "Male").length },
-      { id: "female", label: "Female", count: patients.filter(p => p.gender === "Female").length },
+      { id: "active", label: "Active Patients", count: patients.filter(p => p.status === "active").length },
+      { id: "male", label: "Male", count: patients.filter(p => p.gender === "male").length },
+      { id: "female", label: "Female", count: patients.filter(p => p.gender === "female").length },
       { id: "gujarat", label: "Gujarat", count: patients.filter(p => p.state === "Gujarat").length },
       { id: "maharashtra", label: "Maharashtra", count: patients.filter(p => p.state === "Maharashtra").length },
     ],
     sortOptions: [
-      { id: "name", label: "Name" },
-      { id: "age", label: "Age" },
-      { id: "last_visit", label: "Last Visit" },
+      { id: "full_name", label: "Name" },
+      { id: "date_of_birth", label: "Age" },
+      { id: "created_at", label: "Registration Date" },
       { id: "state", label: "State" },
     ],
     showExport: true,
-    showSettings: true,
+    showSettings: false,
   }
 
   const handleViewChange = (view: string) => {
@@ -245,16 +274,52 @@ export default function PatientsPage() {
 
   const handleFilterChange = (filters: string[]) => {
     setAppliedFilters(filters)
+    const filterParams: PatientFilters = {}
+
+    // Collect status filters
+    const statusFilters = filters.filter(f => f === "active")
+    if (statusFilters.length > 0) {
+      filterParams.status = statusFilters
+    }
+    
+    // Collect gender filters
+    const genderFilters = filters.filter(f => ["male", "female"].includes(f))
+    if (genderFilters.length > 0) {
+      filterParams.gender = genderFilters
+    }
+    
+    // Collect state filters
+    const stateFilters = filters.filter(f => ["gujarat", "maharashtra"].includes(f))
+    if (stateFilters.length > 0) {
+      filterParams.state = stateFilters.map(s => s === "gujarat" ? "Gujarat" : "Maharashtra")
+    }
+
+    filter(filterParams)
   }
 
-  const handleSortChange = (sort: string, direction: 'asc' | 'desc') => {
-    setCurrentSort(sort)
+  const handleSortChange = (sortBy: string, direction: 'asc' | 'desc') => {
+    setCurrentSort(sortBy)
     setSortDirection(direction)
+    sort(sortBy, direction)
   }
 
-  const handleExport = () => {
-    console.log("Export patients data")
-    // Add export functionality here
+  const handleExport = async () => {
+    try {
+      // Import dynamically to avoid SSR issues
+      const { exportToCSV } = await import('@/lib/utils/export')
+      exportToCSV(patients, 'patients')
+      toast({
+        title: "Export successful",
+        description: "Patients data has been exported to CSV."
+      })
+    } catch (error) {
+      console.error('Export error:', error)
+      toast({
+        variant: "destructive",
+        title: "Export failed",
+        description: "Failed to export patients data."
+      })
+    }
   }
 
   const handleSettings = () => {
@@ -262,87 +327,42 @@ export default function PatientsPage() {
     // Add settings functionality here
   }
 
-  // Filter and sort patients based on current selections
-  const filteredAndSortedPatients = React.useMemo(() => {
-    let filtered = [...patients]
-
-    // Apply text search
-    if (searchTerm.trim()) {
-      const q = searchTerm.trim().toLowerCase()
-      filtered = filtered.filter(p =>
-        p.name.toLowerCase().includes(q) ||
-        (p.email || '').toLowerCase().includes(q) ||
-        p.mobile.toLowerCase().includes(q) ||
-        p.gender.toLowerCase().includes(q) ||
-        p.state.toLowerCase().includes(q)
-      )
-    }
-
-    // Apply filters
-    if (appliedFilters.includes("active")) {
-      filtered = filtered.filter(p => p.status === "Active")
-    }
-    if (appliedFilters.includes("male")) {
-      filtered = filtered.filter(p => p.gender === "Male")
-    }
-    if (appliedFilters.includes("female")) {
-      filtered = filtered.filter(p => p.gender === "Female")
-    }
-    if (appliedFilters.includes("gujarat")) {
-      filtered = filtered.filter(p => p.state === "Gujarat")
-    }
-    if (appliedFilters.includes("maharashtra")) {
-      filtered = filtered.filter(p => p.state === "Maharashtra")
-    }
-
-    // Apply sorting
-    filtered.sort((a, b) => {
-      let aValue, bValue
-      switch (currentSort) {
-        case "name":
-          aValue = a.name
-          bValue = b.name
-          break
-        case "age":
-          aValue = a.age
-          bValue = b.age
-          break
-        case "last_visit":
-          aValue = new Date(a.last_visit.split("/").reverse().join("-"))
-          bValue = new Date(b.last_visit.split("/").reverse().join("-"))
-          break
-        case "state":
-          aValue = a.state
-          bValue = b.state
-          break
-        default:
-          aValue = a.name
-          bValue = b.name
-      }
-
-      if (sortDirection === 'asc') {
-        return aValue > bValue ? 1 : -1
-      } else {
-        return aValue < bValue ? 1 : -1
-      }
-    })
-
-    return filtered
-  }, [patients, appliedFilters, currentSort, sortDirection, searchTerm])
-
-  // Paginate the filtered data
-  const paginatedPatients = React.useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize
-    const endIndex = startIndex + pageSize
-    return filteredAndSortedPatients.slice(startIndex, endIndex)
-  }, [filteredAndSortedPatients, currentPage, pageSize])
-
-  const totalPages = Math.ceil(filteredAndSortedPatients.length / pageSize)
-
-  // Reset to first page when filters change
+  // Handle search with debouncing
   React.useEffect(() => {
-    setCurrentPage(1)
-  }, [searchTerm, appliedFilters, currentSort, sortDirection])
+    const timeoutId = setTimeout(() => {
+      if (searchTerm.trim()) {
+        search(searchTerm.trim())
+      } else {
+        search("")
+      }
+    }, 300)
+
+    return () => clearTimeout(timeoutId)
+  }, [searchTerm, search])
+
+  // Handle page changes
+  React.useEffect(() => {
+    changePage(currentPage)
+  }, [currentPage, changePage])
+
+  React.useEffect(() => {
+    changePageSize(pageSize)
+  }, [pageSize, changePageSize])
+
+  // Calculate age from date of birth
+  const calculateAge = (dateOfBirth: string | undefined): number | null => {
+    if (!dateOfBirth) return null
+    const today = new Date()
+    const birth = new Date(dateOfBirth)
+    // Validate date
+    if (isNaN(birth.getTime())) return null
+    let age = today.getFullYear() - birth.getFullYear()
+    const monthDiff = today.getMonth() - birth.getMonth()
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--
+    }
+    return age >= 0 ? age : null
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -377,7 +397,7 @@ export default function PatientsPage() {
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
                   control={form.control}
-                  name="name"
+                  name="full_name"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Full Name *</FormLabel>
@@ -392,12 +412,12 @@ export default function PatientsPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="age"
+                    name="date_of_birth"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Age *</FormLabel>
+                        <FormLabel>Date of Birth</FormLabel>
                         <FormControl>
-                          <Input placeholder="45" {...field} />
+                          <Input type="date" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -416,9 +436,9 @@ export default function PatientsPage() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="Male">Male</SelectItem>
-                            <SelectItem value="Female">Female</SelectItem>
-                            <SelectItem value="Other">Other</SelectItem>
+                            <SelectItem value="male">Male</SelectItem>
+                            <SelectItem value="female">Female</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -448,7 +468,11 @@ export default function PatientsPage() {
                       <FormItem>
                         <FormLabel>Mobile *</FormLabel>
                         <FormControl>
-                          <Input placeholder="9856452114" {...field} />
+                          <PhoneNumberInput
+                            value={field.value}
+                            onChange={field.onChange}
+                            defaultCountry={selectedCountry === "India" ? "IN" : selectedCountry === "United States" ? "US" : "IN"}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -458,24 +482,51 @@ export default function PatientsPage() {
 
                 <FormField
                   control={form.control}
+                  name="country"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Country *</FormLabel>
+                      <FormControl>
+                        <SearchableSelect
+                          options={countries}
+                          value={field.value}
+                          onValueChange={(value) => {
+                            field.onChange(value)
+                            // Reset state when country changes
+                            form.setValue("state", "")
+                          }}
+                          placeholder="Select country"
+                          searchPlaceholder="Search countries..."
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
                   name="state"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>State *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select state" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="Gujarat">Gujarat</SelectItem>
-                          <SelectItem value="Maharashtra">Maharashtra</SelectItem>
-                          <SelectItem value="Karnataka">Karnataka</SelectItem>
-                          <SelectItem value="Tamil Nadu">Tamil Nadu</SelectItem>
-                          <SelectItem value="Delhi">Delhi</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        {getStatesForCountry(selectedCountry).length > 0 ? (
+                          <SearchableSelect
+                            options={getStatesForCountry(selectedCountry)}
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            placeholder="Select state/province"
+                            searchPlaceholder="Search states..."
+                          />
+                        ) : (
+                          <Input
+                            placeholder="Enter state/province"
+                            value={field.value}
+                            onChange={(e) => field.onChange(e.target.value)}
+                          />
+                        )}
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -503,7 +554,9 @@ export default function PatientsPage() {
                   }}>
                     Cancel
                   </Button>
-                  <Button type="submit">{editingPatient ? "Update Patient" : "Add Patient"}</Button>
+                  <Button type="submit" disabled={createLoading || updateLoading}>
+                    {createLoading || updateLoading ? "Processing..." : (editingPatient ? "Update Patient" : "Add Patient")}
+                  </Button>
                 </DialogFooter>
               </form>
             </Form>
@@ -518,7 +571,7 @@ export default function PatientsPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">2,847</div>
+            <div className="text-2xl font-bold">{pagination?.total || 0}</div>
             <p className="text-xs text-muted-foreground">all time</p>
           </CardContent>
         </Card>
@@ -572,6 +625,7 @@ export default function PatientsPage() {
                   className="pl-8 w-[300px]"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  disabled={loading}
                 />
               </div>
               <ViewOptions
@@ -606,30 +660,36 @@ export default function PatientsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedPatients.length === 0 ? (
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      Loading patients...
+                    </TableCell>
+                  </TableRow>
+                ) : patients.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       No patients found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  paginatedPatients.map((patient, index) => (
+                  patients.map((patient, index) => (
                   <TableRow key={patient.id}>
-                    <TableCell>{(currentPage - 1) * pageSize + index + 1}</TableCell>
-                    <TableCell className="font-medium uppercase">{patient.name}</TableCell>
-                    <TableCell>{patient.age}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">{patient.email}</TableCell>
+                    <TableCell>{((pagination?.page || 1) - 1) * (pagination?.limit || 10) + index + 1}</TableCell>
+                    <TableCell className="font-medium uppercase">{patient.full_name}</TableCell>
+                    <TableCell>{calculateAge(patient.date_of_birth) ?? '-'}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{patient.email || '-'}</TableCell>
                     <TableCell>{patient.mobile}</TableCell>
                     <TableCell>
-                      <Badge variant="secondary">{patient.gender}</Badge>
+                      <Badge variant="secondary" className="capitalize">{patient.gender}</Badge>
                     </TableCell>
-                    <TableCell>{patient.state}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">{patient.last_visit}</TableCell>
+                    <TableCell>{patient.state || '-'}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{new Date(patient.created_at).toLocaleDateString('en-GB')}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <ViewEditDialog
-                          title={`Patient - ${patient.name}`}
-                          description={`Details for ${patient.name}`}
+                          title={`Patient - ${patient.full_name}`}
+                          description={`Details for ${patient.full_name}`}
                           data={patient}
                           schema={patientFormSchema}
                           renderViewAction={(data: any) => (
@@ -637,11 +697,11 @@ export default function PatientsPage() {
                               <div className="grid grid-cols-2 gap-4">
                                 <div>
                                   <p className="text-sm text-muted-foreground">Name</p>
-                                  <p className="font-semibold uppercase">{data?.name}</p>
+                                  <p className="font-semibold uppercase">{data?.full_name}</p>
                                 </div>
                                 <div>
                                   <p className="text-sm text-muted-foreground">Age</p>
-                                  <p className="font-semibold">{data?.age}</p>
+                                  <p className="font-semibold">{calculateAge(data?.date_of_birth) ?? 'N/A'}</p>
                                 </div>
                                 <div>
                                   <p className="text-sm text-muted-foreground">Gender</p>
@@ -667,7 +727,7 @@ export default function PatientsPage() {
                               <div className="grid grid-cols-2 gap-4">
                                 <FormField
                                   control={form.control}
-                                  name={"name"}
+                                  name={"full_name"}
                                   render={({ field }) => (
                                     <FormItem>
                                       <FormLabel>Full Name *</FormLabel>
@@ -680,12 +740,12 @@ export default function PatientsPage() {
                                 />
                                 <FormField
                                   control={form.control}
-                                  name={"age"}
+                                  name={"date_of_birth"}
                                   render={({ field }) => (
                                     <FormItem>
-                                      <FormLabel>Age *</FormLabel>
+                                      <FormLabel>Date of Birth</FormLabel>
                                       <FormControl>
-                                        <Input {...field} />
+                                        <Input type="date" {...field} />
                                       </FormControl>
                                       <FormMessage />
                                     </FormItem>
@@ -704,9 +764,9 @@ export default function PatientsPage() {
                                           </SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
-                                          <SelectItem value="Male">Male</SelectItem>
-                                          <SelectItem value="Female">Female</SelectItem>
-                                          <SelectItem value="Other">Other</SelectItem>
+                                          <SelectItem value="male">Male</SelectItem>
+                                          <SelectItem value="female">Female</SelectItem>
+                                          <SelectItem value="other">Other</SelectItem>
                                         </SelectContent>
                                       </Select>
                                       <FormMessage />
@@ -767,15 +827,19 @@ export default function PatientsPage() {
                             </Form>
                           )}
                           onSaveAction={async (values: any) => {
-                            setPatients(prev => prev.map(p => 
-                              p.id === patient.id 
-                                ? { ...p, ...values, age: Number(values.age) }
-                                : p
-                            ))
-                            toast({
-                              title: "Patient Updated",
-                              description: `${values.name} has been updated successfully.`,
-                            })
+                            try {
+                              const result = await updatePatient(
+                                () => patientsApi.update(patient.id, values),
+                                {
+                                  successMessage: `${values.full_name} has been updated successfully.`,
+                                  onSuccess: (updatedPatient) => {
+                                    updateItem(patient.id, updatedPatient)
+                                  }
+                                }
+                              )
+                            } catch (error) {
+                              console.error('Error updating patient:', error)
+                            }
                           }}
                         >
                           <Button variant="ghost" size="icon" className="h-8 w-8" title="View">
@@ -802,7 +866,7 @@ export default function PatientsPage() {
                         </Button>
                         <DeleteConfirmDialog
                           title="Delete Patient"
-                          description={`Are you sure you want to delete ${patient.name}? This action cannot be undone.`}
+                          description={`Are you sure you want to delete ${patient.full_name}? This action cannot be undone.`}
                           onConfirm={() => handleDelete(patient.id)}
                         >
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" title="Delete">
@@ -818,10 +882,10 @@ export default function PatientsPage() {
             </Table>
           </div>
           <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            pageSize={pageSize}
-            totalItems={filteredAndSortedPatients.length}
+            currentPage={pagination?.page || 1}
+            totalPages={pagination?.totalPages || 0}
+            pageSize={pagination?.limit || 10}
+            totalItems={pagination?.total || 0}
             onPageChange={setCurrentPage}
             onPageSizeChange={(newSize) => {
               setPageSize(newSize)

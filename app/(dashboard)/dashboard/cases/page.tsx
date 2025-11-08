@@ -41,148 +41,136 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Pagination } from "@/components/ui/pagination"
 import { useToast } from "@/hooks/use-toast"
+import { useApiList, useApiForm, useApiDelete } from "@/lib/hooks/useApi"
+import { casesApi, patientsApi, type Case, type CaseFilters } from "@/lib/services/api"
 
-interface Case {
-  id: number
-  case_no: string
-  patient_name: string
-  age: number
-  email?: string
-  mobile?: string
-  gender: string
-  state: string
-  case_date: string
-  visit_no: string
-  status: "Active" | "Completed" | "Cancelled"
-}
-
-const initialCases: Case[] = [
-  {
-    id: 1,
-    case_no: "OPT250001",
-    patient_name: "AARAV MEHTA",
-    age: 45,
-    email: "aarav.m@email.com",
-    mobile: "9856452114",
-    gender: "Male",
-    state: "Gujarat",
-    case_date: "2025-02-08",
-    visit_no: "First",
-    status: "Active",
-  },
-  {
-    id: 2,
-    case_no: "OPT250002",
-    patient_name: "NISHANT KAREKAR",
-    age: 28,
-    email: "nishant.k@email.com",
-    mobile: "9319018067",
-    gender: "Male",
-    state: "Maharashtra",
-    case_date: "2025-09-26",
-    visit_no: "Follow-up-1",
-    status: "Active",
-  },
-  {
-    id: 3,
-    case_no: "OPT250003",
-    patient_name: "PRIYA NAIR",
-    age: 34,
-    email: "priya.n@email.com",
-    mobile: "9868412848",
-    gender: "Female",
-    state: "Maharashtra",
-    case_date: "2025-08-19",
-    visit_no: "First",
-    status: "Completed",
-  },
-  {
-    id: 4,
-    case_no: "OPT250004",
-    patient_name: "AISHABEN THAKIR",
-    age: 39,
-    email: "aisha.t@email.com",
-    mobile: "6456445154",
-    gender: "Female",
-    state: "Gujarat",
-    case_date: "2025-08-15",
-    visit_no: "Follow-up-2",
-    status: "Active",
-  },
-]
 
 const statusColors = {
-  Active: "bg-blue-100 text-blue-700 border-blue-200",
-  Completed: "bg-green-100 text-green-700 border-green-200",
-  Cancelled: "bg-red-100 text-red-700 border-red-200",
+  active: "bg-blue-100 text-blue-700 border-blue-200",
+  completed: "bg-green-100 text-green-700 border-green-200",
+  cancelled: "bg-red-100 text-red-700 border-red-200",
 }
 
 export default function CasesPage() {
   const { toast } = useToast()
-  const [cases, setCases] = React.useState<Case[]>(initialCases)
   const [searchTerm, setSearchTerm] = React.useState("")
   const [currentPage, setCurrentPage] = React.useState(1)
   const [pageSize, setPageSize] = React.useState(10)
 
-  const handleAddCase = (caseData: any) => {
-    const newCase: Case = {
-      id: Math.max(...cases.map(c => c.id), 0) + 1,
-      case_no: `OPT${new Date().getFullYear()}${String(Math.max(...cases.map(c => c.id), 0) + 1).padStart(4, '0')}`,
-      ...caseData,
-      status: "Active" as const,
+  // API hooks
+  const {
+    data: cases,
+    loading,
+    error,
+    pagination,
+    search,
+    changePage,
+    changePageSize,
+    addItem,
+    updateItem,
+    removeItem,
+    refresh
+  } = useApiList<Case>(casesApi.list, {
+    page: currentPage,
+    limit: pageSize,
+    sortBy: 'encounter_date',
+    sortOrder: 'desc'
+  })
+
+  const { submitForm: createCase, loading: createLoading } = useApiForm<Case>()
+  const { submitForm: updateCase, loading: updateLoading } = useApiForm<Case>()
+  const { deleteItem, loading: deleteLoading } = useApiDelete()
+
+  const handleAddCase = async (caseData: any) => {
+    try {
+      // Generate collision-resistant case number
+      const timestamp = Date.now()
+      const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase()
+      const caseNumber = `OPT${new Date().getFullYear()}${timestamp.toString().slice(-6)}-${randomSuffix}`
+      
+      const result = await createCase(
+        () => casesApi.create({
+          case_no: caseNumber,
+          patient_id: caseData.patient_id,
+          encounter_date: caseData.encounter_date || new Date().toISOString().split('T')[0],
+          visit_type: caseData.visit_type,
+          chief_complaint: caseData.chief_complaint,
+          history_of_present_illness: caseData.history_of_present_illness,
+          past_medical_history: caseData.past_medical_history,
+          examination_findings: caseData.examination_findings,
+          diagnosis: caseData.diagnosis,
+          treatment_plan: caseData.treatment_plan,
+          medications_prescribed: caseData.medications_prescribed,
+          follow_up_instructions: caseData.follow_up_instructions,
+          status: 'active'
+        }),
+        {
+          successMessage: `Case ${caseNumber} has been added successfully.`,
+          onSuccess: (newCase) => {
+            addItem(newCase)
+          }
+        }
+      )
+    } catch (error) {
+      console.error('Error creating case:', error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Could not create case. Please try again."
+      })
     }
-    setCases(prev => [newCase, ...prev])
-    toast({
-      title: "Case Added",
-      description: `Case ${newCase.case_no} has been added successfully.`,
-    })
   }
 
-  const handleUpdateCase = (caseId: number, values: any) => {
-    setCases(prev => prev.map(c => 
-      c.id === caseId ? { ...c, ...values } : c
-    ))
-    toast({
-      title: "Case Updated",
-      description: "Case has been updated successfully.",
-    })
+  const handleUpdateCase = async (caseId: string, values: any) => {
+    try {
+      const result = await updateCase(
+        () => casesApi.update(caseId, values),
+        {
+          successMessage: "Case has been updated successfully.",
+          onSuccess: (updatedCase) => {
+            updateItem(caseId, updatedCase)
+          }
+        }
+      )
+    } catch (error) {
+      console.error('Error updating case:', error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update case. Please try again."
+      })
+    }
   }
 
-  const handleDeleteCase = (caseId: number) => {
+  const handleDeleteCase = async (caseId: string) => {
     const caseItem = cases.find(c => c.id === caseId)
-    setCases(prev => prev.filter(c => c.id !== caseId))
-    toast({
-      title: "Case Deleted",
-      description: `Case ${caseItem?.case_no} has been deleted successfully.`,
-      variant: "destructive",
-    })
+    if (!caseItem) return
+
+    const success = await deleteItem(
+      () => casesApi.delete(caseId),
+      {
+        successMessage: `Case ${caseItem.case_no} has been deleted successfully.`,
+        onSuccess: () => {
+          removeItem(caseId)
+        }
+      }
+    )
   }
 
-  const filteredCases = React.useMemo(() => {
-    if (!searchTerm.trim()) return cases
-    const q = searchTerm.trim().toLowerCase()
-    return cases.filter(c =>
-      c.case_no.toLowerCase().includes(q) ||
-      c.patient_name.toLowerCase().includes(q) ||
-      (c.email || '').toLowerCase().includes(q) ||
-      (c.mobile || '').toLowerCase().includes(q) ||
-      c.gender.toLowerCase().includes(q) ||
-      c.state.toLowerCase().includes(q) ||
-      c.status.toLowerCase().includes(q)
-    )
-  }, [cases, searchTerm])
 
-  const paginatedCases = React.useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize
-    const endIndex = startIndex + pageSize
-    return filteredCases.slice(startIndex, endIndex)
-  }, [filteredCases, currentPage, pageSize])
-
-  const totalPages = Math.ceil(filteredCases.length / pageSize)
-
+  // Handle search with debouncing
   React.useEffect(() => {
-    setCurrentPage(1)
-  }, [searchTerm])
+    const timeoutId = setTimeout(() => {
+      if (searchTerm.trim()) {
+        search(searchTerm.trim())
+        setCurrentPage(1)
+      } else {
+        search("")
+      }
+    }, 300)
+
+    return () => clearTimeout(timeoutId)
+  }, [searchTerm, search])
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -207,7 +195,7 @@ export default function CasesPage() {
             <FolderOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{cases.length}</div>
+            <div className="text-2xl font-bold">{pagination?.total || 0}</div>
             <p className="text-xs text-muted-foreground">all time</p>
           </CardContent>
         </Card>
@@ -217,8 +205,9 @@ export default function CasesPage() {
             <FolderOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{cases.filter(c => c.status === "Active").length}</div>
-            <p className="text-xs text-muted-foreground">in progress</p>
+            {/* TODO: Replace with API aggregate count instead of filtering current page */}
+            <div className="text-2xl font-bold">{cases.filter(c => c.status === "active").length}</div>
+            <p className="text-xs text-muted-foreground">on this page</p>
           </CardContent>
         </Card>
         <Card>
@@ -227,7 +216,7 @@ export default function CasesPage() {
             <FolderOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{cases.filter(c => c.status === "Completed").length}</div>
+            <div className="text-2xl font-bold">{cases.filter(c => c.status === "completed").length}</div>
             <p className="text-xs text-muted-foreground">completed</p>
           </CardContent>
         </Card>
@@ -237,7 +226,7 @@ export default function CasesPage() {
             <FolderOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{cases.filter(c => c.case_date === new Date().toISOString().split('T')[0]).length}</div>
+            <div className="text-2xl font-bold">{cases.filter(c => c.encounter_date === new Date().toISOString().split('T')[0]).length}</div>
             <p className="text-xs text-muted-foreground">today</p>
           </CardContent>
         </Card>
@@ -261,6 +250,7 @@ export default function CasesPage() {
                   className="pl-8 w-[300px]"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  disabled={loading}
                 />
               </div>
               <Button variant="outline" size="icon">
@@ -286,32 +276,38 @@ export default function CasesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedCases.length === 0 ? (
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      Loading cases...
+                    </TableCell>
+                  </TableRow>
+                ) : cases.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       No cases found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  paginatedCases.map((caseItem, index) => (
+                  cases.map((caseItem, index) => (
                   <TableRow key={caseItem.id}>
-                    <TableCell className="font-medium">{(currentPage - 1) * pageSize + index + 1}</TableCell>
+                    <TableCell className="font-medium">{((pagination?.page || 1) - 1) * (pagination?.limit || 10) + index + 1}</TableCell>
                     <TableCell className="font-medium">{caseItem.case_no}</TableCell>
-                    <TableCell className="font-medium uppercase">{caseItem.patient_name}</TableCell>
-                    <TableCell>{caseItem.age}</TableCell>
-                    <TableCell className="text-muted-foreground">{caseItem.email}</TableCell>
-                    <TableCell>{caseItem.mobile}</TableCell>
+                    <TableCell className="font-medium uppercase">{caseItem.patients?.full_name || '-'}</TableCell>
+                    <TableCell>-</TableCell>
+                    <TableCell className="text-muted-foreground">{caseItem.patients?.email || '-'}</TableCell>
+                    <TableCell>{caseItem.patients?.mobile || '-'}</TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="text-xs">
-                        {caseItem.gender}
+                      <Badge variant="secondary" className="text-xs capitalize">
+                        {caseItem.patients?.gender || '-'}
                       </Badge>
                     </TableCell>
-                    <TableCell>{caseItem.state}</TableCell>
+                    <TableCell>-</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <ViewEditDialog
                           title={`Case Details - ${caseItem.case_no}`}
-                          description={`Complete case information for ${caseItem.patient_name}`}
+                          description={`Complete case information for ${caseItem.patients?.full_name || 'Patient'}`}
                           data={caseItem}
                           // Basic schema for demo purposes; extend as needed
                           schema={z.object({
@@ -519,10 +515,10 @@ export default function CasesPage() {
             </Table>
           </div>
           <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            pageSize={pageSize}
-            totalItems={filteredCases.length}
+            currentPage={pagination?.page || 1}
+            totalPages={pagination?.totalPages || 0}
+            pageSize={pagination?.limit || 10}
+            totalItems={pagination?.total || 0}
             onPageChange={setCurrentPage}
             onPageSizeChange={(newSize) => {
               setPageSize(newSize)

@@ -6,6 +6,9 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
+import { patientsApi, casesApi } from "@/lib/services/api"
+import { useToast } from "@/hooks/use-toast"
 import {
   Dialog,
   DialogContent,
@@ -69,7 +72,12 @@ interface InvoiceFormProps {
 }
 
 export function InvoiceForm({ children, invoiceData, mode = "add", onSubmit: onSubmitCallback }: InvoiceFormProps) {
+  const { toast } = useToast()
   const [open, setOpen] = React.useState(false)
+  const [patients, setPatients] = React.useState<SearchableSelectOption[]>([])
+  const [patientCases, setPatientCases] = React.useState<any[]>([])
+  const [loadingPatients, setLoadingPatients] = React.useState(false)
+  const [loadingCases, setLoadingCases] = React.useState(false)
 
   const form = useForm<z.infer<typeof invoiceFormSchema>>({
     resolver: zodResolver(invoiceFormSchema),
@@ -91,6 +99,77 @@ export function InvoiceForm({ children, invoiceData, mode = "add", onSubmit: onS
     control: form.control,
     name: "items",
   })
+
+  // Load patients
+  React.useEffect(() => {
+    const loadPatients = async () => {
+      if (!open) return
+      setLoadingPatients(true)
+      try {
+        const response = await patientsApi.list({ limit: 1000, status: 'active' })
+        if (response.success && response.data) {
+          setPatients(
+            response.data.map((patient) => ({
+              value: patient.id,
+              label: `${patient.full_name} (${patient.patient_id})`,
+            }))
+          )
+        }
+      } catch (error) {
+        console.error("Error loading patients:", error)
+      } finally {
+        setLoadingPatients(false)
+      }
+    }
+    loadPatients()
+  }, [open])
+
+  // Watch patient selection
+  const selectedPatientId = form.watch("patient_id")
+
+  // Auto-load cases when patient selected
+  React.useEffect(() => {
+    const loadPatientCases = async () => {
+      if (!selectedPatientId) {
+        setPatientCases([])
+        form.setValue("case_id", "")
+        return
+      }
+      
+      setLoadingCases(true)
+      try {
+        const response = await casesApi.list({ patient_id: selectedPatientId })
+        if (response.success && response.data && response.data.length > 0) {
+          setPatientCases(response.data)
+          
+          // Auto-select the most recent case
+          const mostRecentCase = response.data[0]
+          form.setValue("case_id", mostRecentCase.case_no)
+          
+          toast({
+            title: "Case auto-selected",
+            description: `Case ${mostRecentCase.case_no} has been automatically selected.`
+          })
+        } else {
+          setPatientCases([])
+          form.setValue("case_id", "")
+          toast({
+            title: "No cases found",
+            description: "This patient has no registered cases yet."
+          })
+        }
+      } catch (error) {
+        console.error("Error loading cases:", error)
+        setPatientCases([])
+      } finally {
+        setLoadingCases(false)
+      }
+    }
+    
+    if (selectedPatientId) {
+      loadPatientCases()
+    }
+  }, [selectedPatientId, form, toast])
 
   const watchItems = form.watch("items")
   const watchDiscount = form.watch("discount_percent")

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Add Patient API</title>
+  <style>
+    body { font-family: system-ui; padding: 20px; max-width: 800px; margin: 0 auto; }
+    button { padding: 12px 24px; background: #0066cc; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; margin: 10px 5px; }
+    button:hover { background: #0052a3; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+    #result { margin-top: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 6px; white-space: pre-wrap; background: #f5f5f5; font-family: monospace; }
+    .error { color: #c00; }
+    .success { color: #0a0; }
+    input, select { padding: 8px; margin: 5px 0; width: 100%; border: 1px solid #ddd; border-radius: 4px; }
+    label { display: block; margin-top: 10px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test Add Patient Button</h1>
+  <p>This will test if the API is working. Open this file in your browser while the dev server is running.</p>
+  
+  <form id="testForm">
+    <label>Full Name *</label>
+    <input type="text" id="fullName" value="SHREE SHANTH R" required>
+    
+    <label>Mobile *</label>
+    <input type="text" id="mobile" value="6382765347" required>
+    
+    <label>Gender *</label>
+    <select id="gender" required>
+      <option value="male" selected>Male</option>
+      <option value="female">Female</option>
+      <option value="other">Other</option>
+    </select>
+    
+    <label>State *</label>
+    <input type="text" id="state" value="Tamil Nadu" required>
+    
+    <label>Email</label>
+    <input type="email" id="email" value="shreeshanthr06@gmail.com">
+    
+    <label>Date of Birth</label>
+    <input type="date" id="dob" value="2025-11-21">
+    
+    <button type="submit">Test Add Patient</button>
+    <button type="button" onclick="checkAuth()">Check if Logged In</button>
+    <button type="button" onclick="checkTable()">Check Database Table</button>
+  </form>
+  
+  <div id="result">Click a button to test...</div>
+  
+  <script>
+    const result = document.getElementById('result');
+    
+    document.getElementById('testForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      result.textContent = '⏳ Testing API...';
+      result.className = '';
+      
+      const patientData = {
+        patient_id: `PAT-${Date.now()}-TEST`,
+        full_name: document.getElementById('fullName').value,
+        mobile: document.getElementById('mobile').value,
+        gender: document.getElementById('gender').value,
+        state: document.getElementById('state').value,
+        email: document.getElementById('email').value || null,
+        date_of_birth: document.getElementById('dob').value || null,
+        status: 'active'
+      };
+      
+      try {
+        const response = await fetch('http://localhost:3000/api/patients', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(patientData)
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+          result.className = 'success';
+          result.textContent = '✅ SUCCESS! Patient created:\n\n' + JSON.stringify(data, null, 2);
+        } else {
+          result.className = 'error';
+          result.textContent = '❌ ERROR: ' + (data.error || 'Unknown error') + '\n\n';
+          
+          if (data.error === 'Unauthorized') {
+            result.textContent += '🔐 You need to login first!\n';
+            result.textContent += '1. Go to: http://localhost:3000/auth/login\n';
+            result.textContent += '2. Login with your credentials\n';
+            result.textContent += '3. Come back and try again';
+          } else if (data.error.includes('does not exist')) {
+            result.textContent += '📋 Database table missing!\n';
+            result.textContent += '1. Go to Supabase Dashboard\n';
+            result.textContent += '2. Run the SQL from FIX_STUCK_BUTTON.md\n';
+            result.textContent += '3. Try again';
+          }
+          
+          result.textContent += '\n\nFull response:\n' + JSON.stringify(data, null, 2);
+        }
+      } catch (error) {
+        result.className = 'error';
+        result.textContent = '❌ NETWORK ERROR:\n' + error.message + '\n\n';
+        result.textContent += '⚠️  Make sure dev server is running:\n';
+        result.textContent += '   npm run dev';
+      }
+    });
+    
+    async function checkAuth() {
+      result.textContent = '⏳ Checking authentication...';
+      result.className = '';
+      
+      const hasCookie = document.cookie.includes('sb-access-token');
+      
+      if (hasCookie) {
+        result.className = 'success';
+        result.textContent = '✅ You are logged in!\n\nCookies found:\n' + document.cookie.split(';').join('\n');
+      } else {
+        result.className = 'error';
+        result.textContent = '❌ NOT LOGGED IN\n\n';
+        result.textContent += '🔐 You need to login:\n';
+        result.textContent += '1. Go to: http://localhost:3000/auth/login\n';
+        result.textContent += '2. Login with your credentials\n';
+        result.textContent += '3. Come back here';
+      }
+    }
+    
+    async function checkTable() {
+      result.textContent = '⏳ Checking database table...';
+      result.className = '';
+      
+      try {
+        const response = await fetch('http://localhost:3000/api/patients?limit=1', {
+          credentials: 'include'
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+          result.className = 'success';
+          result.textContent = '✅ Database table exists!\n\n';
+          result.textContent += `Total patients: ${data.pagination?.total || 0}\n\n`;
+          result.textContent += 'Full response:\n' + JSON.stringify(data, null, 2);
+        } else if (data.error === 'Unauthorized') {
+          result.className = 'error';
+          result.textContent = '⚠️  Need to login to check table\n\n';
+          result.textContent += 'Go to: http://localhost:3000/auth/login';
+        } else if (data.error.includes('does not exist')) {
+          result.className = 'error';
+          result.textContent = '❌ Database table DOES NOT EXIST\n\n';
+          result.textContent += '📋 You need to create it:\n';
+          result.textContent += '1. Open: FIX_STUCK_BUTTON.md\n';
+          result.textContent += '2. Follow Step 2 (SQL query)\n';
+          result.textContent += '3. Run it in Supabase Dashboard';
+        } else {
+          result.className = 'error';
+          result.textContent = '❌ ERROR: ' + data.error + '\n\n' + JSON.stringify(data, null, 2);
+        }
+      } catch (error) {
+        result.className = 'error';
+        result.textContent = '❌ NETWORK ERROR: ' + error.message + '\n\n';
+        result.textContent += 'Make sure dev server is running!';
+      }
+    }
+  </script>
+</body>
+</html>

@@ -34,7 +34,7 @@ interface MasterDataFormProps {
   children: React.ReactNode
   title: string
   fieldLabel: string
-  onSubmit?: (value: string) => void
+  onSubmit?: (data: { name: string; description?: string }) => void
 }
 
 export function MasterDataForm({ children, title, fieldLabel, onSubmit: onSubmitCallback }: MasterDataFormProps) {
@@ -50,7 +50,10 @@ export function MasterDataForm({ children, title, fieldLabel, onSubmit: onSubmit
 
   function onSubmit(values: z.infer<typeof masterDataSchema>) {
     if (onSubmitCallback) {
-      onSubmitCallback(values.name)
+      onSubmitCallback({
+        name: values.name,
+        description: values.description
+      })
     }
     setOpen(false)
     form.reset()

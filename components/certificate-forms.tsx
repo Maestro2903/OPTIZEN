@@ -5,6 +5,8 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Button } from "@/components/ui/button"
+import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
+import { patientsApi } from "@/lib/services/api"
 import {
   Dialog,
   DialogContent,
@@ -73,9 +75,33 @@ interface CertificateFormsProps {
   children: React.ReactNode
 }
 
+// Visual acuity options
+const visualAcuityOptions: SearchableSelectOption[] = [
+  { value: "6/4", label: "6/4" },
+  { value: "6/4P", label: "6/4P" },
+  { value: "6/5", label: "6/5" },
+  { value: "6/5P", label: "6/5P" },
+  { value: "6/6", label: "6/6" },
+  { value: "6/6P", label: "6/6P" },
+  { value: "6/9", label: "6/9" },
+  { value: "6/9P", label: "6/9P" },
+  { value: "6/12", label: "6/12" },
+  { value: "6/12P", label: "6/12P" },
+  { value: "6/18", label: "6/18" },
+  { value: "6/24", label: "6/24" },
+  { value: "6/36", label: "6/36" },
+  { value: "6/60", label: "6/60" },
+  { value: "FC 1M", label: "FC 1M" },
+  { value: "FC 3M", label: "FC 3M" },
+  { value: "HM", label: "Hand Movements" },
+  { value: "PL+", label: "Perception of Light" },
+]
+
 export function CertificateForms({ children }: CertificateFormsProps) {
   const [open, setOpen] = React.useState(false)
   const [certType, setCertType] = React.useState("fitness")
+  const [patients, setPatients] = React.useState<SearchableSelectOption[]>([])
+  const [loadingPatients, setLoadingPatients] = React.useState(false)
 
   const fitnessForm = useForm<z.infer<typeof fitnessCertSchema>>({
     resolver: zodResolver(fitnessCertSchema),
@@ -100,6 +126,30 @@ export function CertificateForms({ children }: CertificateFormsProps) {
   const customForm = useForm<z.infer<typeof customCertSchema>>({
     resolver: zodResolver(customCertSchema),
   })
+
+  // Load patients
+  React.useEffect(() => {
+    const loadPatients = async () => {
+      if (!open) return
+      setLoadingPatients(true)
+      try {
+        const response = await patientsApi.list({ limit: 1000, status: 'active' })
+        if (response.success && response.data) {
+          setPatients(
+            response.data.map((patient) => ({
+              value: patient.id,
+              label: `${patient.full_name} (${patient.patient_id})`,
+            }))
+          )
+        }
+      } catch (error) {
+        console.error("Error loading patients:", error)
+      } finally {
+        setLoadingPatients(false)
+      }
+    }
+    loadPatients()
+  }, [open])
 
   function onSubmitFitness(values: z.infer<typeof fitnessCertSchema>) {
     console.log("Fitness:", values)
@@ -155,17 +205,16 @@ export function CertificateForms({ children }: CertificateFormsProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Patient *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select patient" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="PAT001">AARAV MEHTA</SelectItem>
-                          <SelectItem value="PAT002">NISHANT KAREKAR</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <SearchableSelect
+                          options={patients}
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          placeholder="Select patient"
+                          searchPlaceholder="Search patients..."
+                          loading={loadingPatients}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -334,7 +383,13 @@ export function CertificateForms({ children }: CertificateFormsProps) {
                       <FormItem>
                         <FormLabel>Visual Acuity - Right</FormLabel>
                         <FormControl>
-                          <Input placeholder="6/6" {...field} />
+                          <SearchableSelect
+                            options={visualAcuityOptions}
+                            value={field.value || ""}
+                            onValueChange={field.onChange}
+                            placeholder="Select visual acuity"
+                            searchPlaceholder="Search acuity..."
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -347,7 +402,13 @@ export function CertificateForms({ children }: CertificateFormsProps) {
                       <FormItem>
                         <FormLabel>Visual Acuity - Left</FormLabel>
                         <FormControl>
-                          <Input placeholder="6/6" {...field} />
+                          <SearchableSelect
+                            options={visualAcuityOptions}
+                            value={field.value || ""}
+                            onValueChange={field.onChange}
+                            placeholder="Select visual acuity"
+                            searchPlaceholder="Search acuity..."
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

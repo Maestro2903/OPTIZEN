@@ -5,14 +5,16 @@ import {
   Plus,
   Search,
   Filter,
-  CreditCard,
+  Receipt,
+  DollarSign,
+  TrendingUp,
+  AlertTriangle,
   Eye,
   Edit,
   Trash2,
-  Printer,
-  DollarSign,
-  TrendingUp,
-  Clock,
+  Download,
+  CheckCircle,
+  XCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -27,157 +29,212 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { InvoiceForm } from "@/components/invoice-form"
-import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
+import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
 import { ViewEditDialog } from "@/components/view-edit-dialog"
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Pagination } from "@/components/ui/pagination"
+import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
+import { useApiList, useApiForm, useApiDelete } from "@/lib/hooks/useApi"
+import { invoicesApi, type Invoice, type InvoiceFilters } from "@/lib/services/api"
 import { useToast } from "@/hooks/use-toast"
-import * as z from "zod"
-
-interface Invoice {
-  id: string
-  date: string
-  patient_name: string
-  items: string
-  total: string
-  paid: string
-  balance: string
-  status: "Paid" | "Partial" | "Unpaid"
-}
-
-const initialInvoices: Invoice[] = [
-  {
-    id: "INV001",
-    date: "15/11/2025",
-    patient_name: "AARAV MEHTA",
-    items: "Consultation, Eye Drops",
-    total: "₹1,250",
-    paid: "₹1,250",
-    balance: "₹0",
-    status: "Paid",
-  },
-  {
-    id: "INV002",
-    date: "14/11/2025",
-    patient_name: "NISHANT KAREKAR",
-    items: "LASIK Surgery",
-    total: "₹45,000",
-    paid: "₹30,000",
-    balance: "₹15,000",
-    status: "Partial",
-  },
-  {
-    id: "INV003",
-    date: "13/11/2025",
-    patient_name: "PRIYA NAIR",
-    items: "Cataract Surgery, IOL",
-    total: "₹35,000",
-    paid: "₹0",
-    balance: "₹35,000",
-    status: "Unpaid",
-  },
-]
+import { Pagination } from "@/components/ui/pagination"
 
 const statusColors = {
-  Paid: "bg-green-100 text-green-700 border-green-200",
-  Partial: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  Unpaid: "bg-red-100 text-red-700 border-red-200",
+  draft: "bg-gray-100 text-gray-700 border-gray-200",
+  sent: "bg-blue-100 text-blue-700 border-blue-200",
+  paid: "bg-green-100 text-green-700 border-green-200",
+  overdue: "bg-red-100 text-red-700 border-red-200",
+  cancelled: "bg-orange-100 text-orange-700 border-orange-200",
+}
+
+const paymentStatusColors = {
+  paid: "bg-green-100 text-green-700 border-green-200",
+  partial: "bg-yellow-100 text-yellow-700 border-yellow-200",
+  unpaid: "bg-red-100 text-red-700 border-red-200",
 }
 
 export default function BillingPage() {
   const { toast } = useToast()
-  const [invoices, setInvoices] = React.useState<Invoice[]>(initialInvoices)
   const [searchTerm, setSearchTerm] = React.useState("")
   const [currentPage, setCurrentPage] = React.useState(1)
   const [pageSize, setPageSize] = React.useState(10)
+  const [appliedFilters, setAppliedFilters] = React.useState<string[]>([])
+  const [currentSort, setCurrentSort] = React.useState("invoice_date")
+  const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('desc')
 
-  // Helper function to get next invoice ID with NaN protection
-  const getNextInvoiceId = (invoices: Invoice[]) => {
-    const maxId = invoices.reduce((max, inv) => {
-      const num = parseInt(inv.id.replace('INV', ''), 10)
-      return !isNaN(num) && num > max ? num : max
-    }, 0)
-    return `INV${String(maxId + 1).padStart(3, '0')}`
-  }
+  // API hooks
+  const {
+    data: invoices,
+    loading,
+    error,
+    pagination,
+    search,
+    sort,
+    filter,
+    changePage,
+    changePageSize,
+    addItem,
+    updateItem,
+    removeItem,
+    refresh
+  } = useApiList<Invoice>(invoicesApi.list, {
+    page: currentPage,
+    limit: pageSize,
+    sortBy: currentSort,
+    sortOrder: sortDirection
+  })
 
-  const handleAddInvoice = (invoiceData: any) => {
-    const newInvoice: Invoice = {
-      id: getNextInvoiceId(invoices),
-      date: new Date().toLocaleDateString('en-GB'),
-      ...invoiceData,
-    }
-    setInvoices(prev => [newInvoice, ...prev])
-    toast({
-      title: "Invoice Created",
-      description: "New invoice has been created successfully.",
-    })
-  }
+  const { submitForm: createInvoice, loading: createLoading } = useApiForm<Invoice>()
+  const { submitForm: updateInvoice, loading: updateLoading } = useApiForm<Invoice>()
+  const { deleteItem, loading: deleteLoading } = useApiDelete()
 
-  const handleUpdateInvoice = (invoiceId: string, values: Partial<Invoice>) => {
-    setInvoices(prev => prev.map(inv =>
-      inv.id === invoiceId ? { ...inv, ...values } : inv
-    ))
-    toast({
-      title: "Invoice Updated",
-      description: "Invoice has been updated successfully.",
-    })
-  }
+  // Handle search with debouncing
+  React.useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchTerm.trim()) {
+        search(searchTerm.trim())
+      } else {
+        search("")
+      }
+    }, 300)
 
-  const handleDeleteInvoice = (invoiceId: string) => {
-    const invoice = invoices.find(inv => inv.id === invoiceId)
-    if (!invoice) {
-      toast({
-        title: "Error",
-        description: "Invoice not found.",
-        variant: "destructive",
-      })
-      return
-    }
-    setInvoices(prev => prev.filter(inv => inv.id !== invoiceId))
-    toast({
-      title: "Invoice Deleted",
-      description: `Invoice ${invoice.id} has been deleted successfully.`,
-      variant: "destructive",
-    })
-  }
+    return () => clearTimeout(timeoutId)
+  }, [searchTerm, search])
 
-  const filteredInvoices = React.useMemo(() => {
-    if (!searchTerm.trim()) return invoices
-    const q = searchTerm.trim().toLowerCase()
-    return invoices.filter(inv =>
-      inv.id.toLowerCase().includes(q) ||
-      inv.date.toLowerCase().includes(q) ||
-      inv.patient_name.toLowerCase().includes(q) ||
-      inv.items.toLowerCase().includes(q) ||
-      inv.status.toLowerCase().includes(q)
-    )
-  }, [invoices, searchTerm])
-
-  const paginatedInvoices = React.useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize
-    const endIndex = startIndex + pageSize
-    return filteredInvoices.slice(startIndex, endIndex)
-  }, [filteredInvoices, currentPage, pageSize])
-
-  const totalPages = Math.ceil(filteredInvoices.length / pageSize)
+  // Handle page changes
+  React.useEffect(() => {
+    changePage(currentPage)
+  }, [currentPage, changePage])
 
   React.useEffect(() => {
-    setCurrentPage(1)
-  }, [searchTerm])
+    changePageSize(pageSize)
+  }, [pageSize, changePageSize])
+
+  const handleAddInvoice = async (invoiceData: any) => {
+    try {
+      // Generate collision-resistant invoice number using timestamp + random suffix
+      const invoiceNumber = `INV-${crypto.randomUUID().split('-')[0].toUpperCase()}`
+
+      const result = await createInvoice(
+        () => invoicesApi.create({
+          invoice_number: invoiceNumber,
+          patient_id: invoiceData.patient_id,
+          invoice_date: invoiceData.invoice_date || new Date().toISOString().split('T')[0],
+          due_date: invoiceData.due_date,
+          subtotal: invoiceData.subtotal,
+          discount_amount: invoiceData.discount_amount || 0,
+          tax_amount: invoiceData.tax_amount || 0,
+          total_amount: invoiceData.total_amount,
+          amount_paid: invoiceData.amount_paid || 0,
+          payment_method: invoiceData.payment_method,
+          notes: invoiceData.notes,
+          status: 'draft',
+          items: invoiceData.items || []
+        }),
+        {
+          successMessage: `Invoice ${invoiceNumber} created successfully.`,
+          onSuccess: (newInvoice) => {
+            addItem(newInvoice)
+          }
+        }
+      )
+    } catch (error) {
+      console.error('Error creating invoice:', error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to create invoice. Please try again."
+      })
+    }
+  }
+
+  const handleUpdateInvoice = async (invoiceId: string, values: any) => {
+    try {
+      const result = await updateInvoice(
+        () => invoicesApi.update(invoiceId, values),
+        {
+          successMessage: "Invoice updated successfully.",
+          onSuccess: (updatedInvoice) => {
+            updateItem(invoiceId, updatedInvoice)
+          }
+        }
+      )
+    } catch (error) {
+      console.error('Error updating invoice:', error)
+    }
+  }
+
+  const handleDeleteInvoice = async (invoiceId: string) => {
+    const invoice = invoices.find(i => i.id === invoiceId)
+    if (!invoice) return
+
+    const success = await deleteItem(
+      () => invoicesApi.delete(invoiceId),
+      {
+        successMessage: `Invoice ${invoice.invoice_number} has been deleted successfully.`,
+        onSuccess: () => {
+          removeItem(invoiceId)
+        }
+      }
+    )
+  }
+
+  const handleFilterChange = (filters: string[]) => {
+    setAppliedFilters(filters)
+    const filterParams: InvoiceFilters = {}
+
+    // Collect all status/payment_status filters
+    const statusFilters = filters.filter(f => 
+      ["paid", "unpaid", "partial", "overdue"].includes(f)
+    )
+    if (statusFilters.length > 0) {
+      filterParams.status = statusFilters
+    }
+
+    filter(filterParams)
+  }
+
+  const handleSortChange = (sortBy: string, direction: 'asc' | 'desc') => {
+    setCurrentSort(sortBy)
+    setSortDirection(direction)
+    sort(sortBy, direction)
+  }
+
+  const viewOptionsConfig: ViewOptionsConfig = {
+    filters: [
+      { id: "paid", label: "Paid", count: invoices.filter(i => i.payment_status === "paid").length },
+      { id: "unpaid", label: "Unpaid", count: invoices.filter(i => i.payment_status === "unpaid").length },
+      { id: "partial", label: "Partial", count: invoices.filter(i => i.payment_status === "partial").length },
+      { id: "overdue", label: "Overdue", count: invoices.filter(i => i.status === "overdue").length },
+    ],
+    sortOptions: [
+      { id: "invoice_date", label: "Invoice Date" },
+      { id: "total_amount", label: "Amount" },
+      { id: "status", label: "Status" },
+      { id: "due_date", label: "Due Date" },
+    ],
+    showExport: true,
+    showSettings: true,
+  }
+
+  // TODO: CRITICAL - Replace with server-provided aggregate metrics from dedicated API endpoint
+  // Current metrics only calculate from current page data (limited to pageSize invoices)
+  // This is misleading as it doesn't represent actual total revenue/amounts
+  const totalRevenue = invoices.reduce((sum, invoice) => sum + invoice.total_amount, 0)
+  const paidAmount = invoices.reduce((sum, invoice) => sum + invoice.amount_paid, 0)
+  const pendingAmount = invoices.reduce((sum, invoice) => sum + invoice.balance_due, 0)
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Billing & Invoices</h1>
           <p className="text-muted-foreground">
-            Manage invoices and payment tracking
+            Manage patient billing and invoice records
           </p>
         </div>
-        <InvoiceForm onSubmit={handleAddInvoice}>
+        <InvoiceForm>
           <Button className="gap-2">
             <Plus className="h-4 w-4" />
-            New Invoice
+            Create Invoice
           </Button>
         </InvoiceForm>
       </div>
@@ -189,38 +246,38 @@ export default function BillingPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹12,45,000</div>
-            <p className="text-xs text-muted-foreground">this month</p>
+            <div className="text-2xl font-bold">₹{totalRevenue.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">current page only</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Outstanding</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹2,15,000</div>
-            <p className="text-xs text-muted-foreground">pending payment</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Invoices</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">143</div>
-            <p className="text-xs text-muted-foreground">this month</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Collection Rate</CardTitle>
+            <CardTitle className="text-sm font-medium">Amount Received</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">82.7%</div>
-            <p className="text-xs text-muted-foreground">collection rate</p>
+            <div className="text-2xl font-bold">₹{paidAmount.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">current page only</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending Amount</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">₹{pendingAmount.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">current page only</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Invoices</CardTitle>
+            <Receipt className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{pagination?.total || 0}</div>
+            <p className="text-xs text-muted-foreground">generated</p>
           </CardContent>
         </Card>
       </div>
@@ -229,9 +286,9 @@ export default function BillingPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Recent Invoices</CardTitle>
+              <CardTitle>Invoice Records</CardTitle>
               <CardDescription>
-                View and manage all billing invoices
+                View and manage all patient invoices
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
@@ -240,14 +297,34 @@ export default function BillingPage() {
                 <Input
                   type="search"
                   placeholder="Search invoices..."
-                  className="pl-8 w-[200px]"
+                  className="pl-8 w-[300px]"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  disabled={loading}
                 />
               </div>
-              <Button variant="outline" size="icon">
-                <Filter className="h-4 w-4" />
-              </Button>
+              <ViewOptions
+                config={viewOptionsConfig}
+                currentView="list"
+                appliedFilters={appliedFilters}
+                currentSort={currentSort}
+                sortDirection={sortDirection}
+                onViewChange={() => {}}
+                onFilterChange={handleFilterChange}
+                onSortChange={handleSortChange}
+                onExport={() => {
+                  toast({
+                    title: "Export feature",
+                    description: "Invoice export functionality coming soon."
+                  })
+                }}
+                onSettings={() => {
+                  toast({
+                    title: "Settings",
+                    description: "Billing settings functionality coming soon."
+                  })
+                }}
+              />
             </div>
           </div>
         </CardHeader>
@@ -256,165 +333,119 @@ export default function BillingPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>SR. NO.</TableHead>
                   <TableHead>INVOICE NO.</TableHead>
+                  <TableHead>PATIENT</TableHead>
                   <TableHead>DATE</TableHead>
-                  <TableHead>PATIENT NAME</TableHead>
-                  <TableHead>ITEMS</TableHead>
-                  <TableHead>TOTAL</TableHead>
+                  <TableHead>AMOUNT</TableHead>
                   <TableHead>PAID</TableHead>
                   <TableHead>BALANCE</TableHead>
                   <TableHead>STATUS</TableHead>
-                  <TableHead>ACTION</TableHead>
+                  <TableHead>PAYMENT</TableHead>
+                  <TableHead>ACTIONS</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedInvoices.length === 0 ? (
+                {loading ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      Loading invoices...
+                    </TableCell>
+                  </TableRow>
+                ) : invoices.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       No invoices found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  paginatedInvoices.map((invoice, index) => (
-                  <TableRow key={invoice.id}>
-                    <TableCell>{(currentPage - 1) * pageSize + index + 1}</TableCell>
-                    <TableCell className="font-medium">{invoice.id}</TableCell>
-                    <TableCell>{invoice.date}</TableCell>
-                    <TableCell className="font-medium uppercase">{invoice.patient_name}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">{invoice.items}</TableCell>
-                    <TableCell className="font-semibold">{invoice.total}</TableCell>
-                    <TableCell className="font-semibold">{invoice.paid}</TableCell>
-                    <TableCell className="font-semibold">{invoice.balance}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={statusColors[invoice.status as keyof typeof statusColors]}
-                      >
-                        {invoice.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <ViewEditDialog
-                          title={`Invoice - ${invoice.id}`}
-                          description={`Patient: ${invoice.patient_name}`}
-                          data={invoice as any}
-                          renderViewAction={(data: any) => (
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                              <div>
-                                <p className="text-muted-foreground">Date</p>
-                                <p className="font-medium">{data.date}</p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">Patient</p>
-                                <p className="font-medium uppercase">{data.patient_name}</p>
-                              </div>
-                              <div className="col-span-2">
-                                <p className="text-muted-foreground">Items</p>
-                                <p className="text-muted-foreground">{data.items}</p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">Total</p>
-                                <p className="font-semibold">{data.total}</p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">Status</p>
-                                <Badge variant="outline" className={statusColors[data.status as keyof typeof statusColors]}>
-                                  {data.status}
-                                </Badge>
-                              </div>
-                            </div>
-                          )}
-                          renderEditAction={(form: any) => (
-                            <Form {...form}>
-                              <div className="grid grid-cols-2 gap-4">
-                                <FormField
-                                  control={form.control}
-                                  name={"date"}
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Date</FormLabel>
-                                      <FormControl>
-                                        <Input {...field} />
-                                      </FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                                <FormField
-                                  control={form.control}
-                                  name={"status"}
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Status</FormLabel>
-                                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                        <FormControl>
-                                          <SelectTrigger>
-                                            <SelectValue placeholder="Select status" />
-                                          </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                          <SelectItem value="Paid">Paid</SelectItem>
-                                          <SelectItem value="Partial">Partial</SelectItem>
-                                          <SelectItem value="Unpaid">Unpaid</SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                              </div>
-                            </Form>
-                          )}
-                          schema={z.object({
-                            date: z.string().min(1),
-                            status: z.string().min(1),
-                          })}
-                          onSaveAction={async (values: any) => {
-                            handleUpdateInvoice(invoice.id, values)
-                          }}
-                        >
-                          <Button variant="ghost" size="icon" className="h-8 w-8" title="View">
+                  invoices.map((invoice) => (
+                    <TableRow key={invoice.id}>
+                      <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
+                      <TableCell className="font-medium uppercase">{invoice.patients?.full_name || '-'}</TableCell>
+                      <TableCell>{new Date(invoice.invoice_date).toLocaleDateString('en-GB')}</TableCell>
+                      <TableCell>₹{invoice.total_amount.toLocaleString()}</TableCell>
+                      <TableCell>₹{invoice.amount_paid.toLocaleString()}</TableCell>
+                      <TableCell>₹{invoice.balance_due.toLocaleString()}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className={`capitalize ${statusColors[invoice.status as keyof typeof statusColors] || ''}`}>
+                          {invoice.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className={`capitalize ${paymentStatusColors[invoice.payment_status as keyof typeof paymentStatusColors] || ''}`}>
+                          {invoice.payment_status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8"
+                            onClick={() => {
+                              toast({
+                                title: "View Invoice",
+                                description: "Invoice detail view coming soon."
+                              })
+                            }}
+                            title="View invoice"
+                          >
                             <Eye className="h-4 w-4" />
                           </Button>
-                        </ViewEditDialog>
-                        <InvoiceForm invoiceData={invoice} mode="edit">
-                          <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit">
-                            <Edit className="h-4 w-4" />
+                          <InvoiceForm>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit invoice">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </InvoiceForm>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8"
+                            onClick={() => {
+                              toast({
+                                title: "Download Invoice",
+                                description: "Invoice download coming soon."
+                              })
+                            }}
+                            title="Download invoice"
+                          >
+                            <Download className="h-4 w-4" />
                           </Button>
-                        </InvoiceForm>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => window.print()}
-                          title="Print"
-                        >
-                          <Printer className="h-4 w-4" />
-                        </Button>
-                        <DeleteConfirmDialog
-                          title="Delete Invoice"
-                          description={`Are you sure you want to delete invoice ${invoice.id}? This action cannot be undone.`}
-                          onConfirm={() => handleDeleteInvoice(invoice.id)}
-                        >
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" title="Delete">
-                            <Trash2 className="h-4 w-4" />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => {
+                              if (window.confirm(`Mark invoice ${invoice.invoice_number} as paid?`)) {
+                                handleUpdateInvoice(invoice.id, { payment_status: 'paid', status: 'paid' })
+                              }
+                            }}
+                            title="Mark as paid"
+                          >
+                            <CheckCircle className="h-4 w-4 text-green-600" />
                           </Button>
-                        </DeleteConfirmDialog>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                          <DeleteConfirmDialog
+                            title="Delete Invoice"
+                            description={`Are you sure you want to delete invoice ${invoice.invoice_number}? This action cannot be undone.`}
+                            onConfirm={() => handleDeleteInvoice(invoice.id)}
+                          >
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </DeleteConfirmDialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
                 )}
               </TableBody>
             </Table>
           </div>
           <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            pageSize={pageSize}
-            totalItems={filteredInvoices.length}
+            currentPage={pagination?.page || 1}
+            totalPages={pagination?.totalPages || 0}
+            pageSize={pagination?.limit || 10}
+            totalItems={pagination?.total || 0}
             onPageChange={setCurrentPage}
             onPageSizeChange={(newSize) => {
               setPageSize(newSize)

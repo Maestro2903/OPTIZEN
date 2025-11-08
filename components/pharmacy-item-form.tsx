@@ -2,6 +2,9 @@
 
 import * as React from "react"
 import { Button } from "@/components/ui/button"
+import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
+import { masterDataApi } from "@/lib/services/api"
+import { useToast } from "@/hooks/use-toast"
 import {
   Dialog,
   DialogContent,
@@ -57,10 +60,14 @@ interface PharmacyItemFormProps {
   children: React.ReactNode
   itemData?: any
   mode?: "create" | "edit"
+  onSubmit?: (data: any) => Promise<void>
 }
 
-export function PharmacyItemForm({ children, itemData, mode = "create" }: PharmacyItemFormProps) {
+export function PharmacyItemForm({ children, itemData, mode = "create", onSubmit: onSubmitProp }: PharmacyItemFormProps) {
+  const { toast } = useToast()
   const [isOpen, setIsOpen] = React.useState(false)
+  const [categories, setCategories] = React.useState<SearchableSelectOption[]>([])
+  const [loadingCategories, setLoadingCategories] = React.useState(false)
 
   const form = useForm<z.infer<typeof pharmacyItemSchema>>({
     resolver: zodResolver(pharmacyItemSchema),
@@ -86,10 +93,69 @@ export function PharmacyItemForm({ children, itemData, mode = "create" }: Pharma
     },
   })
 
-  function onSubmit(values: z.infer<typeof pharmacyItemSchema>) {
-    console.log(mode === "edit" ? "Update:" : "Create:", values)
-    setIsOpen(false)
-    form.reset()
+  // Load categories from master data
+  React.useEffect(() => {
+    const loadCategories = async () => {
+      if (!isOpen) return
+      setLoadingCategories(true)
+      try {
+        const response = await masterDataApi.list({ category: 'medicine_categories', limit: 100 })
+        if (response.success && response.data && response.data.length > 0) {
+          setCategories(
+            response.data.map((item) => ({
+              value: item.name,
+              label: item.name,
+            }))
+          )
+        } else {
+          // Fallback to default categories if not in master data
+          setCategories([
+            { value: "Analgesics", label: "Analgesics" },
+            { value: "Antibiotics", label: "Antibiotics" },
+            { value: "Eye Drops", label: "Eye Drops" },
+            { value: "Eye Ointments", label: "Eye Ointments" },
+            { value: "Antiseptics", label: "Antiseptics" },
+            { value: "Vitamins", label: "Vitamins" },
+            { value: "Anti-inflammatory", label: "Anti-inflammatory" },
+            { value: "Other", label: "Other" },
+          ])
+        }
+      } catch (error) {
+        console.error("Error loading categories:", error)
+        // Use fallback
+        setCategories([
+          { value: "Analgesics", label: "Analgesics" },
+          { value: "Antibiotics", label: "Antibiotics" },
+          { value: "Eye Drops", label: "Eye Drops" },
+          { value: "Eye Ointments", label: "Eye Ointments" },
+          { value: "Other", label: "Other" },
+        ])
+      } finally {
+        setLoadingCategories(false)
+      }
+    }
+    loadCategories()
+  }, [isOpen])
+
+  async function onSubmit(values: z.infer<typeof pharmacyItemSchema>) {
+    try {
+      if (onSubmitProp) {
+        await onSubmitProp(values)
+      }
+      setIsOpen(false)
+      form.reset()
+      toast({
+        title: "Success",
+        description: mode === "edit" ? "Medicine updated successfully." : "Medicine added successfully."
+      })
+    } catch (error) {
+      console.error("Error submitting pharmacy item:", error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to save medicine. Please try again."
+      })
+    }
   }
 
   return (
@@ -140,23 +206,16 @@ export function PharmacyItemForm({ children, itemData, mode = "create" }: Pharma
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Category *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Analgesics">Analgesics</SelectItem>
-                        <SelectItem value="Antibiotics">Antibiotics</SelectItem>
-                        <SelectItem value="Eye Drops">Eye Drops</SelectItem>
-                        <SelectItem value="Eye Ointments">Eye Ointments</SelectItem>
-                        <SelectItem value="Antiseptics">Antiseptics</SelectItem>
-                        <SelectItem value="Vitamins">Vitamins</SelectItem>
-                        <SelectItem value="Anti-inflammatory">Anti-inflammatory</SelectItem>
-                        <SelectItem value="Other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <SearchableSelect
+                        options={categories}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="Select category"
+                        searchPlaceholder="Search categories..."
+                        loading={loadingCategories}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

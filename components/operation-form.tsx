@@ -1,0 +1,527 @@
+"use client"
+
+import * as React from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
+import { useToast } from "@/hooks/use-toast"
+import { patientsApi, casesApi, masterDataApi, operationsApi } from "@/lib/services/api"
+import { Checkbox } from "@/components/ui/checkbox"
+
+const operationFormSchema = z.object({
+  patient_id: z.string().min(1, "Patient is required"),
+  case_id: z.string().optional(),
+  operation_name: z.string().min(1, "Operation name is required"),
+  operation_date: z.string().min(1, "Operation date is required"),
+  begin_time: z.string().optional(),
+  end_time: z.string().optional(),
+  duration: z.string().optional(),
+  eye: z.string().optional(),
+  sys_diagnosis: z.string().optional(),
+  anesthesia: z.string().optional(),
+  operation_notes: z.string().optional(),
+  payment_mode: z.string().optional(),
+  amount: z.string().optional(),
+  iol_name: z.string().optional(),
+  iol_power: z.string().optional(),
+  print_notes: z.boolean().optional(),
+  print_payment: z.boolean().optional(),
+  print_iol: z.boolean().optional(),
+})
+
+interface OperationFormProps {
+  children: React.ReactNode
+  onSubmit?: (data: any) => void
+  operationData?: any
+  mode?: "create" | "edit"
+}
+
+export function OperationForm({ children, onSubmit, operationData, mode = "create" }: OperationFormProps) {
+  const { toast } = useToast()
+  const [open, setOpen] = React.useState(false)
+  const [patients, setPatients] = React.useState<SearchableSelectOption[]>([])
+  const [cases, setCases] = React.useState<SearchableSelectOption[]>([])
+  const [surgeryTypes, setSurgeryTypes] = React.useState<SearchableSelectOption[]>([])
+  const [loadingPatients, setLoadingPatients] = React.useState(false)
+  const [loadingCases, setLoadingCases] = React.useState(false)
+  const [loadingSurgeries, setLoadingSurgeries] = React.useState(false)
+
+  const form = useForm<z.infer<typeof operationFormSchema>>({
+    resolver: zodResolver(operationFormSchema),
+    defaultValues: {
+      patient_id: operationData?.patient_id || "",
+      case_id: operationData?.case_id || "",
+      operation_name: operationData?.operation_name || "",
+      operation_date: operationData?.operation_date || new Date().toISOString().split('T')[0],
+      begin_time: operationData?.begin_time || "",
+      end_time: operationData?.end_time || "",
+      duration: operationData?.duration || "",
+      eye: operationData?.eye || "",
+      sys_diagnosis: operationData?.sys_diagnosis || "",
+      anesthesia: operationData?.anesthesia || "",
+      operation_notes: operationData?.operation_notes || "",
+      payment_mode: operationData?.payment_mode || "",
+      amount: operationData?.amount?.toString() || "",
+      iol_name: operationData?.iol_name || "",
+      iol_power: operationData?.iol_power || "",
+      print_notes: operationData?.print_notes || false,
+      print_payment: operationData?.print_payment || false,
+      print_iol: operationData?.print_iol || false,
+    },
+  })
+
+  const selectedPatientId = form.watch("patient_id")
+
+  // Load patients
+  React.useEffect(() => {
+    const loadPatients = async () => {
+      setLoadingPatients(true)
+      try {
+        const response = await patientsApi.list({ limit: 1000 })
+        if (response.success && response.data) {
+          setPatients(
+            response.data.map((patient) => ({
+              value: patient.id,
+              label: `${patient.full_name} (${patient.patient_id})`,
+            }))
+          )
+        }
+      } catch (error) {
+        console.error("Error loading patients:", error)
+      } finally {
+        setLoadingPatients(false)
+      }
+    }
+    if (open) {
+      loadPatients()
+    }
+  }, [open])
+
+  // Load cases for selected patient
+  React.useEffect(() => {
+    const loadCases = async () => {
+      if (!selectedPatientId) {
+        setCases([])
+        return
+      }
+      setLoadingCases(true)
+      try {
+        const response = await casesApi.list({ patient_id: selectedPatientId, limit: 100 })
+        if (response.success && response.data) {
+          setCases(
+            response.data.map((caseItem) => ({
+              value: caseItem.id,
+              label: `${caseItem.case_no} - ${caseItem.diagnosis || 'No diagnosis'}`,
+            }))
+          )
+        }
+      } catch (error) {
+        console.error("Error loading cases:", error)
+      } finally {
+        setLoadingCases(false)
+      }
+    }
+    if (open && selectedPatientId) {
+      loadCases()
+    }
+  }, [selectedPatientId, open])
+
+  // Load surgery types from master data
+  React.useEffect(() => {
+    const loadSurgeryTypes = async () => {
+      setLoadingSurgeries(true)
+      try {
+        const response = await masterDataApi.list({ category: 'surgery_types', limit: 100 })
+        if (response.success && response.data) {
+          setSurgeryTypes(
+            response.data.map((item) => ({
+              value: item.name,
+              label: item.name,
+            }))
+          )
+        }
+      } catch (error) {
+        console.error("Error loading surgery types:", error)
+      } finally {
+        setLoadingSurgeries(false)
+      }
+    }
+    if (open) {
+      loadSurgeryTypes()
+    }
+  }, [open])
+
+  async function handleSubmit(values: z.infer<typeof operationFormSchema>) {
+    try {
+      const operationData = {
+        ...values,
+        amount: values.amount ? parseFloat(values.amount) : undefined,
+        status: 'scheduled' as const,
+      }
+      
+      if (onSubmit) {
+        await onSubmit(operationData)
+      }
+      
+      setOpen(false)
+      form.reset()
+      toast({
+        title: "Success",
+        description: mode === "create" ? "Operation scheduled successfully." : "Operation updated successfully.",
+      })
+    } catch (error) {
+      console.error("Error submitting operation:", error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to schedule operation. Please try again.",
+      })
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>{children}</DialogTrigger>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{mode === "create" ? "Schedule Operation" : "Edit Operation"}</DialogTitle>
+          <DialogDescription>
+            {mode === "create" ? "Schedule a new surgical operation" : "Update operation details"}
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="patient_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Patient *</FormLabel>
+                    <FormControl>
+                      <SearchableSelect
+                        options={patients}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="Select patient"
+                        searchPlaceholder="Search patients..."
+                        loading={loadingPatients}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="case_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Case (Optional)</FormLabel>
+                    <FormControl>
+                      <SearchableSelect
+                        options={cases}
+                        value={field.value || ""}
+                        onValueChange={field.onChange}
+                        placeholder="Select case"
+                        searchPlaceholder="Search cases..."
+                        loading={loadingCases}
+                        disabled={!selectedPatientId}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="operation_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Operation Type *</FormLabel>
+                    <FormControl>
+                      <SearchableSelect
+                        options={surgeryTypes}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="Select operation type"
+                        searchPlaceholder="Search surgeries..."
+                        loading={loadingSurgeries}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="operation_date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Operation Date *</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="begin_time"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Begin Time</FormLabel>
+                    <FormControl>
+                      <Input type="time" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="end_time"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>End Time</FormLabel>
+                    <FormControl>
+                      <Input type="time" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="eye"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Eye</FormLabel>
+                    <FormControl>
+                      <SearchableSelect
+                        options={[
+                          { value: "Right", label: "Right" },
+                          { value: "Left", label: "Left" },
+                          { value: "Both", label: "Both" },
+                        ]}
+                        value={field.value || ""}
+                        onValueChange={field.onChange}
+                        placeholder="Select eye"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="sys_diagnosis"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Diagnosis</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter diagnosis" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="anesthesia"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Anesthesia</FormLabel>
+                    <FormControl>
+                      <SearchableSelect
+                        options={[
+                          { value: "Local", label: "Local" },
+                          { value: "General", label: "General" },
+                          { value: "Topical", label: "Topical" },
+                          { value: "Regional", label: "Regional" },
+                        ]}
+                        value={field.value || ""}
+                        onValueChange={field.onChange}
+                        placeholder="Select anesthesia type"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="iol_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>IOL Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="IOL name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="iol_power"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>IOL Power</FormLabel>
+                    <FormControl>
+                      <Input placeholder="IOL power" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Amount</FormLabel>
+                    <FormControl>
+                      <Input type="number" placeholder="0.00" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="payment_mode"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Payment Mode</FormLabel>
+                  <FormControl>
+                    <SearchableSelect
+                      options={[
+                        { value: "Cash", label: "Cash" },
+                        { value: "Card", label: "Card" },
+                        { value: "UPI", label: "UPI" },
+                        { value: "Cheque", label: "Cheque" },
+                        { value: "Insurance", label: "Insurance" },
+                      ]}
+                      value={field.value || ""}
+                      onValueChange={field.onChange}
+                      placeholder="Select payment mode"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="operation_notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Operation Notes</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Enter operation notes..." rows={3} {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="flex items-center gap-4">
+              <FormField
+                control={form.control}
+                name="print_notes"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-2 space-y-0">
+                    <FormControl>
+                      <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                    <FormLabel className="!mt-0 cursor-pointer">Print Notes</FormLabel>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="print_payment"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-2 space-y-0">
+                    <FormControl>
+                      <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                    <FormLabel className="!mt-0 cursor-pointer">Print Payment</FormLabel>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="print_iol"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-2 space-y-0">
+                    <FormControl>
+                      <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                    <FormLabel className="!mt-0 cursor-pointer">Print IOL</FormLabel>
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">
+                {mode === "create" ? "Schedule Operation" : "Update Operation"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  )
+}

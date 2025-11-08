@@ -28,9 +28,12 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
+import { patientsApi, employeesApi, masterDataApi } from "@/lib/services/api"
+import { useToast } from "@/hooks/use-toast"
 
 const appointmentSchema = z.object({
   patient_id: z.string().min(1, "Patient is required"),
@@ -47,24 +50,20 @@ interface AppointmentFormProps {
   children: React.ReactNode
   appointmentData?: any
   mode?: "create" | "edit"
+  onSubmit?: (data: any) => Promise<void>
 }
 
-// Mock data - in real app, fetch from database
-const patients = [
-  { id: "1", name: "AARAV MEHTA", mrn: "MRN001" },
-  { id: "2", name: "NISHANT KAREKAR", mrn: "MRN002" },
-  { id: "3", name: "PRIYA NAIR", mrn: "MRN003" },
-  { id: "4", name: "AISHABEN THAKIR", mrn: "MRN004" },
-]
-
-const doctors = [
-  { id: "1", name: "Dr. Sarah Martinez", specialty: "Ophthalmologist" },
-  { id: "2", name: "Dr. James Wilson", specialty: "Ophthalmologist" },
-  { id: "3", name: "Dr. Anita Desai", specialty: "Optometrist" },
-]
-
-export function AppointmentForm({ children, appointmentData, mode = "create" }: AppointmentFormProps) {
+export function AppointmentForm({ children, appointmentData, mode = "create", onSubmit: onSubmitProp }: AppointmentFormProps) {
+  const { toast } = useToast()
   const [isOpen, setIsOpen] = React.useState(false)
+  
+  // State for searchable dropdowns
+  const [patients, setPatients] = React.useState<SearchableSelectOption[]>([])
+  const [doctors, setDoctors] = React.useState<SearchableSelectOption[]>([])
+  const [rooms, setRooms] = React.useState<SearchableSelectOption[]>([])
+  const [loadingPatients, setLoadingPatients] = React.useState(false)
+  const [loadingDoctors, setLoadingDoctors] = React.useState(false)
+  const [loadingRooms, setLoadingRooms] = React.useState(false)
 
   const form = useForm<z.infer<typeof appointmentSchema>>({
     resolver: zodResolver(appointmentSchema),
@@ -80,10 +79,108 @@ export function AppointmentForm({ children, appointmentData, mode = "create" }: 
     },
   })
 
-  function onSubmit(values: z.infer<typeof appointmentSchema>) {
-    console.log(mode === "edit" ? "Update:" : "Create:", values)
-    setIsOpen(false)
-    form.reset()
+  // Load patients from backend
+  React.useEffect(() => {
+    const loadPatients = async () => {
+      if (!isOpen) return
+      setLoadingPatients(true)
+      try {
+        const response = await patientsApi.list({ limit: 1000, status: 'active' })
+        if (response.success && response.data) {
+          setPatients(
+            response.data.map((patient) => ({
+              value: patient.id,
+              label: `${patient.full_name} (${patient.patient_id})`,
+            }))
+          )
+        }
+      } catch (error) {
+        console.error("Error loading patients:", error)
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load patients list."
+        })
+      } finally {
+        setLoadingPatients(false)
+      }
+    }
+    loadPatients()
+  }, [isOpen, toast])
+
+  // Load doctors from employees
+  React.useEffect(() => {
+    const loadDoctors = async () => {
+      if (!isOpen) return
+      setLoadingDoctors(true)
+      try {
+        const response = await employeesApi.list({ role: 'Doctor', limit: 1000, status: 'active' })
+        if (response.success && response.data) {
+          setDoctors(
+            response.data.map((doctor) => ({
+              value: doctor.id,
+              label: `${doctor.full_name} - ${doctor.role}`,
+            }))
+          )
+        }
+      } catch (error) {
+        console.error("Error loading doctors:", error)
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load doctors list."
+        })
+      } finally {
+        setLoadingDoctors(false)
+      }
+    }
+    loadDoctors()
+  }, [isOpen, toast])
+
+  // Load room types from master data
+  React.useEffect(() => {
+    const loadRooms = async () => {
+      if (!isOpen) return
+      setLoadingRooms(true)
+      try {
+        const response = await masterDataApi.list({ category: 'room_types', limit: 100 })
+        if (response.success && response.data) {
+          setRooms(
+            response.data.map((room) => ({
+              value: room.name,
+              label: room.name,
+            }))
+          )
+        }
+      } catch (error) {
+        console.error("Error loading rooms:", error)
+        // Non-critical, don't show error toast
+      } finally {
+        setLoadingRooms(false)
+      }
+    }
+    loadRooms()
+  }, [isOpen])
+
+  async function onSubmit(values: z.infer<typeof appointmentSchema>) {
+    try {
+      if (onSubmitProp) {
+        await onSubmitProp(values)
+      }
+      setIsOpen(false)
+      form.reset()
+      toast({
+        title: "Success",
+        description: mode === "edit" ? "Appointment updated successfully." : "Appointment booked successfully."
+      })
+    } catch (error) {
+      console.error("Error submitting appointment:", error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to save appointment. Please try again."
+      })
+    }
   }
 
   return (
@@ -105,20 +202,16 @@ export function AppointmentForm({ children, appointmentData, mode = "create" }: 
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Patient *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select patient" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {patients.map((patient) => (
-                          <SelectItem key={patient.id} value={patient.id}>
-                            {patient.name} ({patient.mrn})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <SearchableSelect
+                        options={patients}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="Select patient"
+                        searchPlaceholder="Search patients..."
+                        loading={loadingPatients}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -129,20 +222,16 @@ export function AppointmentForm({ children, appointmentData, mode = "create" }: 
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Doctor *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select doctor" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {doctors.map((doctor) => (
-                          <SelectItem key={doctor.id} value={doctor.id}>
-                            {doctor.name} - {doctor.specialty}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <SearchableSelect
+                        options={doctors}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="Select doctor"
+                        searchPlaceholder="Search doctors..."
+                        loading={loadingDoctors}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -223,20 +312,16 @@ export function AppointmentForm({ children, appointmentData, mode = "create" }: 
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Room</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select room" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Room 1">Room 1</SelectItem>
-                        <SelectItem value="Room 2">Room 2</SelectItem>
-                        <SelectItem value="Room 3">Room 3</SelectItem>
-                        <SelectItem value="OT 1">OT 1</SelectItem>
-                        <SelectItem value="OT 2">OT 2</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <SearchableSelect
+                        options={rooms}
+                        value={field.value || ""}
+                        onValueChange={field.onChange}
+                        placeholder="Select room"
+                        searchPlaceholder="Search rooms..."
+                        loading={loadingRooms}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

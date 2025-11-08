@@ -3,6 +3,9 @@
 import * as React from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
+import { patientsApi, masterDataApi, employeesApi } from "@/lib/services/api"
+import { useToast } from "@/hooks/use-toast"
 import {
   Dialog,
   DialogContent,
@@ -73,12 +76,19 @@ const doctors = [
 ]
 
 export function BedAssignmentForm({ children, assignmentData, mode = "create" }: BedAssignmentFormProps) {
+  const { toast } = useToast()
   const [isOpen, setIsOpen] = React.useState(false)
   const [selectedBedInfo, setSelectedBedInfo] = React.useState<{
     rate: number | null
     ward_type: string | null
     ward_name: string | null
   }>({ rate: null, ward_type: null, ward_name: null })
+  const [patients, setPatients] = React.useState<SearchableSelectOption[]>([])
+  const [doctors, setDoctors] = React.useState<SearchableSelectOption[]>([])
+  const [surgeryTypes, setSurgeryTypes] = React.useState<SearchableSelectOption[]>([])
+  const [loadingPatients, setLoadingPatients] = React.useState(false)
+  const [loadingDoctors, setLoadingDoctors] = React.useState(false)
+  const [loadingSurgeryTypes, setLoadingSurgeryTypes] = React.useState(false)
 
   const form = useForm<z.infer<typeof bedAssignmentSchema>>({
     resolver: zodResolver(bedAssignmentSchema),
@@ -94,6 +104,68 @@ export function BedAssignmentForm({ children, assignmentData, mode = "create" }:
       notes: assignmentData?.notes || "",
     },
   })
+
+  // Load data when dialog opens
+  React.useEffect(() => {
+    const loadData = async () => {
+      if (!isOpen) return
+      
+      // Load patients
+      setLoadingPatients(true)
+      try {
+        const response = await patientsApi.list({ limit: 1000, status: 'active' })
+        if (response.success && response.data) {
+          setPatients(
+            response.data.map((patient) => ({
+              value: patient.id,
+              label: `${patient.full_name} (${patient.patient_id})`,
+            }))
+          )
+        }
+      } catch (error) {
+        console.error("Error loading patients:", error)
+      } finally {
+        setLoadingPatients(false)
+      }
+
+      // Load doctors
+      setLoadingDoctors(true)
+      try {
+        const response = await employeesApi.list({ role: 'Doctor', limit: 500 })
+        if (response.success && response.data) {
+          setDoctors(
+            response.data.map((doctor) => ({
+              value: doctor.id,
+              label: `Dr. ${doctor.full_name} (${doctor.employee_id})`,
+            }))
+          )
+        }
+      } catch (error) {
+        console.error("Error loading doctors:", error)
+      } finally {
+        setLoadingDoctors(false)
+      }
+
+      // Load surgery types
+      setLoadingSurgeryTypes(true)
+      try {
+        const response = await masterDataApi.list({ category: 'surgery_types', limit: 100 })
+        if (response.success && response.data) {
+          setSurgeryTypes(
+            response.data.map((item) => ({
+              value: item.name,
+              label: item.name,
+            }))
+          )
+        }
+      } catch (error) {
+        console.error("Error loading surgery types:", error)
+      } finally {
+        setLoadingSurgeryTypes(false)
+      }
+    }
+    loadData()
+  }, [isOpen])
 
   const handleBedChange = (bedId: string) => {
     const selectedBed = availableBeds.find(b => b.id === bedId)
@@ -131,20 +203,16 @@ export function BedAssignmentForm({ children, assignmentData, mode = "create" }:
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Patient *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select patient" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {patients.map((patient) => (
-                          <SelectItem key={patient.id} value={patient.id}>
-                            {patient.name} ({patient.mrn}) - {patient.age}y
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <SearchableSelect
+                        options={patients}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="Select patient"
+                        searchPlaceholder="Search patients..."
+                        loading={loadingPatients}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -258,20 +326,16 @@ export function BedAssignmentForm({ children, assignmentData, mode = "create" }:
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Assigned Doctor</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select doctor" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {doctors.map((doctor) => (
-                        <SelectItem key={doctor.id} value={doctor.id}>
-                          {doctor.name} - {doctor.specialty}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <FormControl>
+                    <SearchableSelect
+                      options={doctors}
+                      value={field.value || ""}
+                      onValueChange={field.onChange}
+                      placeholder="Select doctor"
+                      searchPlaceholder="Search doctors..."
+                      loading={loadingDoctors}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -299,20 +363,16 @@ export function BedAssignmentForm({ children, assignmentData, mode = "create" }:
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Surgery Type</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select type" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="Cataract Surgery">Cataract Surgery</SelectItem>
-                          <SelectItem value="LASIK">LASIK</SelectItem>
-                          <SelectItem value="Glaucoma Surgery">Glaucoma Surgery</SelectItem>
-                          <SelectItem value="Corneal Transplant">Corneal Transplant</SelectItem>
-                          <SelectItem value="Retinal Surgery">Retinal Surgery</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <SearchableSelect
+                          options={surgeryTypes}
+                          value={field.value || ""}
+                          onValueChange={field.onChange}
+                          placeholder="Select surgery type"
+                          searchPlaceholder="Search surgery types..."
+                          loading={loadingSurgeryTypes}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}

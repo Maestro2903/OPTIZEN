@@ -5,13 +5,16 @@ import {
   Plus,
   Search,
   Filter,
-  UserCog,
+  Users,
+  UserPlus,
+  UserCheck,
+  UserX,
   Eye,
   Edit,
   Trash2,
-  Shield,
-  Mail,
   Phone,
+  Mail,
+  MapPin,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -26,172 +29,208 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { EmployeeForm } from "@/components/employee-form"
-import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
+import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
 import { ViewEditDialog } from "@/components/view-edit-dialog"
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Pagination } from "@/components/ui/pagination"
+import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
+import { useApiList, useApiForm, useApiDelete } from "@/lib/hooks/useApi"
+import { employeesApi, type Employee, type EmployeeFilters } from "@/lib/services/api"
 import { useToast } from "@/hooks/use-toast"
-import * as z from "zod"
-
-interface Employee {
-  employee_id: string
-  full_name: string
-  role: string
-  email: string
-  phone: string
-  address?: string
-  joining_date: string
-  qualifications?: string
-  permissions?: string
-  status: "Active" | "Inactive" | "OnLeave"
-}
-
-const initialEmployees: Employee[] = [
-  {
-    employee_id: "EMP001",
-    full_name: "Dr. Sarah Martinez",
-    role: "Ophthalmologist",
-    email: "sarah.m@opticnauts.com",
-    phone: "+91 98765 43210",
-    address: "123 Medical Plaza, Mumbai",
-    joining_date: "2023-01-15",
-    qualifications: "MBBS, MS (Ophthalmology)",
-    permissions: "All access",
-    status: "Active",
-  },
-  {
-    employee_id: "EMP002",
-    full_name: "Dr. James Wilson",
-    role: "Ophthalmologist",
-    email: "james.w@opticnauts.com",
-    phone: "+91 98765 43211",
-    address: "456 Medical Center, Delhi",
-    joining_date: "2023-03-22",
-    qualifications: "MBBS, MS (Ophthalmology)",
-    permissions: "All access",
-    status: "Active",
-  },
-  {
-    employee_id: "EMP003",
-    full_name: "Nurse Priya Sharma",
-    role: "Nurse",
-    email: "priya.s@opticnauts.com",
-    phone: "+91 98765 43212",
-    address: "789 Health Street, Pune",
-    joining_date: "2023-05-10",
-    qualifications: "BSc Nursing",
-    permissions: "Patient care access",
-    status: "Active",
-  },
-  {
-    employee_id: "EMP004",
-    full_name: "Rajesh Kumar",
-    role: "Receptionist",
-    email: "rajesh.k@opticnauts.com",
-    phone: "+91 98765 43213",
-    address: "321 Admin Block, Chennai",
-    joining_date: "2023-07-05",
-    qualifications: "BBA",
-    permissions: "Reception access",
-    status: "Active",
-  },
-]
+import { Pagination } from "@/components/ui/pagination"
 
 const statusColors = {
-  Active: "bg-green-100 text-green-700 border-green-200",
-  Inactive: "bg-gray-100 text-gray-700 border-gray-200",
-  OnLeave: "bg-yellow-100 text-yellow-700 border-yellow-200",
+  active: "bg-green-100 text-green-700 border-green-200",
+  inactive: "bg-red-100 text-red-700 border-red-200",
+}
+
+const roleColors = {
+  doctor: "bg-blue-100 text-blue-700 border-blue-200",
+  nurse: "bg-green-100 text-green-700 border-green-200",
+  technician: "bg-purple-100 text-purple-700 border-purple-200",
+  receptionist: "bg-yellow-100 text-yellow-700 border-yellow-200",
+  admin: "bg-red-100 text-red-700 border-red-200",
+  other: "bg-gray-100 text-gray-700 border-gray-200",
 }
 
 export default function EmployeesPage() {
   const { toast } = useToast()
-  const [employees, setEmployees] = React.useState<Employee[]>(initialEmployees)
   const [searchTerm, setSearchTerm] = React.useState("")
   const [currentPage, setCurrentPage] = React.useState(1)
   const [pageSize, setPageSize] = React.useState(10)
+  const [appliedFilters, setAppliedFilters] = React.useState<string[]>([])
+  const [currentSort, setCurrentSort] = React.useState("full_name")
+  const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('asc')
 
-  const handleAddEmployee = (employeeData: Omit<Employee, 'employee_id' | 'status'>) => {
-    // Calculate next ID by finding max existing ID number
-    const maxId = employees.reduce((max, emp) => {
-      const num = parseInt(emp.employee_id.slice(3), 10) || 0
-      return num > max ? num : max
-    }, 0)
-    
-    const newEmployee: Employee = {
-      employee_id: `EMP${String(maxId + 1).padStart(3, '0')}`,
-      ...employeeData,
-      status: "Active" as const,
-    }
-    setEmployees(prev => [newEmployee, ...prev])
-    toast({
-      title: "Employee Added",
-      description: `${newEmployee.full_name} has been added successfully.`,
-    })
-  }
+  // API hooks
+  const {
+    data: employees,
+    loading,
+    error,
+    pagination,
+    search,
+    sort,
+    filter,
+    changePage,
+    changePageSize,
+    addItem,
+    updateItem,
+    removeItem,
+    refresh
+  } = useApiList<Employee>(employeesApi.list, {
+    page: currentPage,
+    limit: pageSize,
+    sortBy: currentSort,
+    sortOrder: sortDirection
+  })
 
-  const handleUpdateEmployee = (employeeId: string, values: Partial<Employee>) => {
-    setEmployees(prev => prev.map(emp => 
-      emp.employee_id === employeeId ? { ...emp, ...values } : emp
-    ))
-    toast({
-      title: "Employee Updated",
-      description: "Employee has been updated successfully.",
-    })
-  }
+  const { submitForm: createEmployee, loading: createLoading } = useApiForm<Employee>()
+  const { submitForm: updateEmployee, loading: updateLoading } = useApiForm<Employee>()
+  const { deleteItem, loading: deleteLoading } = useApiDelete()
 
-  const handleDeleteEmployee = (employeeId: string) => {
-    const employee = employees.find(emp => emp.employee_id === employeeId)
-    if (!employee) {
-      toast({
-        title: "Error",
-        description: "Employee not found.",
-        variant: "destructive",
-      })
-      return
-    }
-    setEmployees(prev => prev.filter(emp => emp.employee_id !== employeeId))
-    toast({
-      title: "Employee Deleted",
-      description: `${employee.full_name} has been deleted successfully.`,
-      variant: "destructive",
-    })
-  }
+  // Handle search with debouncing
+  React.useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchTerm.trim()) {
+        search(searchTerm.trim())
+      } else {
+        search("")
+      }
+    }, 300)
 
-  const filteredEmployees = React.useMemo(() => {
-    if (!searchTerm.trim()) return employees
-    const q = searchTerm.trim().toLowerCase()
-    return employees.filter(emp =>
-      emp.employee_id.toLowerCase().includes(q) ||
-      emp.full_name.toLowerCase().includes(q) ||
-      emp.role.toLowerCase().includes(q) ||
-      emp.email.toLowerCase().includes(q) ||
-      emp.phone.toLowerCase().includes(q) ||
-      emp.status.toLowerCase().includes(q)
-    )
-  }, [employees, searchTerm])
+    return () => clearTimeout(timeoutId)
+  }, [searchTerm, search])
 
-  const paginatedEmployees = React.useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize
-    const endIndex = startIndex + pageSize
-    return filteredEmployees.slice(startIndex, endIndex)
-  }, [filteredEmployees, currentPage, pageSize])
-
-  const totalPages = Math.ceil(filteredEmployees.length / pageSize)
+  // Handle page changes
+  React.useEffect(() => {
+    changePage(currentPage)
+  }, [currentPage, changePage])
 
   React.useEffect(() => {
-    setCurrentPage(1)
-  }, [searchTerm])
+    changePageSize(pageSize)
+  }, [pageSize, changePageSize])
+
+  const handleAddEmployee = async (employeeData: any) => {
+    try {
+      // Backend will generate employee_id
+      const result = await createEmployee(
+        () => employeesApi.create({
+          full_name: employeeData.full_name,
+          email: employeeData.email,
+          phone: employeeData.phone,
+          role: employeeData.role,
+          department: employeeData.department,
+          hire_date: employeeData.hire_date,
+          salary: employeeData.salary,
+          address: employeeData.address,
+          emergency_contact: employeeData.emergency_contact,
+          emergency_phone: employeeData.emergency_phone,
+          qualifications: employeeData.qualifications,
+          license_number: employeeData.license_number,
+          status: 'active'
+        }),
+        {
+          successMessage: `Employee ${employeeData.full_name} has been added successfully.`,
+          onSuccess: (newEmployee) => {
+            addItem(newEmployee)
+          }
+        }
+      )
+    } catch (error) {
+      console.error('Error creating employee:', error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to add employee. Please try again."
+      })
+    }
+  }
+
+  const handleUpdateEmployee = async (employeeId: string, values: any) => {
+    try {
+      const result = await updateEmployee(
+        () => employeesApi.update(employeeId, values),
+        {
+          successMessage: "Employee updated successfully.",
+          onSuccess: (updatedEmployee) => {
+            updateItem(employeeId, updatedEmployee)
+          }
+        }
+      )
+    } catch (error) {
+      console.error('Error updating employee:', error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update employee. Please try again."
+      })
+    }
+  }
+
+  const handleDeleteEmployee = async (employeeId: string) => {
+    const employee = employees.find(e => e.id === employeeId)
+    if (!employee) return
+
+    const success = await deleteItem(
+      () => employeesApi.delete(employeeId),
+      {
+        successMessage: `Employee ${employee.full_name} has been removed successfully.`,
+        onSuccess: () => {
+          removeItem(employeeId)
+        }
+      }
+    )
+  }
+
+  const handleFilterChange = (filters: string[]) => {
+    setAppliedFilters(filters)
+    const filterParams: EmployeeFilters = {}
+
+    const statusFilters = filters.filter(f => ["active", "inactive"].includes(f))
+    const roleFilters = filters.filter(f => ["doctor", "nurse", "technician"].includes(f))
+    
+    if (statusFilters.length > 0) {
+      filterParams.status = statusFilters
+    }
+    if (roleFilters.length > 0) {
+      filterParams.role = roleFilters
+    }
+
+    filter(filterParams)
+  }
+
+  const handleSortChange = (sortBy: string, direction: 'asc' | 'desc') => {
+    setCurrentSort(sortBy)
+    setSortDirection(direction)
+    sort(sortBy, direction)
+  }
+
+  const viewOptionsConfig: ViewOptionsConfig = {
+    filters: [
+      { id: "active", label: "Active", count: employees.filter(e => e.status === "active").length },
+      { id: "inactive", label: "Inactive", count: employees.filter(e => e.status === "inactive").length },
+      { id: "doctor", label: "Doctors", count: employees.filter(e => e.role === "doctor").length },
+      { id: "nurse", label: "Nurses", count: employees.filter(e => e.role === "nurse").length },
+      { id: "technician", label: "Technicians", count: employees.filter(e => e.role === "technician").length },
+    ],
+    sortOptions: [
+      { id: "full_name", label: "Name" },
+      { id: "role", label: "Role" },
+      { id: "hire_date", label: "Hire Date" },
+      { id: "department", label: "Department" },
+    ],
+    showExport: true,
+    showSettings: true,
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Employees</h1>
           <p className="text-muted-foreground">
-            Manage staff records and roles
+            Manage staff members and employee records
           </p>
         </div>
-        <EmployeeForm onSubmit={handleAddEmployee}>
+        <EmployeeForm>
           <Button className="gap-2">
             <Plus className="h-4 w-4" />
             Add Employee
@@ -202,42 +241,42 @@ export default function EmployeesPage() {
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
-            <UserCog className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Total Staff</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{employees.length}</div>
-            <p className="text-xs text-muted-foreground">staff members</p>
+            <div className="text-2xl font-bold">{pagination?.total || 0}</div>
+            <p className="text-xs text-muted-foreground">employees</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Staff</CardTitle>
+            <UserCheck className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{employees.filter(e => e.status === "active").length}</div>
+            <p className="text-xs text-muted-foreground">currently working</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Doctors</CardTitle>
-            <Shield className="h-4 w-4 text-muted-foreground" />
+            <UserPlus className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{employees.filter(e => e.role === "Ophthalmologist").length}</div>
-            <p className="text-xs text-muted-foreground">ophthalmologists</p>
+            <div className="text-2xl font-bold">{employees.filter(e => e.role === "doctor").length}</div>
+            <p className="text-xs text-muted-foreground">medical professionals</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Nurses</CardTitle>
-            <UserCog className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Support Staff</CardTitle>
+            <UserX className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{employees.filter(e => e.role === "Nurse").length}</div>
-            <p className="text-xs text-muted-foreground">nursing staff</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">On Duty</CardTitle>
-            <UserCog className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{employees.filter(e => e.status === "Active").length}</div>
-            <p className="text-xs text-muted-foreground">currently active</p>
+            <div className="text-2xl font-bold">{employees.filter(e => e.role !== "doctor").length}</div>
+            <p className="text-xs text-muted-foreground">nursing & admin</p>
           </CardContent>
         </Card>
       </div>
@@ -257,14 +296,24 @@ export default function EmployeesPage() {
                 <Input
                   type="search"
                   placeholder="Search employees..."
-                  className="pl-8 w-[200px]"
+                  className="pl-8 w-[300px]"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  disabled={loading}
                 />
               </div>
-              <Button variant="outline" size="icon">
-                <Filter className="h-4 w-4" />
-              </Button>
+              <ViewOptions
+                config={viewOptionsConfig}
+                currentView="list"
+                appliedFilters={appliedFilters}
+                currentSort={currentSort}
+                sortDirection={sortDirection}
+                onViewChange={() => {}}
+                onFilterChange={handleFilterChange}
+                onSortChange={handleSortChange}
+                onExport={() => {}}
+                onSettings={() => {}}
+              />
             </div>
           </div>
         </CardHeader>
@@ -273,185 +322,108 @@ export default function EmployeesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>SR. NO.</TableHead>
                   <TableHead>EMP ID</TableHead>
                   <TableHead>NAME</TableHead>
                   <TableHead>ROLE</TableHead>
+                  <TableHead>DEPARTMENT</TableHead>
                   <TableHead>EMAIL</TableHead>
                   <TableHead>PHONE</TableHead>
                   <TableHead>STATUS</TableHead>
-                  <TableHead>JOINED</TableHead>
-                  <TableHead>ACTION</TableHead>
+                  <TableHead>ACTIONS</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedEmployees.length === 0 ? (
+                {loading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      Loading employees...
+                    </TableCell>
+                  </TableRow>
+                ) : employees.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       No employees found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  paginatedEmployees.map((emp, index) => (
-                  <TableRow key={emp.employee_id}>
-                    <TableCell className="font-medium">{(currentPage - 1) * pageSize + index + 1}</TableCell>
-                    <TableCell className="font-medium">{emp.employee_id}</TableCell>
-                    <TableCell className="font-medium">{emp.full_name}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{emp.role}</Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      <div className="flex items-center gap-2">
-                        <Mail className="h-3 w-3" />
-                        {emp.email}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      <div className="flex items-center gap-2">
-                        <Phone className="h-3 w-3" />
-                        {emp.phone}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={statusColors[emp.status as keyof typeof statusColors]}
-                      >
-                        {emp.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{new Date(emp.joining_date).toLocaleDateString('en-GB')}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <ViewEditDialog
-                          title={`Employee - ${emp.full_name}`}
-                          description={`${emp.role}`}
-                          data={emp as any}
-                          renderViewAction={(data: any) => (
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                              <div>
-                                <p className="text-muted-foreground">Name</p>
-                                <p className="font-medium">{data.full_name}</p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">Role</p>
-                                <Badge variant="secondary">{data.role}</Badge>
-                              </div>
-                              <div className="col-span-2">
-                                <p className="text-muted-foreground">Email</p>
-                                <p className="text-muted-foreground">{data.email}</p>
-                              </div>
-                              <div className="col-span-2">
-                                <p className="text-muted-foreground">Phone</p>
-                                <p className="text-muted-foreground">{data.phone}</p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">Status</p>
-                                <Badge variant="outline" className={statusColors[data.status as keyof typeof statusColors]}>{data.status}</Badge>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">Joined</p>
-                                <p>{data.joined}</p>
-                              </div>
-                            </div>
-                          )}
-                          renderEditAction={(form: any) => (
-                            <Form {...form}>
-                              <div className="grid grid-cols-2 gap-4">
-                                <FormField control={form.control} name={"name"} render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Name</FormLabel>
-                                    <FormControl>
-                                      <Input {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}/>
-                                <FormField control={form.control} name={"role"} render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Role</FormLabel>
-                                    <FormControl>
-                                      <Input {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}/>
-                                <FormField control={form.control} name={"email"} render={({ field }) => (
-                                  <FormItem className="col-span-2">
-                                    <FormLabel>Email</FormLabel>
-                                    <FormControl>
-                                      <Input type="email" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}/>
-                                <FormField control={form.control} name={"phone"} render={({ field }) => (
-                                  <FormItem className="col-span-2">
-                                    <FormLabel>Phone</FormLabel>
-                                    <FormControl>
-                                      <Input {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}/>
-                                <FormField control={form.control} name={"status"} render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Status</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                      <FormControl>
-                                        <SelectTrigger>
-                                          <SelectValue placeholder="Select status" />
-                                        </SelectTrigger>
-                                      </FormControl>
-                                      <SelectContent>
-                                        <SelectItem value="Active">Active</SelectItem>
-                                        <SelectItem value="Inactive">Inactive</SelectItem>
-                                        <SelectItem value="OnLeave">OnLeave</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}/>
-                              </div>
-                            </Form>
-                          )}
-                          schema={z.object({
-                            name: z.string().min(1),
-                            role: z.string().min(1),
-                            email: z.string().email(),
-                            phone: z.string().min(1),
-                            status: z.string().min(1),
-                          })}
-                          onSaveAction={async (values: any) => {
-                            handleUpdateEmployee(emp.employee_id, values)
-                          }}
-                        >
-                          <Button variant="ghost" size="icon" className="h-8 w-8" title="View/Edit">
+                  employees.map((employee) => (
+                    <TableRow key={employee.id}>
+                      <TableCell className="font-medium">{employee.employee_id}</TableCell>
+                      <TableCell className="font-medium uppercase">{employee.full_name}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className={`capitalize ${roleColors[employee.role as keyof typeof roleColors] || ''}`}>
+                          {employee.role}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{employee.department || '-'}</TableCell>
+                      <TableCell className="text-muted-foreground">{employee.email}</TableCell>
+                      <TableCell>{employee.phone}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className={`capitalize ${statusColors[employee.status as keyof typeof statusColors] || ''}`}>
+                          {employee.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
                             <Eye className="h-4 w-4" />
                           </Button>
-                        </ViewEditDialog>
-                        <DeleteConfirmDialog
-                          title="Delete Employee"
-                          description={`Are you sure you want to delete ${emp.full_name}? This action cannot be undone.`}
-                          onConfirm={() => handleDeleteEmployee(emp.employee_id)}
-                        >
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" title="Delete">
-                            <Trash2 className="h-4 w-4" />
+                          <EmployeeForm>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              title="Edit employee"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </EmployeeForm>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8"
+                            onClick={() => {
+                              window.location.href = `tel:${employee.phone}`
+                            }}
+                            title={`Call ${employee.phone}`}
+                            aria-label={`Call ${employee.full_name}`}
+                          >
+                            <Phone className="h-4 w-4" />
                           </Button>
-                        </DeleteConfirmDialog>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8"
+                            onClick={() => {
+                              window.location.href = `mailto:${employee.email}`
+                            }}
+                            title={`Email ${employee.email}`}
+                            aria-label={`Email ${employee.full_name}`}
+                          >
+                            <Mail className="h-4 w-4" />
+                          </Button>
+                          <DeleteConfirmDialog
+                            title="Remove Employee"
+                            description={`Are you sure you want to remove ${employee.full_name} from the system? This action cannot be undone.`}
+                            onConfirm={() => handleDeleteEmployee(employee.id)}
+                          >
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </DeleteConfirmDialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
                 )}
               </TableBody>
             </Table>
           </div>
           <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            pageSize={pageSize}
-            totalItems={filteredEmployees.length}
+            currentPage={pagination?.page || 1}
+            totalPages={pagination?.totalPages || 0}
+            pageSize={pagination?.limit || 10}
+            totalItems={pagination?.total || 0}
             onPageChange={setCurrentPage}
             onPageSizeChange={(newSize) => {
               setPageSize(newSize)

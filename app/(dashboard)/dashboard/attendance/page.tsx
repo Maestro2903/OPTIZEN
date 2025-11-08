@@ -11,6 +11,7 @@ import {
   TrendingUp,
   Edit,
   Clock,
+  Trash2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -25,110 +26,13 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { AttendanceForm } from "@/components/attendance-form"
+import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
+import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
+import { useApiList, useApiForm, useApiDelete } from "@/lib/hooks/useApi"
+import { attendanceApi, employeesApi, type AttendanceRecord, type AttendanceFilters } from "@/lib/services/api"
+import { useToast } from "@/hooks/use-toast"
+import { Pagination } from "@/components/ui/pagination"
 
-// Mock attendance data
-const attendanceRecords = [
-  {
-    id: "1",
-    date: "06/11/2025",
-    staff_name: "Dr. Sarah Martinez",
-    role: "Ophthalmologist",
-    status: "present",
-    check_in: "09:00 AM",
-    check_out: "06:00 PM",
-    hours: 9,
-  },
-  {
-    id: "2",
-    date: "06/11/2025",
-    staff_name: "Dr. James Wilson",
-    role: "Ophthalmologist",
-    status: "present",
-    check_in: "09:15 AM",
-    check_out: "05:45 PM",
-    hours: 8.5,
-  },
-  {
-    id: "3",
-    date: "06/11/2025",
-    staff_name: "Nurse Priya Sharma",
-    role: "Nurse",
-    status: "present",
-    check_in: "08:30 AM",
-    check_out: "05:30 PM",
-    hours: 9,
-  },
-  {
-    id: "4",
-    date: "06/11/2025",
-    staff_name: "Rajesh Kumar",
-    role: "Receptionist",
-    status: "half_day",
-    check_in: "09:00 AM",
-    check_out: "01:00 PM",
-    hours: 4,
-  },
-  {
-    id: "5",
-    date: "06/11/2025",
-    staff_name: "Dr. Anita Desai",
-    role: "Optometrist",
-    status: "sick_leave",
-    check_in: "-",
-    check_out: "-",
-    hours: 0,
-  },
-  {
-    id: "6",
-    date: "06/11/2025",
-    staff_name: "Vikram Singh",
-    role: "Technician",
-    status: "present",
-    check_in: "08:45 AM",
-    check_out: "05:45 PM",
-    hours: 9,
-  },
-  {
-    id: "7",
-    date: "05/11/2025",
-    staff_name: "Dr. Sarah Martinez",
-    role: "Ophthalmologist",
-    status: "present",
-    check_in: "09:00 AM",
-    check_out: "06:15 PM",
-    hours: 9.25,
-  },
-  {
-    id: "8",
-    date: "05/11/2025",
-    staff_name: "Dr. James Wilson",
-    role: "Ophthalmologist",
-    status: "casual_leave",
-    check_in: "-",
-    check_out: "-",
-    hours: 0,
-  },
-  {
-    id: "9",
-    date: "05/11/2025",
-    staff_name: "Nurse Priya Sharma",
-    role: "Nurse",
-    status: "present",
-    check_in: "08:30 AM",
-    check_out: "05:30 PM",
-    hours: 9,
-  },
-  {
-    id: "10",
-    date: "05/11/2025",
-    staff_name: "Rajesh Kumar",
-    role: "Receptionist",
-    status: "present",
-    check_in: "09:00 AM",
-    check_out: "06:00 PM",
-    hours: 9,
-  },
-]
 
 const statusColors = {
   present: "bg-green-100 text-green-700 border-green-200",
@@ -149,14 +53,187 @@ const statusLabels = {
 }
 
 export default function AttendancePage() {
-  const today = new Date().toISOString().split("T")[0]
-  const todayRecords = attendanceRecords.filter(r => r.date === "06/11/2025")
-  
-  const totalStaff = 24
+  const { toast } = useToast()
+  const [searchTerm, setSearchTerm] = React.useState("")
+  const [currentPage, setCurrentPage] = React.useState(1)
+  const [pageSize, setPageSize] = React.useState(10)
+  const [appliedFilters, setAppliedFilters] = React.useState<string[]>([])
+  const [currentSort, setCurrentSort] = React.useState("attendance_date")
+  const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('desc')
+  const [selectedDate, setSelectedDate] = React.useState(new Date().toISOString().split('T')[0])
+  const [attendanceSummary, setAttendanceSummary] = React.useState({
+    total_staff: 0,
+    present: 0,
+    absent: 0,
+    on_leave: 0,
+    attendance_percentage: 0
+  })
+
+  // API hooks
+  const {
+    data: attendanceRecords,
+    loading,
+    error,
+    pagination,
+    search,
+    sort,
+    filter,
+    changePage,
+    changePageSize,
+    addItem,
+    updateItem,
+    removeItem,
+    refresh
+  } = useApiList<AttendanceRecord>(attendanceApi.list, {
+    page: currentPage,
+    limit: pageSize,
+    sortBy: currentSort,
+    sortOrder: sortDirection,
+    date: selectedDate
+  })
+
+  const { submitForm: createAttendance, loading: createLoading } = useApiForm<AttendanceRecord>()
+  const { submitForm: updateAttendance, loading: updateLoading } = useApiForm<AttendanceRecord>()
+  const { deleteItem, loading: deleteLoading } = useApiDelete()
+
+  // Load attendance summary
+  React.useEffect(() => {
+    const loadSummary = async () => {
+      const response = await attendanceApi.getSummary({ date: selectedDate })
+      if (response.success && response.data) {
+        setAttendanceSummary(response.data)
+      }
+    }
+    loadSummary()
+  }, [selectedDate])
+
+  // Handle search with debouncing
+  React.useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchTerm.trim()) {
+        search(searchTerm.trim())
+      } else {
+        search("")
+      }
+    }, 300)
+
+    return () => clearTimeout(timeoutId)
+  }, [searchTerm, search])
+
+  // Handle page changes
+  React.useEffect(() => {
+    changePage(currentPage)
+  }, [currentPage, changePage])
+
+  React.useEffect(() => {
+    changePageSize(pageSize)
+  }, [pageSize, changePageSize])
+
+  // Handle date filter
+  React.useEffect(() => {
+    filter({ date: selectedDate })
+  }, [selectedDate, filter])
+
+  const handleAddAttendance = async (attendanceData: any) => {
+    try {
+      const result = await createAttendance(
+        () => attendanceApi.create({
+          user_id: attendanceData.employee_id,
+          attendance_date: attendanceData.date,
+          status: attendanceData.status,
+          check_in_time: attendanceData.check_in_time,
+          check_out_time: attendanceData.check_out_time,
+          working_hours: attendanceData.working_hours,
+          notes: attendanceData.notes,
+          marked_by: attendanceData.marked_by
+        }),
+        {
+          successMessage: "Attendance marked successfully.",
+          onSuccess: (newRecord) => {
+            addItem(newRecord)
+          }
+        }
+      )
+    } catch (error) {
+      console.error('Error creating attendance record:', error)
+    }
+  }
+
+  const handleUpdateAttendance = async (recordId: string, values: any) => {
+    try {
+      const result = await updateAttendance(
+        () => attendanceApi.update(recordId, values),
+        {
+          successMessage: "Attendance updated successfully.",
+          onSuccess: (updatedRecord) => {
+            updateItem(recordId, updatedRecord)
+          }
+        }
+      )
+    } catch (error) {
+      console.error('Error updating attendance record:', error)
+    }
+  }
+
+  const handleDeleteAttendance = async (recordId: string) => {
+    const record = attendanceRecords.find(r => r.id === recordId)
+    if (!record) return
+
+    const success = await deleteItem(
+      () => attendanceApi.delete(recordId),
+      {
+        successMessage: "Attendance record has been deleted successfully.",
+        onSuccess: () => {
+          removeItem(recordId)
+        }
+      }
+    )
+  }
+
+  const handleFilterChange = (filters: string[]) => {
+    setAppliedFilters(filters)
+    const filterParams: AttendanceFilters = {}
+
+    // Collect all status filters
+    const statusFilters = filters.filter(f => 
+      ["present", "absent", "sick_leave", "casual_leave", "half_day"].includes(f)
+    )
+    if (statusFilters.length > 0) {
+      filterParams.status = statusFilters
+    }
+
+    filter(filterParams)
+  }
+
+  const handleSortChange = (sortBy: string, direction: 'asc' | 'desc') => {
+    setCurrentSort(sortBy)
+    setSortDirection(direction)
+    sort(sortBy, direction)
+  }
+
+  // TODO: Replace with server-provided aggregate counts from API
+  // Current counts only reflect the current page, not total records
+  const viewOptionsConfig: ViewOptionsConfig = {
+    filters: [
+      { id: "present", label: "Present (page)", count: attendanceRecords.filter(r => r.status === "present").length },
+      { id: "absent", label: "Absent (page)", count: attendanceRecords.filter(r => r.status === "absent").length },
+      { id: "sick_leave", label: "Sick Leave (page)", count: attendanceRecords.filter(r => r.status === "sick_leave").length },
+      { id: "casual_leave", label: "Casual Leave (page)", count: attendanceRecords.filter(r => r.status === "casual_leave").length },
+      { id: "half_day", label: "Half Day (page)", count: attendanceRecords.filter(r => r.status === "half_day").length },
+    ],
+    sortOptions: [
+      { id: "attendance_date", label: "Date" },
+      { id: "status", label: "Status" },
+      { id: "working_hours", label: "Hours" },
+    ],
+    showExport: true,
+    showSettings: true,
+  }
+
+  const todayRecords = attendanceRecords.filter(r => r.attendance_date === selectedDate)
   const presentToday = todayRecords.filter(r => r.status === "present" || r.status === "half_day").length
   const absentToday = todayRecords.filter(r => r.status === "absent").length
   const onLeave = todayRecords.filter(r => r.status.includes("leave")).length
-  const attendancePercentage = ((presentToday / totalStaff) * 100).toFixed(1)
 
   // Calculate month statistics
   const thisMonthLeaves = attendanceRecords.filter(r => r.status.includes("leave")).length
@@ -186,7 +263,7 @@ export default function AttendancePage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalStaff}</div>
+            <div className="text-2xl font-bold">{attendanceSummary.total_staff}</div>
             <p className="text-xs text-muted-foreground">all staff members</p>
           </CardContent>
         </Card>
@@ -196,7 +273,7 @@ export default function AttendancePage() {
             <UserCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{presentToday}</div>
+            <div className="text-2xl font-bold">{attendanceSummary.present}</div>
             <p className="text-xs text-muted-foreground">currently on duty</p>
           </CardContent>
         </Card>
@@ -206,7 +283,7 @@ export default function AttendancePage() {
             <CalendarIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{onLeave}</div>
+            <div className="text-2xl font-bold">{attendanceSummary.on_leave}</div>
             <p className="text-xs text-muted-foreground">{thisMonthLeaves} this month</p>
           </CardContent>
         </Card>
@@ -216,7 +293,7 @@ export default function AttendancePage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{attendancePercentage}%</div>
+            <div className="text-2xl font-bold">{attendanceSummary.attendance_percentage.toFixed(1)}%</div>
             <p className="text-xs text-muted-foreground">today&apos;s attendance</p>
           </CardContent>
         </Card>
@@ -232,17 +309,46 @@ export default function AttendancePage() {
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="w-[150px]"
+                disabled={loading}
+              />
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="search"
                   placeholder="Search staff..."
                   className="pl-8 w-[200px]"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  disabled={loading}
                 />
               </div>
-              <Button variant="outline" size="icon">
-                <Filter className="h-4 w-4" />
-              </Button>
+              <ViewOptions
+                config={viewOptionsConfig}
+                currentView="list"
+                appliedFilters={appliedFilters}
+                currentSort={currentSort}
+                sortDirection={sortDirection}
+                onViewChange={() => {}}
+                onFilterChange={handleFilterChange}
+                onSortChange={handleSortChange}
+                onExport={() => {
+                  toast({
+                    title: "Export feature",
+                    description: "Attendance export functionality coming soon."
+                  })
+                }}
+                onSettings={() => {
+                  toast({
+                    title: "Settings",
+                    description: "Attendance settings functionality coming soon."
+                  })
+                }}
+              />
             </div>
           </div>
         </CardHeader>
@@ -262,52 +368,107 @@ export default function AttendancePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {attendanceRecords.map((record) => (
-                  <TableRow key={record.id}>
-                    <TableCell className="text-sm">{record.date}</TableCell>
-                    <TableCell className="font-medium">{record.staff_name}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{record.role}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={statusColors[record.status as keyof typeof statusColors]}
-                      >
-                        {statusLabels[record.status as keyof typeof statusLabels]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        {record.check_in !== "-" && <Clock className="h-3 w-3 text-muted-foreground" />}
-                        <span className="text-sm">{record.check_in}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        {record.check_out !== "-" && <Clock className="h-3 w-3 text-muted-foreground" />}
-                        <span className="text-sm">{record.check_out}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {record.hours > 0 ? (
-                        <span className="font-semibold">{record.hours}h</span>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <AttendanceForm attendanceData={record} mode="edit">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </AttendanceForm>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      Loading attendance records...
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : attendanceRecords.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      No attendance records found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  attendanceRecords.map((record) => (
+                    <TableRow key={record.id}>
+                      <TableCell className="text-sm">
+                        {new Date(record.attendance_date).toLocaleDateString('en-GB')}
+                      </TableCell>
+                      <TableCell className="font-medium uppercase">
+                        {record.employees?.full_name || 'N/A'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{record.employees?.role || 'N/A'}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={statusColors[record.status as keyof typeof statusColors]}
+                        >
+                          {statusLabels[record.status as keyof typeof statusLabels]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          {record.check_in_time && <Clock className="h-3 w-3 text-muted-foreground" />}
+                          <span className="text-sm">
+                            {record.check_in_time ? new Date(`2000-01-01T${record.check_in_time}`).toLocaleTimeString('en-US', {
+                              hour: 'numeric',
+                              minute: '2-digit',
+                              hour12: true
+                            }) : '-'}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          {record.check_out_time && <Clock className="h-3 w-3 text-muted-foreground" />}
+                          <span className="text-sm">
+                            {record.check_out_time ? new Date(`2000-01-01T${record.check_out_time}`).toLocaleTimeString('en-US', {
+                              hour: 'numeric',
+                              minute: '2-digit',
+                              hour12: true
+                            }) : '-'}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {record.working_hours && record.working_hours > 0 ? (
+                          <span className="font-semibold">{record.working_hours}h</span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <AttendanceForm
+                            attendanceData={record}
+                            mode="edit"
+                          >
+                            <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </AttendanceForm>
+                          <DeleteConfirmDialog
+                            title="Delete Attendance Record"
+                            description="Are you sure you want to delete this attendance record? This action cannot be undone."
+                            onConfirm={() => handleDeleteAttendance(record.id)}
+                          >
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </DeleteConfirmDialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
+          <Pagination
+            currentPage={pagination?.page || 1}
+            totalPages={pagination?.totalPages || 0}
+            pageSize={pagination?.limit || 10}
+            totalItems={pagination?.total || 0}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize)
+              setCurrentPage(1)
+            }}
+          />
         </CardContent>
       </Card>
 
@@ -321,11 +482,11 @@ export default function AttendancePage() {
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Total Working Days</span>
-              <span className="font-semibold">22</span>
+              <span className="font-semibold">-</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Average Attendance</span>
-              <span className="font-semibold">91.2%</span>
+              <span className="font-semibold">{attendanceSummary.attendance_percentage.toFixed(1)}%</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Total Leaves Taken</span>

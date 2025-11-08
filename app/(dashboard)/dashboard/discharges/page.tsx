@@ -36,39 +36,33 @@ interface Discharge {
   notes?: string
 }
 
+// Sample data removed for production - should be fetched from API
 const discharges: Discharge[] = [
-  {
-    id: "DIS001",
-    patient_name: "RAJESH KUMAR",
-    admission_date: "2025-10-15",
-    discharge_date: "2025-10-18",
-    notes: "Successful cataract surgery, patient recovered well"
-  },
-  {
-    id: "DIS002",
-    patient_name: "PRIYA SHARMA",
-    admission_date: "2025-11-01",
-    discharge_date: "2025-11-03",
-    notes: "Retinal detachment surgery completed successfully"
-  },
-  {
-    id: "DIS003",
-    patient_name: "ARUN MEHTA",
-    admission_date: "2025-11-05",
-    discharge_date: "2025-11-07",
-    notes: "Glaucoma treatment, stable condition"
-  },
-  {
-    id: "DIS004",
-    patient_name: "SUNITA PATEL",
-    admission_date: "2025-11-08",
-    discharge_date: "2025-11-08",
-    notes: "Day surgery for minor eye procedure"
-  }
+  // This should be populated from the discharges API
+  // Example: const discharges = await fetchDischarges()
 ]
 
 export default function DischargesPage() {
   const [searchTerm, setSearchTerm] = React.useState("")
+  const [dischargeList, setDischargeList] = React.useState<Discharge[]>(discharges)
+  const [isLoading, setIsLoading] = React.useState(false)
+
+  // Function to handle delete with API integration
+  const handleDelete = async (dischargeId: string) => {
+    try {
+      setIsLoading(true)
+      // TODO: Replace with actual API call
+      // await fetch(`/api/discharges/${dischargeId}`, { method: 'DELETE' })
+
+      // For now, remove from local state
+      setDischargeList(prev => prev.filter(d => d.id !== dischargeId))
+      console.log("Discharge deleted:", dischargeId)
+    } catch (error) {
+      console.error("Error deleting discharge:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   // Computed statistics from discharge data
   const stats = React.useMemo(() => {
@@ -76,17 +70,17 @@ export default function DischargesPage() {
     const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1)
     const thisWeek = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000))
 
-    const thisMonthDischarges = discharges.filter(d =>
+    const thisMonthDischarges = dischargeList.filter(d =>
       new Date(d.discharge_date) >= thisMonth
     ).length
 
-    const thisWeekDischarges = discharges.filter(d =>
+    const thisWeekDischarges = dischargeList.filter(d =>
       new Date(d.discharge_date) >= thisWeek
     ).length
 
     // Calculate average stay length in days
-    const avgStay = discharges.length > 0 ?
-      discharges.reduce((total, d) => {
+    const avgStay = dischargeList.length > 0 ?
+      dischargeList.reduce((total, d) => {
         const admission = new Date(d.admission_date)
         const discharge = new Date(d.discharge_date)
 
@@ -101,26 +95,26 @@ export default function DischargesPage() {
 
         const stayDays = Math.max(0, (discharge.getTime() - admission.getTime()) / (1000 * 60 * 60 * 24))
         return total + stayDays
-      }, 0) / discharges.length : 0
+      }, 0) / dischargeList.length : 0
 
     return {
-      total: discharges.length,
+      total: dischargeList.length,
       thisMonth: thisMonthDischarges,
       thisWeek: thisWeekDischarges,
       avgStay: Number(avgStay.toFixed(1))
     }
-  }, [discharges])
+  }, [dischargeList])
 
   const filteredDischarges = React.useMemo(() => {
-    if (!searchTerm.trim()) return discharges
+    if (!searchTerm.trim()) return dischargeList
     const q = searchTerm.trim().toLowerCase()
-    return discharges.filter(d =>
+    return dischargeList.filter(d =>
       (d.patient_name || '').toLowerCase().includes(q) ||
       (d.admission_date || '').toLowerCase().includes(q) ||
       (d.discharge_date || '').toLowerCase().includes(q) ||
       (d.notes || '').toLowerCase().includes(q)
     )
-  }, [searchTerm])
+  }, [searchTerm, dischargeList])
 
   return (
     <div className="flex flex-col gap-6">
@@ -315,7 +309,7 @@ export default function DischargesPage() {
                           <DeleteConfirmDialog
                             title="Delete Discharge"
                             description="Are you sure you want to delete this discharge record? This action cannot be undone."
-                            onConfirm={() => console.log("Delete discharge:", discharge.id)}
+                            onConfirm={() => handleDelete(discharge.id)}
                           >
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" title="Delete">
                               <Trash2 className="h-4 w-4" />

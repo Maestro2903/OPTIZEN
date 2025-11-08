@@ -50,103 +50,26 @@ interface Expense {
   bill_number?: string
 }
 
-// Mock expenses data
-const expenses = [
-  {
-    id: "1",
-    date: "05/11/2025",
-    category: "utilities",
-    sub_category: "Electricity",
-    description: "Monthly electricity bill",
-    amount: 28500,
-    payment_method: "Bank Transfer",
-    vendor: "State Electricity Board",
-    bill_number: "EB-2025-11-001",
-  },
-  {
-    id: "2",
-    date: "04/11/2025",
-    category: "supplies",
-    sub_category: "Medical Supplies",
-    description: "Surgical instruments and consumables",
-    amount: 45000,
-    payment_method: "Bank Transfer",
-    vendor: "MedEquip Supplies",
-    bill_number: "MS-2025-345",
-  },
-  {
-    id: "3",
-    date: "03/11/2025",
-    category: "salary",
-    sub_category: "Staff Salary",
-    description: "Monthly salary - November 2025",
-    amount: 385000,
-    payment_method: "Bank Transfer",
-    vendor: "Staff Payroll",
-    bill_number: "SAL-NOV-2025",
-  },
-  {
-    id: "4",
-    date: "01/11/2025",
-    category: "rent",
-    sub_category: "Office Rent",
-    description: "Monthly clinic rent",
-    amount: 125000,
-    payment_method: "Bank Transfer",
-    vendor: "Property Owner",
-    bill_number: "RENT-NOV-2025",
-  },
-  {
-    id: "5",
-    date: "30/10/2025",
-    category: "maintenance",
-    sub_category: "Equipment",
-    description: "OCT machine servicing",
-    amount: 15000,
-    payment_method: "Cash",
-    vendor: "Optical Systems Ltd",
-    bill_number: "SVC-2025-089",
-  },
+// Sample data removed for production - should be fetched from API
+const expenses: Expense[] = [
+  // This should be populated from the revenue/expenses API
+  // Example: const expenses = await fetchExpenses()
 ]
 
-// Mock recent transactions (invoices)
-const recentTransactions = [
-  {
-    id: "INV-089",
-    date: "06/11/2025",
-    patient: "AARAV MEHTA",
-    type: "Surgery",
-    amount: 45000,
-    payment_method: "Card",
-    status: "paid",
-  },
-  {
-    id: "INV-088",
-    date: "06/11/2025",
-    patient: "PRIYA NAIR",
-    type: "Consultation",
-    amount: 1500,
-    payment_method: "Cash",
-    status: "paid",
-  },
-  {
-    id: "INV-087",
-    date: "05/11/2025",
-    patient: "NISHANT KAREKAR",
-    type: "Optical",
-    amount: 8500,
-    payment_method: "UPI",
-    status: "paid",
-  },
-  {
-    id: "INV-086",
-    date: "05/11/2025",
-    patient: "AISHABEN THAKIR",
-    type: "Pharmacy",
-    amount: 2300,
-    payment_method: "Cash",
-    status: "paid",
-  },
+// Sample data removed for production - should be fetched from API
+interface Transaction {
+  id: string
+  date: string
+  patient: string
+  type: string
+  amount: number
+  payment_method: string
+  status: string
+}
+
+const recentTransactions: Transaction[] = [
+  // This should be populated from the revenue/transactions API
+  // Example: const transactions = await fetchTransactions()
 ]
 
 const categoryColors = {
@@ -161,27 +84,46 @@ const categoryColors = {
 }
 
 export default function RevenuePage() {
-  // Financial calculations
-  const thisMonthRevenue = 1245000
-  const lastMonthRevenue = 1082000
-  const revenueChange = ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100
-
-  const thisMonthExpenses = 758500
-  const lastMonthExpenses = 725000
-  const expensesChange = ((thisMonthExpenses - lastMonthExpenses) / lastMonthExpenses) * 100
-
-  const netProfit = thisMonthRevenue - thisMonthExpenses
-  const profitMargin = (netProfit / thisMonthRevenue) * 100
-
-  const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0)
-
+  const [expensesList, setExpensesList] = React.useState<Expense[]>(expenses)
+  const [transactionsList, setTransactionsList] = React.useState<Transaction[]>(recentTransactions)
+  const [isLoading, setIsLoading] = React.useState(false)
   const [expensesSearchTerm, setExpensesSearchTerm] = React.useState("")
   const [transactionsSearchTerm, setTransactionsSearchTerm] = React.useState("")
 
+  // Function to handle expense deletion
+  const handleDeleteExpense = async (expenseId: string) => {
+    try {
+      setIsLoading(true)
+      // TODO: Replace with actual API call
+      // await fetch(`/api/revenue/expenses/${expenseId}`, { method: 'DELETE' })
+
+      // For now, remove from local state
+      setExpensesList(prev => prev.filter(e => e.id !== expenseId))
+      console.log("Expense deleted:", expenseId)
+    } catch (error) {
+      console.error("Error deleting expense:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Financial calculations based on actual data
+  const thisMonthRevenue = 0 // Should be calculated from actual API data
+  const lastMonthRevenue = 0 // Should be calculated from actual API data
+  const revenueChange = lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : 0
+
+  const totalExpenses = expensesList.reduce((sum, exp) => sum + exp.amount, 0)
+  const thisMonthExpenses = totalExpenses // Should be filtered to current month
+  const lastMonthExpenses = 0 // Should be calculated from actual API data
+  const expensesChange = lastMonthExpenses > 0 ? ((thisMonthExpenses - lastMonthExpenses) / lastMonthExpenses) * 100 : 0
+
+  const netProfit = thisMonthRevenue - thisMonthExpenses
+  const profitMargin = thisMonthRevenue > 0 ? (netProfit / thisMonthRevenue) * 100 : 0
+
   const filteredExpenses = React.useMemo(() => {
-    if (!expensesSearchTerm.trim()) return expenses
+    if (!expensesSearchTerm.trim()) return expensesList
     const q = expensesSearchTerm.trim().toLowerCase()
-    return expenses.filter(e =>
+    return expensesList.filter(e =>
       e.date.toLowerCase().includes(q) ||
       e.category.toLowerCase().includes(q) ||
       (e.sub_category || '').toLowerCase().includes(q) ||
@@ -190,12 +132,12 @@ export default function RevenuePage() {
       e.payment_method.toLowerCase().includes(q) ||
       (e.bill_number || '').toLowerCase().includes(q)
     )
-  }, [expensesSearchTerm])
+  }, [expensesSearchTerm, expensesList])
 
   const filteredTransactions = React.useMemo(() => {
-    if (!transactionsSearchTerm.trim()) return recentTransactions
+    if (!transactionsSearchTerm.trim()) return transactionsList
     const q = transactionsSearchTerm.trim().toLowerCase()
-    return recentTransactions.filter(t =>
+    return transactionsList.filter(t =>
       t.id.toLowerCase().includes(q) ||
       t.date.toLowerCase().includes(q) ||
       t.patient.toLowerCase().includes(q) ||
@@ -203,7 +145,7 @@ export default function RevenuePage() {
       t.payment_method.toLowerCase().includes(q) ||
       t.status.toLowerCase().includes(q)
     )
-  }, [transactionsSearchTerm])
+  }, [transactionsSearchTerm, transactionsList])
 
   return (
     <div className="flex flex-col gap-6">
@@ -511,7 +453,7 @@ export default function RevenuePage() {
                             <DeleteConfirmDialog
                               title="Delete Expense"
                               description={`Are you sure you want to delete this expense? This action cannot be undone.`}
-                              onConfirm={() => console.log("Delete:", expense.id)}
+                              onConfirm={() => handleDeleteExpense(expense.id)}
                             >
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" title="Delete">
                                 <Trash2 className="h-4 w-4" />
@@ -528,7 +470,7 @@ export default function RevenuePage() {
               {/* Expense Summary */}
               <div className="mt-4 p-4 bg-muted rounded-lg">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Total Expenses (Showing {expenses.length} records)</span>
+                  <span className="text-sm font-medium">Total Expenses (Showing {expensesList.length} records)</span>
                   <span className="text-lg font-bold">₹{totalExpenses.toLocaleString()}</span>
                 </div>
               </div>

@@ -36,103 +36,35 @@ import { BedAssignmentForm } from "@/components/bed-assignment-form"
 import { BedDetailsSheet } from "@/components/bed-details-sheet"
 import { BedForm } from "@/components/bed-form"
 
-// Mock bed data with assignments
-const bedsData = [
-  {
-    bed: { id: "1", bed_number: "101", ward_name: "General", ward_type: "general", floor_number: 1, room_number: "A", status: "available" as const, daily_rate: 1500 },
-    assignment: null
-  },
-  {
-    bed: { id: "2", bed_number: "102", ward_name: "General", ward_type: "general", floor_number: 1, room_number: "A", status: "occupied" as const, daily_rate: 1500 },
-    assignment: {
-      patient_name: "AARAV MEHTA",
-      patient_age: 45,
-      patient_mrn: "MRN001",
-      admission_date: "2025-11-03T10:00:00Z",
-      days_in_ward: 3,
-      expected_discharge_date: "2025-11-10",
-      surgery_scheduled_time: "2025-11-07T14:00:00Z",
-      surgery_type: "Cataract Surgery",
-      admission_reason: "Cataract removal and IOL implantation",
-      doctor_name: "Dr. Sarah Martinez"
-    }
-  },
-  {
-    bed: { id: "3", bed_number: "103", ward_name: "General", ward_type: "general", floor_number: 1, room_number: "B", status: "occupied" as const, daily_rate: 1500 },
-    assignment: {
-      patient_name: "PRIYA NAIR",
-      patient_age: 34,
-      patient_mrn: "MRN003",
-      admission_date: "2025-11-04T08:30:00Z",
-      days_in_ward: 2,
-      admission_reason: "Post-operative care",
-      doctor_name: "Dr. James Wilson"
-    }
-  },
-  {
-    bed: { id: "4", bed_number: "104", ward_name: "General", ward_type: "general", floor_number: 1, room_number: "B", status: "available" as const, daily_rate: 1500 },
-    assignment: null
-  },
-  {
-    bed: { id: "5", bed_number: "105", ward_name: "General", ward_type: "general", floor_number: 1, room_number: "C", status: "maintenance" as const, daily_rate: 1500 },
-    assignment: null
-  },
-  {
-    bed: { id: "6", bed_number: "201", ward_name: "ICU", ward_type: "icu", floor_number: 2, room_number: "ICU-1", status: "occupied" as const, daily_rate: 5000 },
-    assignment: {
-      patient_name: "NISHANT KAREKAR",
-      patient_age: 28,
-      patient_mrn: "MRN002",
-      admission_date: "2025-11-01T15:00:00Z",
-      days_in_ward: 5,
-      expected_discharge_date: "2025-11-08",
-      surgery_scheduled_time: "2025-11-06T09:00:00Z",
-      surgery_type: "LASIK",
-      admission_reason: "LASIK surgery and monitoring",
-      doctor_name: "Dr. Sarah Martinez"
-    }
-  },
-  {
-    bed: { id: "7", bed_number: "202", ward_name: "ICU", ward_type: "icu", floor_number: 2, room_number: "ICU-2", status: "occupied" as const, daily_rate: 5000 },
-    assignment: {
-      patient_name: "AISHABEN THAKIR",
-      patient_age: 39,
-      patient_mrn: "MRN004",
-      admission_date: "2025-11-05T11:00:00Z",
-      days_in_ward: 1,
-      admission_reason: "Critical post-operative monitoring",
-      doctor_name: "Dr. James Wilson"
-    }
-  },
-  {
-    bed: { id: "8", bed_number: "203", ward_name: "ICU", ward_type: "icu", floor_number: 2, room_number: "ICU-3", status: "available" as const, daily_rate: 5000 },
-    assignment: null
-  },
-  {
-    bed: { id: "9", bed_number: "204", ward_name: "ICU", ward_type: "icu", floor_number: 2, room_number: "ICU-4", status: "reserved" as const, daily_rate: 5000 },
-    assignment: null
-  },
-  {
-    bed: { id: "10", bed_number: "301", ward_name: "Private", ward_type: "private", floor_number: 3, room_number: "301", status: "available" as const, daily_rate: 3500 },
-    assignment: null
-  },
-  {
-    bed: { id: "11", bed_number: "302", ward_name: "Private", ward_type: "private", floor_number: 3, room_number: "302", status: "occupied" as const, daily_rate: 3500 },
-    assignment: {
-      patient_name: "KARAN SINGH",
-      patient_age: 52,
-      patient_mrn: "MRN005",
-      admission_date: "2025-10-28T09:00:00Z",
-      days_in_ward: 9,
-      expected_discharge_date: "2025-11-07",
-      admission_reason: "Extended post-operative recovery",
-      doctor_name: "Dr. Anita Desai"
-    }
-  },
-  {
-    bed: { id: "12", bed_number: "303", ward_name: "Private", ward_type: "private", floor_number: 3, room_number: "303", status: "available" as const, daily_rate: 3500 },
-    assignment: null
-  },
+// Sample data removed for production - should be fetched from API
+interface BedData {
+  bed: {
+    id: string
+    bed_number: string
+    ward_name: string
+    ward_type: string
+    floor_number: number
+    room_number: string
+    status: "available" | "occupied" | "maintenance" | "reserved"
+    daily_rate: number
+  }
+  assignment: {
+    patient_name: string
+    patient_age: number
+    patient_mrn: string
+    admission_date: string
+    days_in_ward: number
+    expected_discharge_date?: string
+    surgery_scheduled_time?: string
+    surgery_type?: string
+    admission_reason: string
+    doctor_name: string
+  } | null
+}
+
+const bedsData: BedData[] = [
+  // This should be populated from the beds API
+  // Example: const bedsData = await fetchBeds()
 ]
 
 export default function BedsPage() {
@@ -141,17 +73,40 @@ export default function BedsPage() {
   const [wardFilter, setWardFilter] = React.useState<string>("all")
   const [floorFilter, setFloorFilter] = React.useState<string>("all")
   const [statusFilter, setStatusFilter] = React.useState<string>("all")
-  const [beds, setBeds] = React.useState(bedsData)
+  const [beds, setBeds] = React.useState<BedData[]>(bedsData)
   const [draggedBed, setDraggedBed] = React.useState<any>(null)
   const [dragOverColumn, setDragOverColumn] = React.useState<string | null>(null)
   const [searchTerm, setSearchTerm] = React.useState("")
+  const [isLoading, setIsLoading] = React.useState(false)
 
-  const totalBeds = bedsData.length
-  const occupiedBeds = bedsData.filter(b => b.bed.status === 'occupied').length
-  const availableBeds = bedsData.filter(b => b.bed.status === 'available').length
-  const maintenanceBeds = bedsData.filter(b => b.bed.status === 'maintenance').length
-  const occupancyRate = ((occupiedBeds / totalBeds) * 100).toFixed(1)
-  const bedsWithSurgeryToday = bedsData.filter(b => {
+  // Function to handle bed deletion/discharge
+  const handleDischarge = async (bedId: string) => {
+    try {
+      setIsLoading(true)
+      // TODO: Replace with actual API call
+      // await fetch(`/api/beds/${bedId}/discharge`, { method: 'POST' })
+
+      // For now, remove assignment from local state
+      setBeds(prev => prev.map(item =>
+        item.bed.id === bedId
+          ? { ...item, assignment: null, bed: { ...item.bed, status: "available" as const } }
+          : item
+      ))
+      console.log("Bed discharged:", bedId)
+    } catch (error) {
+      console.error("Error discharging bed:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Calculate statistics based on current bed state
+  const totalBeds = beds.length
+  const occupiedBeds = beds.filter(b => b.bed.status === 'occupied').length
+  const availableBeds = beds.filter(b => b.bed.status === 'available').length
+  const maintenanceBeds = beds.filter(b => b.bed.status === 'maintenance').length
+  const occupancyRate = totalBeds > 0 ? ((occupiedBeds / totalBeds) * 100).toFixed(1) : "0.0"
+  const bedsWithSurgeryToday = beds.filter(b => {
     if (!b.assignment?.surgery_scheduled_time) return false
     const surgeryDate = new Date(b.assignment.surgery_scheduled_time).toDateString()
     const today = new Date().toDateString()
@@ -657,7 +612,9 @@ export default function BedsPage() {
         bedData={selectedBed?.bed || null}
         assignmentData={selectedBed?.assignment || null}
         onDischarge={() => {
-          console.log("Discharge patient")
+          if (selectedBed?.bed?.id) {
+            handleDischarge(selectedBed.bed.id)
+          }
           setIsSheetOpen(false)
         }}
         onTransfer={() => {

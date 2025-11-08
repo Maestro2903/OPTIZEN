@@ -54,31 +54,38 @@ interface Certificate {
   content?: string
 }
 
+// Sample data removed for production - should be fetched from API
 const certificates: Certificate[] = [
-  {
-    id: "CERT001",
-    date: "15/11/2025",
-    patient_name: "AARAV MEHTA",
-    type: "Fitness Certificate",
-    purpose: "Employment",
-    status: "Issued",
-  },
-  {
-    id: "CERT002",
-    date: "14/11/2025",
-    patient_name: "PRIYA NAIR",
-    type: "Medical Certificate",
-    purpose: "Leave Application",
-    status: "Issued",
-  },
+  // This should be populated from the certificates API
+  // Example: const certificates = await fetchCertificates()
 ]
 
 export default function CertificatesPage() {
   const [searchTerm, setSearchTerm] = React.useState("")
+  const [certificatesList, setCertificatesList] = React.useState<Certificate[]>(certificates)
+  const [isLoading, setIsLoading] = React.useState(false)
+
+  // Function to handle certificate deletion
+  const handleDelete = async (certificateId: string) => {
+    try {
+      setIsLoading(true)
+      // TODO: Replace with actual API call
+      // await fetch(`/api/certificates/${certificateId}`, { method: 'DELETE' })
+
+      // For now, remove from local state
+      setCertificatesList(prev => prev.filter(c => c.id !== certificateId))
+      console.log("Certificate deleted:", certificateId)
+    } catch (error) {
+      console.error("Error deleting certificate:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const filteredCertificates = React.useMemo(() => {
-    if (!searchTerm.trim()) return certificates
+    if (!searchTerm.trim()) return certificatesList
     const q = searchTerm.trim().toLowerCase()
-    return certificates.filter(c =>
+    return certificatesList.filter(c =>
       c.id.toLowerCase().includes(q) ||
       c.date.toLowerCase().includes(q) ||
       c.patient_name.toLowerCase().includes(q) ||
@@ -86,7 +93,7 @@ export default function CertificatesPage() {
       (c.purpose || '').toLowerCase().includes(q) ||
       (c.status || '').toLowerCase().includes(q)
     )
-  }, [searchTerm])
+  }, [searchTerm, certificatesList])
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -111,7 +118,7 @@ export default function CertificatesPage() {
             <Award className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">527</div>
+            <div className="text-2xl font-bold">{certificatesList.length}</div>
             <p className="text-xs text-muted-foreground">all time</p>
           </CardContent>
         </Card>
@@ -121,7 +128,7 @@ export default function CertificatesPage() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">42</div>
+            <div className="text-2xl font-bold">{certificatesList.length}</div>
             <p className="text-xs text-muted-foreground">certificates</p>
           </CardContent>
         </Card>
@@ -131,8 +138,8 @@ export default function CertificatesPage() {
             <Award className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-bold">Fitness</div>
-            <p className="text-xs text-muted-foreground">certificate type</p>
+            <div className="text-lg font-bold">-</div>
+            <p className="text-xs text-muted-foreground">no data</p>
           </CardContent>
         </Card>
         <Card>
@@ -141,7 +148,7 @@ export default function CertificatesPage() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12</div>
+            <div className="text-2xl font-bold">{certificatesList.length}</div>
             <p className="text-xs text-muted-foreground">certificates</p>
           </CardContent>
         </Card>
@@ -653,7 +660,7 @@ export default function CertificatesPage() {
                         <DeleteConfirmDialog
                           title="Delete Certificate"
                           description={`Are you sure you want to delete certificate ${cert.id}? This action cannot be undone.`}
-                          onConfirm={() => console.log("Delete certificate:", cert.id)}
+                          onConfirm={() => handleDelete(cert.id)}
                         >
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" title="Delete">
                             <Trash2 className="h-4 w-4" />
