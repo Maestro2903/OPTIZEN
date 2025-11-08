@@ -44,12 +44,16 @@ const employeeFormSchema = z.object({
   permissions: z.string().optional(),
 })
 
+export type EmployeeFormData = z.infer<typeof employeeFormSchema>
+
 interface EmployeeFormProps {
   children: React.ReactNode
+  onSubmit?: (data: EmployeeFormData) => void | Promise<void>
 }
 
-export function EmployeeForm({ children }: EmployeeFormProps) {
+export function EmployeeForm({ children, onSubmit: onSubmitCallback }: EmployeeFormProps) {
   const [open, setOpen] = React.useState(false)
+  const [isLoading, setIsLoading] = React.useState(false)
 
   const form = useForm<z.infer<typeof employeeFormSchema>>({
     resolver: zodResolver(employeeFormSchema),
@@ -60,14 +64,31 @@ export function EmployeeForm({ children }: EmployeeFormProps) {
     },
   })
 
-  function onSubmit(values: z.infer<typeof employeeFormSchema>) {
-    console.log(values)
-    setOpen(false)
-    form.reset()
+  async function onSubmit(values: z.infer<typeof employeeFormSchema>) {
+    if (onSubmitCallback) {
+      setIsLoading(true)
+      try {
+        await onSubmitCallback(values)
+        setOpen(false)
+        form.reset()
+      } catch (error) {
+        console.error("Error submitting employee form:", error)
+        form.setError("root", {
+          type: "submit",
+          message: "Failed to submit. Please try again."
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(newOpen) => {
+      if (!isLoading) {
+        setOpen(newOpen)
+      }
+    }}>
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -219,11 +240,18 @@ export function EmployeeForm({ children }: EmployeeFormProps) {
               )}
             />
 
+            {form.formState.errors.root && (
+              <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
+                {form.formState.errors.root.message}
+              </div>
+            )}
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isLoading}>
                 Cancel
               </Button>
-              <Button type="submit">Add Employee</Button>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? "Adding Employee..." : "Add Employee"}
+              </Button>
             </DialogFooter>
           </form>
         </Form>

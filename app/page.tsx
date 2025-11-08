@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 
 export default function Home() {
-  // Redirect to dashboard or login based on auth state
-  redirect("/dashboard")
+  // Redirect to cases page as the default landing page
+  redirect("/dashboard/cases")
 }
 

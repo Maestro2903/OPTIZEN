@@ -39,8 +39,24 @@ import { ViewEditDialog } from "@/components/view-edit-dialog"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Pagination } from "@/components/ui/pagination"
+import { useToast } from "@/hooks/use-toast"
 
-const cases = [
+interface Case {
+  id: number
+  case_no: string
+  patient_name: string
+  age: number
+  email?: string
+  mobile?: string
+  gender: string
+  state: string
+  case_date: string
+  visit_no: string
+  status: "Active" | "Completed" | "Cancelled"
+}
+
+const initialCases: Case[] = [
   {
     id: 1,
     case_no: "OPT250001",
@@ -102,7 +118,46 @@ const statusColors = {
 }
 
 export default function CasesPage() {
+  const { toast } = useToast()
+  const [cases, setCases] = React.useState<Case[]>(initialCases)
   const [searchTerm, setSearchTerm] = React.useState("")
+  const [currentPage, setCurrentPage] = React.useState(1)
+  const [pageSize, setPageSize] = React.useState(10)
+
+  const handleAddCase = (caseData: any) => {
+    const newCase: Case = {
+      id: Math.max(...cases.map(c => c.id), 0) + 1,
+      case_no: `OPT${new Date().getFullYear()}${String(Math.max(...cases.map(c => c.id), 0) + 1).padStart(4, '0')}`,
+      ...caseData,
+      status: "Active" as const,
+    }
+    setCases(prev => [newCase, ...prev])
+    toast({
+      title: "Case Added",
+      description: `Case ${newCase.case_no} has been added successfully.`,
+    })
+  }
+
+  const handleUpdateCase = (caseId: number, values: any) => {
+    setCases(prev => prev.map(c => 
+      c.id === caseId ? { ...c, ...values } : c
+    ))
+    toast({
+      title: "Case Updated",
+      description: "Case has been updated successfully.",
+    })
+  }
+
+  const handleDeleteCase = (caseId: number) => {
+    const caseItem = cases.find(c => c.id === caseId)
+    setCases(prev => prev.filter(c => c.id !== caseId))
+    toast({
+      title: "Case Deleted",
+      description: `Case ${caseItem?.case_no} has been deleted successfully.`,
+      variant: "destructive",
+    })
+  }
+
   const filteredCases = React.useMemo(() => {
     if (!searchTerm.trim()) return cases
     const q = searchTerm.trim().toLowerCase()
@@ -115,9 +170,21 @@ export default function CasesPage() {
       c.state.toLowerCase().includes(q) ||
       c.status.toLowerCase().includes(q)
     )
+  }, [cases, searchTerm])
+
+  const paginatedCases = React.useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize
+    const endIndex = startIndex + pageSize
+    return filteredCases.slice(startIndex, endIndex)
+  }, [filteredCases, currentPage, pageSize])
+
+  const totalPages = Math.ceil(filteredCases.length / pageSize)
+
+  React.useEffect(() => {
+    setCurrentPage(1)
   }, [searchTerm])
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Cases</h1>
@@ -125,7 +192,7 @@ export default function CasesPage() {
             Manage patient cases and medical records
           </p>
         </div>
-        <CaseForm>
+        <CaseForm onSubmit={handleAddCase}>
           <Button className="gap-2">
             <Plus className="h-4 w-4" />
             Add Case
@@ -140,7 +207,7 @@ export default function CasesPage() {
             <FolderOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">963</div>
+            <div className="text-2xl font-bold">{cases.length}</div>
             <p className="text-xs text-muted-foreground">all time</p>
           </CardContent>
         </Card>
@@ -150,7 +217,7 @@ export default function CasesPage() {
             <FolderOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">245</div>
+            <div className="text-2xl font-bold">{cases.filter(c => c.status === "Active").length}</div>
             <p className="text-xs text-muted-foreground">in progress</p>
           </CardContent>
         </Card>
@@ -160,8 +227,8 @@ export default function CasesPage() {
             <FolderOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">48</div>
-            <p className="text-xs text-muted-foreground">new cases</p>
+            <div className="text-2xl font-bold">{cases.filter(c => c.status === "Completed").length}</div>
+            <p className="text-xs text-muted-foreground">completed</p>
           </CardContent>
         </Card>
         <Card>
@@ -170,8 +237,8 @@ export default function CasesPage() {
             <FolderOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">718</div>
-            <p className="text-xs text-muted-foreground">total</p>
+            <div className="text-2xl font-bold">{cases.filter(c => c.case_date === new Date().toISOString().split('T')[0]).length}</div>
+            <p className="text-xs text-muted-foreground">today</p>
           </CardContent>
         </Card>
       </div>
@@ -191,7 +258,7 @@ export default function CasesPage() {
                 <Input
                   type="search"
                   placeholder="Search cases..."
-                  className="pl-8 w-[200px]"
+                  className="pl-8 w-[300px]"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -219,9 +286,16 @@ export default function CasesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCases.map((caseItem, index) => (
+                {paginatedCases.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      No cases found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedCases.map((caseItem, index) => (
                   <TableRow key={caseItem.id}>
-                    <TableCell>{index + 1}</TableCell>
+                    <TableCell className="font-medium">{(currentPage - 1) * pageSize + index + 1}</TableCell>
                     <TableCell className="font-medium">{caseItem.case_no}</TableCell>
                     <TableCell className="font-medium uppercase">{caseItem.patient_name}</TableCell>
                     <TableCell>{caseItem.age}</TableCell>
@@ -407,15 +481,14 @@ export default function CasesPage() {
                             </Form>
                           )}
                           onSaveAction={async (values: any) => {
-                            // TODO: integrate with real service once available
-                            console.log("Update case", values)
+                            handleUpdateCase(caseItem.id, values)
                           }}
                         >
                           <Button variant="ghost" size="icon" className="h-8 w-8">
                             <Eye className="h-4 w-4" />
                           </Button>
                         </ViewEditDialog>
-                        <CaseForm caseData={caseItem} mode="edit">
+                        <CaseForm caseData={caseItem} mode="edit" onSubmit={(data) => handleUpdateCase(caseItem.id, data)}>
                           <Button variant="ghost" size="icon" className="h-8 w-8">
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -431,7 +504,7 @@ export default function CasesPage() {
                         <DeleteConfirmDialog
                           title="Delete Case"
                           description={`Are you sure you want to delete case ${caseItem.case_no}? This action cannot be undone.`}
-                          onConfirm={() => console.log("Delete case:", caseItem.id)}
+                          onConfirm={() => handleDeleteCase(caseItem.id)}
                         >
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
                             <Trash2 className="h-4 w-4" />
@@ -440,10 +513,22 @@ export default function CasesPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                ))
+                )}
               </TableBody>
             </Table>
           </div>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filteredCases.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize)
+              setCurrentPage(1)
+            }}
+          />
         </CardContent>
       </Card>
     </div>

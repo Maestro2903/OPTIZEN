@@ -11,7 +11,6 @@ import {
   Map,
   PieChart,
   Settings2,
-  LayoutDashboard,
   Users,
   Calendar,
   FileText,
@@ -70,12 +69,6 @@ const data = {
     },
   ],
   navMain: [
-    {
-      title: "Dashboard",
-      url: "/dashboard",
-      icon: LayoutDashboard,
-      isActive: true,
-    },
     {
       title: "Patients",
       url: "/dashboard/patients",

@@ -191,10 +191,6 @@ export default function AppointmentsPage() {
   const completedToday = appointments.filter(a => a.date === "08/11/2025" && a.status === "completed").length
 
   const viewOptionsConfig: ViewOptionsConfig = {
-    views: [
-      { id: "list", label: "List" },
-      { id: "calendar", label: "Calendar" },
-    ],
     filters: [
       { id: "today", label: "Today", count: todayAppointments.length },
       { id: "scheduled", label: "Scheduled", count: appointments.filter(a => a.status === "scheduled").length },
@@ -313,7 +309,7 @@ export default function AppointmentsPage() {
   }, [appliedFilters, currentSort, sortDirection, searchTerm])
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Appointments</h1>
@@ -606,7 +602,7 @@ export default function AppointmentsPage() {
             {todayAppointments.map((appointment) => (
               <div
                 key={appointment.id}
-                className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                className="flex items-center justify-between p-3 rounded-lg border hover:bg-gray-100 transition-colors"
               >
                 <div className="flex items-center gap-3">
                   <div className="flex flex-col items-center justify-center w-16 h-16 rounded-lg bg-blue-50 border border-blue-200">

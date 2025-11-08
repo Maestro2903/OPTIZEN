@@ -53,7 +53,7 @@ export default function LoginPage() {
               <Label htmlFor="password">Password</Label>
               <a
                 href="#"
-                className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
+                className="text-sm text-blue-600 hover:text-gray-700 hover:underline"
               >
                 Forgot password?
               </a>
@@ -127,7 +127,7 @@ export default function LoginPage() {
 
           <p className="text-center text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}
-            <a href="#" className="text-blue-600 hover:text-blue-700 hover:underline font-medium">
+            <a href="#" className="text-blue-600 hover:text-gray-700 hover:underline font-medium">
               Sign up
             </a>
           </p>

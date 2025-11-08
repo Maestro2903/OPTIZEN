@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { z, ZodType } from "zod"
-import { useForm, type UseFormReturn } from "react-hook-form"
+import { useForm, type UseFormReturn, FieldValues } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import {
   Dialog,
@@ -14,27 +14,27 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 
-export type ViewEditDialogProps = {
+export type ViewEditDialogProps<T extends FieldValues = Record<string, unknown>> = {
   children: React.ReactNode
   title: string
   description?: string
   // Initial data to display/edit
-  data?: Record<string, any>
+  data?: T
   // Render the read-only view
-  renderViewAction: (data?: Record<string, any>) => React.ReactNode
+  renderViewAction: (data?: T) => React.ReactNode
   // Optional: render editable form using provided form instance
-  renderEditAction?: (form: UseFormReturn<any>) => React.ReactNode
+  renderEditAction?: (form: UseFormReturn<T>) => React.ReactNode
   // Optional Zod schema to validate values when saving
-  schema?: ZodType<any>
+  schema?: ZodType<T>
   // Called when user saves. Should persist changes.
-  onSaveAction?: (values: Record<string, any>) => Promise<void> | void
+  onSaveAction?: (values: T) => Promise<void> | void
   // Optional className override for content
   contentClassName?: string
   // If true, open dialog initially in edit mode
   defaultEdit?: boolean
 }
 
-export function ViewEditDialog({
+export function ViewEditDialog<T extends FieldValues = Record<string, unknown>>({
   children,
   title,
   description,
@@ -45,21 +45,21 @@ export function ViewEditDialog({
   onSaveAction,
   contentClassName,
   defaultEdit,
-}: ViewEditDialogProps) {
+}: ViewEditDialogProps<T>) {
   const [open, setOpen] = React.useState(false)
   const [isEdit, setIsEdit] = React.useState(false)
   const [saving, setSaving] = React.useState(false)
 
-  const form = useForm<any>({
+  const form = useForm<T>({
     resolver: schema ? zodResolver(schema as any) : undefined,
-    defaultValues: data || {},
+    defaultValues: (data || {}) as any,
     mode: "onChange",
   })
 
   React.useEffect(() => {
     // Reset form when dialog opens with new data
     if (open) {
-      form.reset(data || {})
+      form.reset((data || {}) as any)
       setIsEdit(!!defaultEdit)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -233,7 +233,8 @@ export function EyeDrawingTool({ rightEye, leftEye, onChangeAction, defaultBothU
     // No longer needed - using actual image instead of drawn guide
   }
 
-  const CanvasBox = React.memo<{ side: Side; title: string; refEl: React.RefObject<HTMLCanvasElement> }>(({ side, title, refEl }) => (
+  const CanvasBox = React.memo<{ side: Side; title: string; refEl: React.RefObject<HTMLCanvasElement> }>(function CanvasBox({ side, title, refEl }) {
+    return (
     <div className={cn(
       "p-2 rounded border",
       active === side ? "ring-1 ring-foreground/20 border-foreground/20" : "border-muted"
@@ -255,7 +256,8 @@ export function EyeDrawingTool({ rightEye, leftEye, onChangeAction, defaultBothU
         onWheel={(e) => { e.preventDefault() }}
       />
     </div>
-  ))
+    )
+  })
 
   // Sync when external images change (e.g., file upload)
   React.useEffect(() => {

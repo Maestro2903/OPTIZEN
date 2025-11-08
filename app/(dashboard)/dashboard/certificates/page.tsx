@@ -31,7 +31,30 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 
-const certificates = [
+interface Certificate {
+  id: string
+  date: string
+  patient_name: string
+  type: string
+  purpose: string
+  status: string
+  exam_date?: string
+  findings?: string
+  diagnosis?: string
+  treatment_period?: string
+  recommendations?: string
+  visual_acuity_right?: string
+  visual_acuity_left?: string
+  color_vision?: string
+  driving_fitness?: string
+  illness?: string
+  leave_from?: string
+  leave_to?: string
+  title?: string
+  content?: string
+}
+
+const certificates: Certificate[] = [
   {
     id: "CERT001",
     date: "15/11/2025",
@@ -65,7 +88,7 @@ export default function CertificatesPage() {
     )
   }, [searchTerm])
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Certificates</h1>
@@ -180,111 +203,111 @@ export default function CertificatesPage() {
                         <ViewEditDialog
                           title={`Certificate - ${cert.id}`}
                           description={`${cert.type}`}
-                          data={cert as any}
-                          renderViewAction={(data: any) => (
+                          data={cert}
+                          renderViewAction={(data?: Certificate) => (
                             <div className="grid grid-cols-2 gap-4 text-sm">
                               <div>
                                 <p className="text-muted-foreground">Date</p>
-                                <p>{data.date}</p>
+                                <p>{data?.date}</p>
                               </div>
                               <div>
                                 <p className="text-muted-foreground">Patient</p>
-                                <p className="font-medium uppercase">{data.patient_name}</p>
+                                <p className="font-medium uppercase">{data?.patient_name}</p>
                               </div>
                               <div>
                                 <p className="text-muted-foreground">Type</p>
-                                <Badge variant="secondary">{data.type}</Badge>
+                                <Badge variant="secondary">{data?.type}</Badge>
                               </div>
                               <div>
                                 <p className="text-muted-foreground">Purpose</p>
-                                <p>{data.purpose ?? '-'}</p>
+                                <p>{data?.purpose ?? '-'}</p>
                               </div>
                               <div className="col-span-2">
                                 <p className="text-muted-foreground">Status</p>
-                                <Badge variant="outline">{data.status}</Badge>
+                                <Badge variant="outline">{data?.status}</Badge>
                               </div>
 
-                              {data.type === 'Fitness Certificate' && (
+                              {data?.type === 'Fitness Certificate' && (
                                 <>
                                   <div>
                                     <p className="text-muted-foreground">Examination Date</p>
-                                    <p>{data.exam_date ?? data.date ?? '-'}</p>
+                                    <p>{data?.exam_date ?? data?.date ?? '-'}</p>
                                   </div>
                                   <div className="col-span-2">
                                     <p className="text-muted-foreground">Findings</p>
-                                    <p className="text-muted-foreground">{data.findings ?? '-'}</p>
+                                    <p className="text-muted-foreground">{data?.findings ?? '-'}</p>
                                   </div>
                                 </>
                               )}
 
-                              {data.type === 'Medical Certificate' && (
+                              {data?.type === 'Medical Certificate' && (
                                 <>
                                   <div className="col-span-2">
                                     <p className="text-muted-foreground">Diagnosis</p>
-                                    <p>{data.diagnosis ?? '-'}</p>
+                                    <p>{data?.diagnosis ?? '-'}</p>
                                   </div>
                                   <div>
                                     <p className="text-muted-foreground">Treatment Period</p>
-                                    <p>{data.treatment_period ?? '-'}</p>
+                                    <p>{data?.treatment_period ?? '-'}</p>
                                   </div>
                                   <div className="col-span-2">
                                     <p className="text-muted-foreground">Recommendations</p>
-                                    <p className="text-muted-foreground">{data.recommendations ?? '-'}</p>
+                                    <p className="text-muted-foreground">{data?.recommendations ?? '-'}</p>
                                   </div>
                                 </>
                               )}
 
-                              {data.type === 'Eye Test' && (
+                              {data?.type === 'Eye Test' && (
                                 <>
                                   <div>
                                     <p className="text-muted-foreground">Visual Acuity - Right</p>
-                                    <p>{data.visual_acuity_right ?? '-'}</p>
+                                    <p>{data?.visual_acuity_right ?? '-'}</p>
                                   </div>
                                   <div>
                                     <p className="text-muted-foreground">Visual Acuity - Left</p>
-                                    <p>{data.visual_acuity_left ?? '-'}</p>
+                                    <p>{data?.visual_acuity_left ?? '-'}</p>
                                   </div>
                                   <div>
                                     <p className="text-muted-foreground">Color Vision</p>
-                                    <p>{data.color_vision ?? '-'}</p>
+                                    <p>{data?.color_vision ?? '-'}</p>
                                   </div>
                                   <div className="col-span-2">
                                     <p className="text-muted-foreground">Driving Fitness</p>
-                                    <p className="text-muted-foreground">{data.driving_fitness ?? '-'}</p>
+                                    <p className="text-muted-foreground">{data?.driving_fitness ?? '-'}</p>
                                   </div>
                                 </>
                               )}
 
-                              {data.type === 'Sick Leave' && (
+                              {data?.type === 'Sick Leave' && (
                                 <>
                                   <div className="col-span-2">
                                     <p className="text-muted-foreground">Illness</p>
-                                    <p>{data.illness ?? '-'}</p>
+                                    <p>{data?.illness ?? '-'}</p>
                                   </div>
                                   <div>
                                     <p className="text-muted-foreground">Leave From</p>
-                                    <p>{data.leave_from ?? '-'}</p>
+                                    <p>{data?.leave_from ?? '-'}</p>
                                   </div>
                                   <div>
                                     <p className="text-muted-foreground">Leave To</p>
-                                    <p>{data.leave_to ?? '-'}</p>
+                                    <p>{data?.leave_to ?? '-'}</p>
                                   </div>
                                   <div className="col-span-2">
                                     <p className="text-muted-foreground">Recommendations</p>
-                                    <p className="text-muted-foreground">{data.recommendations ?? '-'}</p>
+                                    <p className="text-muted-foreground">{data?.recommendations ?? '-'}</p>
                                   </div>
                                 </>
                               )}
 
-                              {data.type === 'Custom' && (
+                              {data?.type === 'Custom' && (
                                 <>
                                   <div className="col-span-2">
                                     <p className="text-muted-foreground">Certificate Title</p>
-                                    <p>{data.title ?? '-'}</p>
+                                    <p>{data?.title ?? '-'}</p>
                                   </div>
                                   <div className="col-span-2">
                                     <p className="text-muted-foreground">Certificate Content</p>
-                                    <p className="text-muted-foreground whitespace-pre-wrap">{data.content ?? '-'}</p>
+                                    <p className="text-muted-foreground whitespace-pre-wrap">{data?.content ?? '-'}</p>
                                   </div>
                                 </>
                               )}
@@ -542,7 +565,7 @@ export default function CertificatesPage() {
                               </div>
                             </Form>
                           )}
-                          onSaveAction={async (values: any) => {
+                          onSaveAction={async (values: Certificate) => {
                             console.log("Update certificate", values)
                           }}
                         >
@@ -553,7 +576,7 @@ export default function CertificatesPage() {
                         <ViewEditDialog
                           title={`Edit Certificate - ${cert.id}`}
                           description={cert.type}
-                          data={cert as any}
+                          data={cert}
                           defaultEdit
                           renderViewAction={() => null}
                           renderEditAction={(form: any) => (
@@ -616,7 +639,7 @@ export default function CertificatesPage() {
                               </div>
                             </Form>
                           )}
-                          onSaveAction={async (values: any) => {
+                          onSaveAction={async (values: Certificate) => {
                             console.log("Update certificate", values)
                           }}
                         >

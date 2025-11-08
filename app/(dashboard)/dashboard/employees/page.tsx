@@ -30,43 +30,71 @@ import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
 import { ViewEditDialog } from "@/components/view-edit-dialog"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Pagination } from "@/components/ui/pagination"
+import { useToast } from "@/hooks/use-toast"
+import * as z from "zod"
 
-const employees = [
+interface Employee {
+  employee_id: string
+  full_name: string
+  role: string
+  email: string
+  phone: string
+  address?: string
+  joining_date: string
+  qualifications?: string
+  permissions?: string
+  status: "Active" | "Inactive" | "OnLeave"
+}
+
+const initialEmployees: Employee[] = [
   {
-    id: "EMP001",
-    name: "Dr. Sarah Martinez",
+    employee_id: "EMP001",
+    full_name: "Dr. Sarah Martinez",
     role: "Ophthalmologist",
     email: "sarah.m@opticnauts.com",
     phone: "+91 98765 43210",
+    address: "123 Medical Plaza, Mumbai",
+    joining_date: "2023-01-15",
+    qualifications: "MBBS, MS (Ophthalmology)",
+    permissions: "All access",
     status: "Active",
-    joined: "15/01/2023",
   },
   {
-    id: "EMP002",
-    name: "Dr. James Wilson",
+    employee_id: "EMP002",
+    full_name: "Dr. James Wilson",
     role: "Ophthalmologist",
     email: "james.w@opticnauts.com",
     phone: "+91 98765 43211",
+    address: "456 Medical Center, Delhi",
+    joining_date: "2023-03-22",
+    qualifications: "MBBS, MS (Ophthalmology)",
+    permissions: "All access",
     status: "Active",
-    joined: "22/03/2023",
   },
   {
-    id: "EMP003",
-    name: "Nurse Priya Sharma",
+    employee_id: "EMP003",
+    full_name: "Nurse Priya Sharma",
     role: "Nurse",
     email: "priya.s@opticnauts.com",
     phone: "+91 98765 43212",
+    address: "789 Health Street, Pune",
+    joining_date: "2023-05-10",
+    qualifications: "BSc Nursing",
+    permissions: "Patient care access",
     status: "Active",
-    joined: "10/05/2023",
   },
   {
-    id: "EMP004",
-    name: "Rajesh Kumar",
+    employee_id: "EMP004",
+    full_name: "Rajesh Kumar",
     role: "Receptionist",
     email: "rajesh.k@opticnauts.com",
     phone: "+91 98765 43213",
+    address: "321 Admin Block, Chennai",
+    joining_date: "2023-07-05",
+    qualifications: "BBA",
+    permissions: "Reception access",
     status: "Active",
-    joined: "05/07/2023",
   },
 ]
 
@@ -77,21 +105,85 @@ const statusColors = {
 }
 
 export default function EmployeesPage() {
+  const { toast } = useToast()
+  const [employees, setEmployees] = React.useState<Employee[]>(initialEmployees)
   const [searchTerm, setSearchTerm] = React.useState("")
+  const [currentPage, setCurrentPage] = React.useState(1)
+  const [pageSize, setPageSize] = React.useState(10)
+
+  const handleAddEmployee = (employeeData: Omit<Employee, 'employee_id' | 'status'>) => {
+    // Calculate next ID by finding max existing ID number
+    const maxId = employees.reduce((max, emp) => {
+      const num = parseInt(emp.employee_id.slice(3), 10) || 0
+      return num > max ? num : max
+    }, 0)
+    
+    const newEmployee: Employee = {
+      employee_id: `EMP${String(maxId + 1).padStart(3, '0')}`,
+      ...employeeData,
+      status: "Active" as const,
+    }
+    setEmployees(prev => [newEmployee, ...prev])
+    toast({
+      title: "Employee Added",
+      description: `${newEmployee.full_name} has been added successfully.`,
+    })
+  }
+
+  const handleUpdateEmployee = (employeeId: string, values: Partial<Employee>) => {
+    setEmployees(prev => prev.map(emp => 
+      emp.employee_id === employeeId ? { ...emp, ...values } : emp
+    ))
+    toast({
+      title: "Employee Updated",
+      description: "Employee has been updated successfully.",
+    })
+  }
+
+  const handleDeleteEmployee = (employeeId: string) => {
+    const employee = employees.find(emp => emp.employee_id === employeeId)
+    if (!employee) {
+      toast({
+        title: "Error",
+        description: "Employee not found.",
+        variant: "destructive",
+      })
+      return
+    }
+    setEmployees(prev => prev.filter(emp => emp.employee_id !== employeeId))
+    toast({
+      title: "Employee Deleted",
+      description: `${employee.full_name} has been deleted successfully.`,
+      variant: "destructive",
+    })
+  }
+
   const filteredEmployees = React.useMemo(() => {
     if (!searchTerm.trim()) return employees
     const q = searchTerm.trim().toLowerCase()
     return employees.filter(emp =>
-      emp.id.toLowerCase().includes(q) ||
-      emp.name.toLowerCase().includes(q) ||
+      emp.employee_id.toLowerCase().includes(q) ||
+      emp.full_name.toLowerCase().includes(q) ||
       emp.role.toLowerCase().includes(q) ||
       emp.email.toLowerCase().includes(q) ||
       emp.phone.toLowerCase().includes(q) ||
       emp.status.toLowerCase().includes(q)
     )
+  }, [employees, searchTerm])
+
+  const paginatedEmployees = React.useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize
+    const endIndex = startIndex + pageSize
+    return filteredEmployees.slice(startIndex, endIndex)
+  }, [filteredEmployees, currentPage, pageSize])
+
+  const totalPages = Math.ceil(filteredEmployees.length / pageSize)
+
+  React.useEffect(() => {
+    setCurrentPage(1)
   }, [searchTerm])
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Employees</h1>
@@ -99,7 +191,7 @@ export default function EmployeesPage() {
             Manage staff records and roles
           </p>
         </div>
-        <EmployeeForm>
+        <EmployeeForm onSubmit={handleAddEmployee}>
           <Button className="gap-2">
             <Plus className="h-4 w-4" />
             Add Employee
@@ -114,7 +206,7 @@ export default function EmployeesPage() {
             <UserCog className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">24</div>
+            <div className="text-2xl font-bold">{employees.length}</div>
             <p className="text-xs text-muted-foreground">staff members</p>
           </CardContent>
         </Card>
@@ -124,7 +216,7 @@ export default function EmployeesPage() {
             <Shield className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">8</div>
+            <div className="text-2xl font-bold">{employees.filter(e => e.role === "Ophthalmologist").length}</div>
             <p className="text-xs text-muted-foreground">ophthalmologists</p>
           </CardContent>
         </Card>
@@ -134,7 +226,7 @@ export default function EmployeesPage() {
             <UserCog className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12</div>
+            <div className="text-2xl font-bold">{employees.filter(e => e.role === "Nurse").length}</div>
             <p className="text-xs text-muted-foreground">nursing staff</p>
           </CardContent>
         </Card>
@@ -144,7 +236,7 @@ export default function EmployeesPage() {
             <UserCog className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">18</div>
+            <div className="text-2xl font-bold">{employees.filter(e => e.status === "Active").length}</div>
             <p className="text-xs text-muted-foreground">currently active</p>
           </CardContent>
         </Card>
@@ -193,11 +285,18 @@ export default function EmployeesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredEmployees.map((emp, index) => (
-                  <TableRow key={emp.id}>
-                    <TableCell>{index + 1}</TableCell>
-                    <TableCell className="font-medium">{emp.id}</TableCell>
-                    <TableCell className="font-medium">{emp.name}</TableCell>
+                {paginatedEmployees.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      No employees found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedEmployees.map((emp, index) => (
+                  <TableRow key={emp.employee_id}>
+                    <TableCell className="font-medium">{(currentPage - 1) * pageSize + index + 1}</TableCell>
+                    <TableCell className="font-medium">{emp.employee_id}</TableCell>
+                    <TableCell className="font-medium">{emp.full_name}</TableCell>
                     <TableCell>
                       <Badge variant="secondary">{emp.role}</Badge>
                     </TableCell>
@@ -221,18 +320,18 @@ export default function EmployeesPage() {
                         {emp.status}
                       </Badge>
                     </TableCell>
-                    <TableCell>{emp.joined}</TableCell>
+                    <TableCell>{new Date(emp.joining_date).toLocaleDateString('en-GB')}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <ViewEditDialog
-                          title={`Employee - ${emp.name}`}
+                          title={`Employee - ${emp.full_name}`}
                           description={`${emp.role}`}
                           data={emp as any}
                           renderViewAction={(data: any) => (
                             <div className="grid grid-cols-2 gap-4 text-sm">
                               <div>
                                 <p className="text-muted-foreground">Name</p>
-                                <p className="font-medium">{data.name}</p>
+                                <p className="font-medium">{data.full_name}</p>
                               </div>
                               <div>
                                 <p className="text-muted-foreground">Role</p>
@@ -316,8 +415,15 @@ export default function EmployeesPage() {
                               </div>
                             </Form>
                           )}
+                          schema={z.object({
+                            name: z.string().min(1),
+                            role: z.string().min(1),
+                            email: z.string().email(),
+                            phone: z.string().min(1),
+                            status: z.string().min(1),
+                          })}
                           onSaveAction={async (values: any) => {
-                            console.log("Update employee", values)
+                            handleUpdateEmployee(emp.employee_id, values)
                           }}
                         >
                           <Button variant="ghost" size="icon" className="h-8 w-8" title="View/Edit">
@@ -326,8 +432,8 @@ export default function EmployeesPage() {
                         </ViewEditDialog>
                         <DeleteConfirmDialog
                           title="Delete Employee"
-                          description={`Are you sure you want to delete ${emp.name}? This action cannot be undone.`}
-                          onConfirm={() => console.log("Delete employee:", emp.id)}
+                          description={`Are you sure you want to delete ${emp.full_name}? This action cannot be undone.`}
+                          onConfirm={() => handleDeleteEmployee(emp.employee_id)}
                         >
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" title="Delete">
                             <Trash2 className="h-4 w-4" />
@@ -336,10 +442,22 @@ export default function EmployeesPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                ))
+                )}
               </TableBody>
             </Table>
           </div>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filteredEmployees.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize)
+              setCurrentPage(1)
+            }}
+          />
         </CardContent>
       </Card>
     </div>

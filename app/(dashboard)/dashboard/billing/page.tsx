@@ -31,8 +31,22 @@ import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
 import { ViewEditDialog } from "@/components/view-edit-dialog"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Pagination } from "@/components/ui/pagination"
+import { useToast } from "@/hooks/use-toast"
+import * as z from "zod"
 
-const invoices = [
+interface Invoice {
+  id: string
+  date: string
+  patient_name: string
+  items: string
+  total: string
+  paid: string
+  balance: string
+  status: "Paid" | "Partial" | "Unpaid"
+}
+
+const initialInvoices: Invoice[] = [
   {
     id: "INV001",
     date: "15/11/2025",
@@ -72,7 +86,62 @@ const statusColors = {
 }
 
 export default function BillingPage() {
+  const { toast } = useToast()
+  const [invoices, setInvoices] = React.useState<Invoice[]>(initialInvoices)
   const [searchTerm, setSearchTerm] = React.useState("")
+  const [currentPage, setCurrentPage] = React.useState(1)
+  const [pageSize, setPageSize] = React.useState(10)
+
+  // Helper function to get next invoice ID with NaN protection
+  const getNextInvoiceId = (invoices: Invoice[]) => {
+    const maxId = invoices.reduce((max, inv) => {
+      const num = parseInt(inv.id.replace('INV', ''), 10)
+      return !isNaN(num) && num > max ? num : max
+    }, 0)
+    return `INV${String(maxId + 1).padStart(3, '0')}`
+  }
+
+  const handleAddInvoice = (invoiceData: any) => {
+    const newInvoice: Invoice = {
+      id: getNextInvoiceId(invoices),
+      date: new Date().toLocaleDateString('en-GB'),
+      ...invoiceData,
+    }
+    setInvoices(prev => [newInvoice, ...prev])
+    toast({
+      title: "Invoice Created",
+      description: "New invoice has been created successfully.",
+    })
+  }
+
+  const handleUpdateInvoice = (invoiceId: string, values: Partial<Invoice>) => {
+    setInvoices(prev => prev.map(inv =>
+      inv.id === invoiceId ? { ...inv, ...values } : inv
+    ))
+    toast({
+      title: "Invoice Updated",
+      description: "Invoice has been updated successfully.",
+    })
+  }
+
+  const handleDeleteInvoice = (invoiceId: string) => {
+    const invoice = invoices.find(inv => inv.id === invoiceId)
+    if (!invoice) {
+      toast({
+        title: "Error",
+        description: "Invoice not found.",
+        variant: "destructive",
+      })
+      return
+    }
+    setInvoices(prev => prev.filter(inv => inv.id !== invoiceId))
+    toast({
+      title: "Invoice Deleted",
+      description: `Invoice ${invoice.id} has been deleted successfully.`,
+      variant: "destructive",
+    })
+  }
+
   const filteredInvoices = React.useMemo(() => {
     if (!searchTerm.trim()) return invoices
     const q = searchTerm.trim().toLowerCase()
@@ -83,9 +152,21 @@ export default function BillingPage() {
       inv.items.toLowerCase().includes(q) ||
       inv.status.toLowerCase().includes(q)
     )
+  }, [invoices, searchTerm])
+
+  const paginatedInvoices = React.useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize
+    const endIndex = startIndex + pageSize
+    return filteredInvoices.slice(startIndex, endIndex)
+  }, [filteredInvoices, currentPage, pageSize])
+
+  const totalPages = Math.ceil(filteredInvoices.length / pageSize)
+
+  React.useEffect(() => {
+    setCurrentPage(1)
   }, [searchTerm])
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Billing & Invoices</h1>
@@ -93,7 +174,7 @@ export default function BillingPage() {
             Manage invoices and payment tracking
           </p>
         </div>
-        <InvoiceForm>
+        <InvoiceForm onSubmit={handleAddInvoice}>
           <Button className="gap-2">
             <Plus className="h-4 w-4" />
             New Invoice
@@ -188,9 +269,16 @@ export default function BillingPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredInvoices.map((invoice, index) => (
+                {paginatedInvoices.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                      No invoices found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedInvoices.map((invoice, index) => (
                   <TableRow key={invoice.id}>
-                    <TableCell>{index + 1}</TableCell>
+                    <TableCell>{(currentPage - 1) * pageSize + index + 1}</TableCell>
                     <TableCell className="font-medium">{invoice.id}</TableCell>
                     <TableCell>{invoice.date}</TableCell>
                     <TableCell className="font-medium uppercase">{invoice.patient_name}</TableCell>
@@ -279,8 +367,12 @@ export default function BillingPage() {
                               </div>
                             </Form>
                           )}
+                          schema={z.object({
+                            date: z.string().min(1),
+                            status: z.string().min(1),
+                          })}
                           onSaveAction={async (values: any) => {
-                            console.log("Update invoice", values)
+                            handleUpdateInvoice(invoice.id, values)
                           }}
                         >
                           <Button variant="ghost" size="icon" className="h-8 w-8" title="View">
@@ -304,7 +396,7 @@ export default function BillingPage() {
                         <DeleteConfirmDialog
                           title="Delete Invoice"
                           description={`Are you sure you want to delete invoice ${invoice.id}? This action cannot be undone.`}
-                          onConfirm={() => console.log("Delete invoice:", invoice.id)}
+                          onConfirm={() => handleDeleteInvoice(invoice.id)}
                         >
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" title="Delete">
                             <Trash2 className="h-4 w-4" />
@@ -313,10 +405,22 @@ export default function BillingPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                ))
+                )}
               </TableBody>
             </Table>
           </div>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filteredInvoices.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize)
+              setCurrentPage(1)
+            }}
+          />
         </CardContent>
       </Card>
     </div>

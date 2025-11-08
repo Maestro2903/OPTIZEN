@@ -30,7 +30,7 @@ export function BedCard({ bed, assignment, onClick }: BedCardProps) {
     switch (status) {
       case 'available':
         return {
-          bg: 'bg-green-50 hover:bg-green-100 border-green-200',
+          bg: 'bg-green-50 hover:bg-gray-100 border-green-200',
           icon: Check,
           iconColor: 'text-green-600',
           label: 'Available',
@@ -38,7 +38,7 @@ export function BedCard({ bed, assignment, onClick }: BedCardProps) {
         }
       case 'occupied':
         return {
-          bg: 'bg-red-50 hover:bg-red-100 border-red-200',
+          bg: 'bg-red-50 hover:bg-gray-100 border-red-200',
           icon: User,
           iconColor: 'text-red-600',
           label: 'Occupied',
@@ -55,7 +55,7 @@ export function BedCard({ bed, assignment, onClick }: BedCardProps) {
         }
       case 'reserved':
         return {
-          bg: 'bg-yellow-50 hover:bg-yellow-100 border-yellow-200',
+          bg: 'bg-yellow-50 hover:bg-gray-100 border-yellow-200',
           icon: AlertCircle,
           iconColor: 'text-yellow-600',
           label: 'Reserved',
@@ -134,7 +134,7 @@ export function BedCard({ bed, assignment, onClick }: BedCardProps) {
       </div>
 
       {/* Floor indicator */}
-      <div className="absolute top-2 right-2">
+      <div className="absolute bottom-2 right-2">
         <Badge variant="outline" className="text-xs">
           F{bed.floor_number}
         </Badge>

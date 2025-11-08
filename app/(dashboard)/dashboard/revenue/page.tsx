@@ -6,7 +6,6 @@ import {
   Search,
   Filter,
   TrendingUp,
-  TrendingDown,
   DollarSign,
   CreditCard,
   ArrowUpRight,
@@ -38,6 +37,18 @@ import {
 import { ViewEditDialog } from "@/components/view-edit-dialog"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
+interface Expense {
+  id: string
+  date: string
+  category: string
+  sub_category?: string
+  description: string
+  amount: number
+  payment_method: string
+  vendor: string
+  bill_number?: string
+}
 
 // Mock expenses data
 const expenses = [
@@ -195,7 +206,7 @@ export default function RevenuePage() {
   }, [transactionsSearchTerm])
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Revenue & Finance</h1>
@@ -370,38 +381,38 @@ export default function RevenuePage() {
                             <ViewEditDialog
                               title={`Expense - ${expense.description}`}
                               description={`Bill: ${expense.bill_number}`}
-                              data={expense as any}
-                              renderViewAction={(data: any) => (
+                              data={expense}
+                              renderViewAction={(data?: Expense) => (
                                 <div className="grid grid-cols-2 gap-4 text-sm">
                                   <div>
                                     <p className="text-muted-foreground">Date</p>
-                                    <p>{data.date}</p>
+                                    <p>{data?.date}</p>
                                   </div>
                                   <div>
                                     <p className="text-muted-foreground">Category</p>
-                                    <Badge variant="outline" className={categoryColors[data.category as keyof typeof categoryColors]}>
-                                      {data.category}
+                                    <Badge variant="outline" className={categoryColors[data?.category as keyof typeof categoryColors]}>
+                                      {data?.category}
                                     </Badge>
                                   </div>
                                   <div className="col-span-2">
                                     <p className="text-muted-foreground">Description</p>
-                                    <p className="text-muted-foreground">{data.description}</p>
+                                    <p className="text-muted-foreground">{data?.description}</p>
                                   </div>
                                   <div>
                                     <p className="text-muted-foreground">Vendor</p>
-                                    <p>{data.vendor}</p>
+                                    <p>{data?.vendor}</p>
                                   </div>
                                   <div>
                                     <p className="text-muted-foreground">Payment</p>
-                                    <Badge variant="secondary">{data.payment_method}</Badge>
+                                    <Badge variant="secondary">{data?.payment_method}</Badge>
                                   </div>
                                   <div>
                                     <p className="text-muted-foreground">Amount</p>
-                                    <p className="font-semibold">₹{Number(data.amount).toLocaleString()}</p>
+                                    <p className="font-semibold">₹{Number(data?.amount || 0).toLocaleString()}</p>
                                   </div>
                                   <div>
                                     <p className="text-muted-foreground">Bill No.</p>
-                                    <p className="font-mono text-xs">{data.bill_number}</p>
+                                    <p className="font-mono text-xs">{data?.bill_number}</p>
                                   </div>
                                 </div>
                               )}

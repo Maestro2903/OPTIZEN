@@ -65,9 +65,10 @@ interface InvoiceFormProps {
   children: React.ReactNode
   invoiceData?: any
   mode?: "add" | "edit"
+  onSubmit?: (data: any) => void
 }
 
-export function InvoiceForm({ children, invoiceData, mode = "add" }: InvoiceFormProps) {
+export function InvoiceForm({ children, invoiceData, mode = "add", onSubmit: onSubmitCallback }: InvoiceFormProps) {
   const [open, setOpen] = React.useState(false)
 
   const form = useForm<z.infer<typeof invoiceFormSchema>>({
@@ -126,15 +127,19 @@ export function InvoiceForm({ children, invoiceData, mode = "add" }: InvoiceForm
   }, [total, watchAmountPaid])
 
   function onSubmit(values: z.infer<typeof invoiceFormSchema>) {
+    const paidAmount = parseFloat(values.amount_paid || "0")
     const invoiceData = {
       ...values,
-      subtotal,
-      discount,
-      tax,
-      total,
-      balance,
+      patient_name: values.patient_id,
+      items: values.items.map(i => i.description || i.service).join(', '),
+      total: `₹${total.toLocaleString()}`,
+      paid: `₹${paidAmount.toLocaleString()}`,
+      balance: `₹${balance.toLocaleString()}`,
+      status: balance === 0 ? "Paid" as const : balance === total ? "Unpaid" as const : "Partial" as const,
     }
-    console.log(mode === "edit" ? "Update invoice:" : "Create invoice:", invoiceData)
+    if (onSubmitCallback) {
+      onSubmitCallback(invoiceData)
+    }
     setOpen(false)
     form.reset()
   }

@@ -59,6 +59,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
 import { ViewEditDialog } from "@/components/view-edit-dialog"
+import { OPERATIONS, type Operation } from "../constants/operationsMock"
 
 // OpticNauts Operation Schema
 const operationFormSchema = z.object({
@@ -81,29 +82,6 @@ const operationFormSchema = z.object({
   print_payment: z.boolean().optional(),
   print_iol: z.boolean().optional(),
 })
-
-const operations = [
-  {
-    id: "OP001",
-    date: "15/10/2025",
-    patient_name: "KARAN SINGH",
-    operation: "FOREIGNBODY",
-    begin_time: "12:00",
-    end_time: "13:00",
-    duration: "60 min",
-    amount: "₹30000",
-  },
-  {
-    id: "OP002",
-    date: "11/10/2025",
-    patient_name: "ARJUN VERMA",
-    operation: "FOREIGNBODY",
-    begin_time: "12:00",
-    end_time: "13:00",
-    duration: "60 min",
-    amount: "₹30000",
-  },
-]
 
 export default function OperationsPage() {
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
@@ -138,7 +116,7 @@ export default function OperationsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Operations</h1>
@@ -148,8 +126,8 @@ export default function OperationsPage() {
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-          <Button className="gap-2">
-            <Plus className="h-4 w-4" />
+            <Button className="gap-2">
+              <Plus className="h-4 w-4" />
               Add Operation
             </Button>
           </DialogTrigger>
@@ -560,7 +538,7 @@ export default function OperationsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {operations
+                {OPERATIONS
                   .filter(op => {
                     if (!searchTerm.trim()) return true
                     const q = searchTerm.trim().toLowerCase()

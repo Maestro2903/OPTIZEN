@@ -24,25 +24,25 @@ export default function PortalLayout({
             <nav className="flex items-center gap-6">
               <Link
                 href="/portal"
-                className="text-sm font-medium text-gray-700 hover:text-primary-600"
+                className="text-sm font-medium text-gray-700 hover:text-gray-900"
               >
                 Home
               </Link>
               <Link
                 href="/portal/appointments"
-                className="text-sm font-medium text-gray-700 hover:text-primary-600"
+                className="text-sm font-medium text-gray-700 hover:text-gray-900"
               >
                 Appointments
               </Link>
               <Link
                 href="/portal/records"
-                className="text-sm font-medium text-gray-700 hover:text-primary-600"
+                className="text-sm font-medium text-gray-700 hover:text-gray-900"
               >
                 Medical Records
               </Link>
               <Link
                 href="/portal/billing"
-                className="text-sm font-medium text-gray-700 hover:text-primary-600"
+                className="text-sm font-medium text-gray-700 hover:text-gray-900"
               >
                 Billing
               </Link>

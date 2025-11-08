@@ -66,6 +66,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
 import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
 import { ViewEditDialog } from "@/components/view-edit-dialog"
+import { Pagination } from "@/components/ui/pagination"
+import { useToast } from "@/hooks/use-toast"
 
 const patientFormSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -77,20 +79,33 @@ const patientFormSchema = z.object({
   address: z.string().optional(),
 })
 
-  const patients = [
-    {
-      id: 1,
+interface Patient {
+  id: number
+  name: string
+  age: number
+  email?: string
+  mobile: string
+  gender: "Male" | "Female" | "Other"
+  state: string
+  last_visit: string
+  status: string
+  address?: string
+}
+
+const initialPatients: Patient[] = [
+  {
+    id: 1,
     name: "AARAV MEHTA",
     age: 45,
     email: "aarav.m@email.com",
     mobile: "9856452114",
-      gender: "Male",
+    gender: "Male",
     state: "Gujarat",
     last_visit: "08/02/2025",
     status: "Active",
-    },
-    {
-      id: 2,
+  },
+  {
+    id: 2,
     name: "NISHANT KAREKAR",
     age: 28,
     email: "nishant.k@email.com",
@@ -99,9 +114,9 @@ const patientFormSchema = z.object({
     state: "Maharashtra",
     last_visit: "26/09/2025",
     status: "Active",
-    },
-    {
-      id: 3,
+  },
+  {
+    id: 3,
     name: "PRIYA NAIR",
     age: 34,
     email: "priya.n@email.com",
@@ -110,14 +125,14 @@ const patientFormSchema = z.object({
     state: "Maharashtra",
     last_visit: "19/08/2025",
     status: "Active",
-    },
-    {
-      id: 4,
+  },
+  {
+    id: 4,
     name: "AISHABEN THAKIR",
     age: 39,
     email: "aisha.t@email.com",
     mobile: "6456445154",
-      gender: "Female",
+    gender: "Female",
     state: "Gujarat",
     last_visit: "15/08/2025",
     status: "Active",
@@ -125,6 +140,8 @@ const patientFormSchema = z.object({
 ]
 
 export default function PatientsPage() {
+  const { toast } = useToast()
+  const [patients, setPatients] = React.useState(initialPatients)
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
   const [editingPatient, setEditingPatient] = React.useState<any>(null)
   const [currentView, setCurrentView] = React.useState("list")
@@ -132,6 +149,8 @@ export default function PatientsPage() {
   const [currentSort, setCurrentSort] = React.useState("name")
   const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('asc')
   const [searchTerm, setSearchTerm] = React.useState("")
+  const [currentPage, setCurrentPage] = React.useState(1)
+  const [pageSize, setPageSize] = React.useState(10)
 
   const form = useForm<z.infer<typeof patientFormSchema>>({
     resolver: zodResolver(patientFormSchema),
@@ -147,7 +166,32 @@ export default function PatientsPage() {
   })
 
   function onSubmit(values: z.infer<typeof patientFormSchema>) {
-    console.log(editingPatient ? "Update:" : "Create:", values)
+    if (editingPatient) {
+      // Update existing patient
+      setPatients(prev => prev.map(p => 
+        p.id === editingPatient.id 
+          ? { ...p, ...values, age: Number(values.age) }
+          : p
+      ))
+      toast({
+        title: "Patient Updated",
+        description: `${values.name} has been updated successfully.`,
+      })
+    } else {
+      // Add new patient
+      const newPatient = {
+        id: Math.max(...patients.map(p => p.id), 0) + 1,
+        ...values,
+        age: Number(values.age),
+        last_visit: new Date().toLocaleDateString('en-GB'),
+        status: "Active",
+      }
+      setPatients(prev => [newPatient, ...prev])
+      toast({
+        title: "Patient Added",
+        description: `${values.name} has been added successfully.`,
+      })
+    }
     setIsDialogOpen(false)
     setEditingPatient(null)
     form.reset()
@@ -168,7 +212,13 @@ export default function PatientsPage() {
   }
 
   const handleDelete = (patientId: number) => {
-    console.log("Delete patient:", patientId)
+    const patient = patients.find(p => p.id === patientId)
+    setPatients(prev => prev.filter(p => p.id !== patientId))
+    toast({
+      title: "Patient Deleted",
+      description: `${patient?.name} has been deleted successfully.`,
+      variant: "destructive",
+    })
   }
 
   const viewOptionsConfig: ViewOptionsConfig = {
@@ -278,10 +328,24 @@ export default function PatientsPage() {
     })
 
     return filtered
-  }, [appliedFilters, currentSort, sortDirection, searchTerm])
+  }, [patients, appliedFilters, currentSort, sortDirection, searchTerm])
+
+  // Paginate the filtered data
+  const paginatedPatients = React.useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize
+    const endIndex = startIndex + pageSize
+    return filteredAndSortedPatients.slice(startIndex, endIndex)
+  }, [filteredAndSortedPatients, currentPage, pageSize])
+
+  const totalPages = Math.ceil(filteredAndSortedPatients.length / pageSize)
+
+  // Reset to first page when filters change
+  React.useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, appliedFilters, currentSort, sortDirection])
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Patients</h1>
@@ -505,7 +569,7 @@ export default function PatientsPage() {
                 <Input
                   type="search"
                   placeholder="Search patients..."
-                  className="pl-8 w-[200px]"
+                  className="pl-8 w-[300px]"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -542,9 +606,16 @@ export default function PatientsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredAndSortedPatients.map((patient, index) => (
+                {paginatedPatients.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      No patients found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedPatients.map((patient, index) => (
                   <TableRow key={patient.id}>
-                    <TableCell>{index + 1}</TableCell>
+                    <TableCell>{(currentPage - 1) * pageSize + index + 1}</TableCell>
                     <TableCell className="font-medium uppercase">{patient.name}</TableCell>
                     <TableCell>{patient.age}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{patient.email}</TableCell>
@@ -696,7 +767,15 @@ export default function PatientsPage() {
                             </Form>
                           )}
                           onSaveAction={async (values: any) => {
-                            console.log("Update patient", values)
+                            setPatients(prev => prev.map(p => 
+                              p.id === patient.id 
+                                ? { ...p, ...values, age: Number(values.age) }
+                                : p
+                            ))
+                            toast({
+                              title: "Patient Updated",
+                              description: `${values.name} has been updated successfully.`,
+                            })
                           }}
                         >
                           <Button variant="ghost" size="icon" className="h-8 w-8" title="View">
@@ -733,10 +812,22 @@ export default function PatientsPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                ))
+                )}
               </TableBody>
             </Table>
           </div>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filteredAndSortedPatients.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize)
+              setCurrentPage(1)
+            }}
+          />
         </CardContent>
       </Card>
     </div>

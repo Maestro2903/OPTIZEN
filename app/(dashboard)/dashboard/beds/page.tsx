@@ -248,7 +248,7 @@ export default function BedsPage() {
   }, {} as Record<string, typeof bedsData>)
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Bed Management</h1>
@@ -584,7 +584,7 @@ export default function BedsPage() {
                     {filteredBeds.map(({ bed, assignment }) => (
                       <TableRow 
                         key={bed.id} 
-                        className="cursor-pointer hover:bg-muted/50"
+                        className="cursor-pointer hover:bg-gray-100"
                         onClick={() => handleBedClick({ bed, assignment })}
                       >
                         <TableCell className="font-mono font-semibold">{bed.bed_number}</TableCell>

@@ -26,13 +26,91 @@ import { DischargeForm } from "@/components/discharge-form"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
 import { ViewEditDialog } from "@/components/view-edit-dialog"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 
-const discharges: any[] = []
+interface Discharge {
+  id: string
+  patient_name: string
+  admission_date: string
+  discharge_date: string
+  notes?: string
+}
+
+const discharges: Discharge[] = [
+  {
+    id: "DIS001",
+    patient_name: "RAJESH KUMAR",
+    admission_date: "2025-10-15",
+    discharge_date: "2025-10-18",
+    notes: "Successful cataract surgery, patient recovered well"
+  },
+  {
+    id: "DIS002",
+    patient_name: "PRIYA SHARMA",
+    admission_date: "2025-11-01",
+    discharge_date: "2025-11-03",
+    notes: "Retinal detachment surgery completed successfully"
+  },
+  {
+    id: "DIS003",
+    patient_name: "ARUN MEHTA",
+    admission_date: "2025-11-05",
+    discharge_date: "2025-11-07",
+    notes: "Glaucoma treatment, stable condition"
+  },
+  {
+    id: "DIS004",
+    patient_name: "SUNITA PATEL",
+    admission_date: "2025-11-08",
+    discharge_date: "2025-11-08",
+    notes: "Day surgery for minor eye procedure"
+  }
+]
 
 export default function DischargesPage() {
   const [searchTerm, setSearchTerm] = React.useState("")
+
+  // Computed statistics from discharge data
+  const stats = React.useMemo(() => {
+    const now = new Date()
+    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    const thisWeek = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000))
+
+    const thisMonthDischarges = discharges.filter(d =>
+      new Date(d.discharge_date) >= thisMonth
+    ).length
+
+    const thisWeekDischarges = discharges.filter(d =>
+      new Date(d.discharge_date) >= thisWeek
+    ).length
+
+    // Calculate average stay length in days
+    const avgStay = discharges.length > 0 ?
+      discharges.reduce((total, d) => {
+        const admission = new Date(d.admission_date)
+        const discharge = new Date(d.discharge_date)
+
+        // Log warning for invalid date ranges
+        if (discharge.getTime() < admission.getTime()) {
+          console.warn('Invalid discharge data: discharge_date is before admission_date', {
+            id: d.id,
+            admission_date: d.admission_date,
+            discharge_date: d.discharge_date
+          })
+        }
+
+        const stayDays = Math.max(0, (discharge.getTime() - admission.getTime()) / (1000 * 60 * 60 * 24))
+        return total + stayDays
+      }, 0) / discharges.length : 0
+
+    return {
+      total: discharges.length,
+      thisMonth: thisMonthDischarges,
+      thisWeek: thisWeekDischarges,
+      avgStay: Number(avgStay.toFixed(1))
+    }
+  }, [discharges])
+
   const filteredDischarges = React.useMemo(() => {
     if (!searchTerm.trim()) return discharges
     const q = searchTerm.trim().toLowerCase()
@@ -45,7 +123,7 @@ export default function DischargesPage() {
   }, [searchTerm])
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Discharges</h1>
@@ -66,7 +144,7 @@ export default function DischargesPage() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">371</div>
+            <div className="text-2xl font-bold">{stats.total}</div>
             <p className="text-xs text-muted-foreground">all time</p>
           </CardContent>
         </Card>
@@ -76,7 +154,7 @@ export default function DischargesPage() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">28</div>
+            <div className="text-2xl font-bold">{stats.thisMonth}</div>
             <p className="text-xs text-muted-foreground">discharges</p>
           </CardContent>
         </Card>
@@ -86,7 +164,7 @@ export default function DischargesPage() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">7</div>
+            <div className="text-2xl font-bold">{stats.thisWeek}</div>
             <p className="text-xs text-muted-foreground">discharges</p>
           </CardContent>
         </Card>
@@ -96,7 +174,7 @@ export default function DischargesPage() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">3.2</div>
+            <div className="text-2xl font-bold">{stats.avgStay}</div>
             <p className="text-xs text-muted-foreground">days</p>
           </CardContent>
         </Card>
@@ -157,8 +235,8 @@ export default function DischargesPage() {
                           <ViewEditDialog
                             title={`Discharge - ${discharge?.patient_name ?? "Record"}`}
                             description={`Admission: ${discharge?.admission_date ?? "-"}`}
-                            data={discharge as any}
-                            renderViewAction={(data: any) => (
+                            data={discharge}
+                            renderViewAction={(data?: Discharge) => (
                               <div className="grid grid-cols-2 gap-4 text-sm">
                                 <div>
                                   <p className="text-muted-foreground">Patient</p>

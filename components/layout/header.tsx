@@ -33,7 +33,7 @@ export function Header() {
         {/* Quick Action Button */}
         <Button 
           size="sm"
-          className="h-10 rounded-xl bg-primary hover:bg-primary-600 text-white shadow-sm transition-smooth"
+          className="h-10 rounded-xl bg-primary hover:bg-primary/90 text-white shadow-sm transition-smooth"
         >
           <Plus className="mr-2 h-4 w-4" />
           New Appointment

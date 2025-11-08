@@ -86,7 +86,7 @@ export function Sidebar() {
 
       {/* Bottom Section - User Profile */}
       <div className="p-4">
-        <div className="flex items-center gap-3 p-3.5 rounded-xl bg-neutral-100 border border-neutral-200 transition-smooth hover:bg-neutral-50 cursor-pointer">
+        <div className="flex items-center gap-3 p-3.5 rounded-xl bg-neutral-100 border border-neutral-200 transition-smooth hover:bg-neutral-100 cursor-pointer">
           <div className="relative">
             <div className="h-11 w-11 rounded-full bg-gradient-to-br from-primary to-medical-purple flex items-center justify-center text-white font-semibold text-sm shadow-md">
               DA

@@ -266,10 +266,6 @@ export default function PharmacyPage() {
 
   // View options configurations for each tab
   const pharmacyViewConfig: ViewOptionsConfig = {
-    views: [
-      { id: "list", label: "List" },
-      { id: "grid", label: "Grid" },
-    ],
     filters: [
       { id: "low-stock", label: "Low Stock", count: pharmacyItems.filter(item => item.stock_quantity <= item.reorder_level).length },
       { id: "expiring", label: "Expiring Soon", count: expiringSoon },
@@ -286,10 +282,6 @@ export default function PharmacyPage() {
   }
 
   const opticalViewConfig: ViewOptionsConfig = {
-    views: [
-      { id: "list", label: "List" },
-      { id: "grid", label: "Grid" },
-    ],
     filters: [
       { id: "low-stock", label: "Low Stock", count: lowStockOptical },
       { id: "frames", label: "Frames", count: opticalItems.filter(item => item.item_type === "frames").length },
@@ -306,9 +298,6 @@ export default function PharmacyPage() {
   }
 
   const movementsViewConfig: ViewOptionsConfig = {
-    views: [
-      { id: "list", label: "List" },
-    ],
     filters: [
       { id: "purchase", label: "Purchase", count: stockMovements.filter(m => m.type === "purchase").length },
       { id: "sale", label: "Sale", count: stockMovements.filter(m => m.type === "sale").length },
@@ -526,7 +515,7 @@ export default function PharmacyPage() {
   }, [movementsAppliedFilters, movementsCurrentSort, movementsSortDirection, movementsSearchTerm])
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Pharmacy & Inventory</h1>

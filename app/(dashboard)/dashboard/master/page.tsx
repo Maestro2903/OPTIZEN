@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Plus, Search, Database, Edit, Trash2 } from "lucide-react"
+import { Plus, Database, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -16,24 +16,174 @@ import {
 } from "@/components/ui/table"
 import { MasterDataForm } from "@/components/master-data-form"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
+import { useMasterData } from "@/contexts/master-data-context"
+import { useToast } from "@/hooks/use-toast"
+import { Pagination } from "@/components/ui/pagination"
 
-const complaints = ["Redness", "Watering", "Pain", "Blurred Vision", "Double Vision", "Headache"]
-const treatments = ["Eye Drops", "Ointment", "Oral Medication", "Surgery", "Laser Treatment"]
-const medicines = ["Moxifloxacin", "Prednisolone", "Timolol", "Tropicamide", "Cyclopentolate"]
-const surgeries = ["FOREIGNBODY", "Cataract Surgery", "LASIK", "Glaucoma Surgery", "Corneal Transplant"]
-const diagnosticTests = ["Visual Acuity", "Refraction", "IOP", "Fundoscopy", "OCT", "Visual Field"]
-const eyeConditions = ["Cataract", "Glaucoma", "Retinopathy", "Myopia", "Hypermetropia", "Astigmatism"]
-const paymentMethods = ["Cash", "Card", "UPI", "Insurance", "Online"]
-const insuranceProviders = ["ICICI", "HDFC", "Star Health", "Max Bupa", "Religare"]
+// Helper component for rendering a category tab
+function CategoryTab({ 
+  category, 
+  title, 
+  data, 
+  onAdd, 
+  onDelete 
+}: { 
+  category: string
+  title: string
+  data: string[]
+  onAdd: (value: string) => void
+  onDelete: (value: string) => void
+}) {
+  const [searchTerm, setSearchTerm] = React.useState("")
+  const [currentPage, setCurrentPage] = React.useState(1)
+  const [pageSize, setPageSize] = React.useState(50)
+  
+  const filteredData = React.useMemo(() => {
+    if (!searchTerm.trim()) return data
+    const q = searchTerm.trim().toLowerCase()
+    return data.filter(item => item.toLowerCase().includes(q))
+  }, [data, searchTerm])
+
+  const paginatedData = React.useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize
+    const endIndex = startIndex + pageSize
+    return filteredData.slice(startIndex, endIndex)
+  }, [filteredData, currentPage, pageSize])
+
+  const totalPages = Math.ceil(filteredData.length / pageSize)
+
+  React.useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm])
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Input 
+            placeholder={`Search ${title.toLowerCase()}...`} 
+            className="max-w-sm"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <div className="text-sm text-muted-foreground">
+            Total: {filteredData.length} items
+          </div>
+        </div>
+        <MasterDataForm 
+          title={title} 
+          fieldLabel={`${title} Name`}
+          onSubmit={onAdd}
+        >
+          <Button size="sm" className="gap-2">
+            <Plus className="h-4 w-4" />
+            Add {title}
+          </Button>
+        </MasterDataForm>
+      </div>
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>SR. NO.</TableHead>
+              <TableHead>NAME</TableHead>
+              <TableHead>ACTION</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {paginatedData.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                  No {title.toLowerCase()} found
+                </TableCell>
+              </TableRow>
+            ) : (
+              paginatedData.map((item, index) => (
+                <TableRow key={`${category}-${index}`}>
+                  <TableCell>{(currentPage - 1) * pageSize + index + 1}</TableCell>
+                  <TableCell className="font-medium">{item}</TableCell>
+                  <TableCell>
+                    <DeleteConfirmDialog
+                      title={`Delete ${title}`}
+                      description={`Are you sure you want to delete "${item}"? This action cannot be undone.`}
+                      onConfirm={() => onDelete(item)}
+                    >
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" title="Delete">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </DeleteConfirmDialog>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        pageSize={pageSize}
+        totalItems={filteredData.length}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={(newSize) => {
+          setPageSize(newSize)
+          setCurrentPage(1)
+        }}
+      />
+    </div>
+  )
+}
 
 export default function MasterDataPage() {
+  const { masterData, addItem, deleteItem } = useMasterData()
+  const { toast } = useToast()
+
+  const handleAdd = (category: keyof typeof masterData, value: string) => {
+    addItem(category, value)
+    toast({
+      title: "Item Added",
+      description: `${value} has been added successfully.`,
+    })
+  }
+
+  const handleDelete = (category: keyof typeof masterData, value: string) => {
+    deleteItem(category, value)
+    toast({
+      title: "Item Deleted",
+      description: `${value} has been deleted successfully.`,
+      variant: "destructive",
+    })
+  }
+
+  // Category configurations
+  const categories = [
+    { key: 'complaints' as const, label: 'Complaints', title: 'Complaint' },
+    { key: 'treatments' as const, label: 'Treatments', title: 'Treatment' },
+    { key: 'medicines' as const, label: 'Medicines', title: 'Medicine' },
+    { key: 'surgeries' as const, label: 'Surgeries', title: 'Surgery' },
+    { key: 'diagnosticTests' as const, label: 'Tests', title: 'Test' },
+    { key: 'eyeConditions' as const, label: 'Conditions', title: 'Eye Condition' },
+    { key: 'visualAcuity' as const, label: 'Vision', title: 'Visual Acuity' },
+    { key: 'bloodTests' as const, label: 'Blood Tests', title: 'Blood Test' },
+    { key: 'diagnosis' as const, label: 'Diagnosis', title: 'Diagnosis' },
+    { key: 'dosages' as const, label: 'Dosages', title: 'Dosage' },
+    { key: 'routes' as const, label: 'Routes', title: 'Route' },
+    { key: 'eyeSelection' as const, label: 'Eye Options', title: 'Eye Option' },
+    { key: 'visitTypes' as const, label: 'Visit Types', title: 'Visit Type' },
+    { key: 'sacStatus' as const, label: 'SAC Status', title: 'SAC Status' },
+    { key: 'iopRanges' as const, label: 'IOP Ranges', title: 'IOP Range' },
+    { key: 'lensOptions' as const, label: 'Lens', title: 'Lens Option' },
+    { key: 'paymentMethods' as const, label: 'Payment', title: 'Payment Method' },
+    { key: 'insuranceProviders' as const, label: 'Insurance', title: 'Insurance Provider' },
+  ]
+
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Master Data</h1>
           <p className="text-muted-foreground">
-            Manage core data for the system
+            Manage all dropdown options for the system
           </p>
         </div>
       </div>
@@ -45,17 +195,7 @@ export default function MasterDataPage() {
             <Database className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{complaints.length}</div>
-            <p className="text-xs text-muted-foreground">entries</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Treatments</CardTitle>
-            <Database className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{treatments.length}</div>
+            <div className="text-2xl font-bold">{masterData.complaints.length}</div>
             <p className="text-xs text-muted-foreground">entries</p>
           </CardContent>
         </Card>
@@ -65,7 +205,7 @@ export default function MasterDataPage() {
             <Database className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{medicines.length}</div>
+            <div className="text-2xl font-bold">{masterData.medicines.length}</div>
             <p className="text-xs text-muted-foreground">entries</p>
           </CardContent>
         </Card>
@@ -75,8 +215,18 @@ export default function MasterDataPage() {
             <Database className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{surgeries.length}</div>
+            <div className="text-2xl font-bold">{masterData.surgeries.length}</div>
             <p className="text-xs text-muted-foreground">entries</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Categories</CardTitle>
+            <Database className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{categories.length}</div>
+            <p className="text-xs text-muted-foreground">categories</p>
           </CardContent>
         </Card>
       </div>
@@ -84,268 +234,37 @@ export default function MasterDataPage() {
       <Card>
         <CardHeader>
           <CardTitle>Master Data Management</CardTitle>
-          <CardDescription>8 sub-modules for core system data</CardDescription>
+          <CardDescription>{categories.length} categories for all case form dropdowns</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="complaints" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8">
-              <TabsTrigger value="complaints">Complaints</TabsTrigger>
-              <TabsTrigger value="treatments">Treatments</TabsTrigger>
-              <TabsTrigger value="medicines">Medicines</TabsTrigger>
-              <TabsTrigger value="surgeries">Surgeries</TabsTrigger>
-              <TabsTrigger value="tests">Tests</TabsTrigger>
-              <TabsTrigger value="conditions">Conditions</TabsTrigger>
-              <TabsTrigger value="payment">Payment</TabsTrigger>
-              <TabsTrigger value="insurance">Insurance</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 gap-1">
+              {categories.slice(0, 6).map(cat => (
+                <TabsTrigger key={cat.key} value={cat.key}>{cat.label}</TabsTrigger>
+              ))}
+            </TabsList>
+            <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 gap-1 mt-2">
+              {categories.slice(6, 12).map(cat => (
+                <TabsTrigger key={cat.key} value={cat.key}>{cat.label}</TabsTrigger>
+              ))}
+            </TabsList>
+            <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 gap-1 mt-2">
+              {categories.slice(12).map(cat => (
+                <TabsTrigger key={cat.key} value={cat.key}>{cat.label}</TabsTrigger>
+              ))}
             </TabsList>
 
-            <TabsContent value="complaints" className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Input placeholder="Search complaints..." className="max-w-sm" />
-                <MasterDataForm title="Complaint" fieldLabel="Complaint Name">
-                  <Button size="sm" className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Add Complaint
-                  </Button>
-                </MasterDataForm>
-              </div>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>SR. NO.</TableHead>
-                      <TableHead>NAME</TableHead>
-                      <TableHead>ACTION</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {complaints.map((item, index) => (
-                      <TableRow key={index}>
-                        <TableCell>{index + 1}</TableCell>
-                        <TableCell className="font-medium">{item}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <DeleteConfirmDialog
-                              title="Delete Complaint"
-                              description={`Are you sure you want to delete "${item}"? This action cannot be undone.`}
-                              onConfirm={() => console.log("Delete complaint:", item)}
-                            >
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" title="Delete">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </DeleteConfirmDialog>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="treatments" className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Input placeholder="Search treatments..." className="max-w-sm" />
-                <MasterDataForm title="Treatment" fieldLabel="Treatment Name">
-                  <Button size="sm" className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Add Treatment
-                  </Button>
-                </MasterDataForm>
-              </div>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>SR. NO.</TableHead>
-                      <TableHead>NAME</TableHead>
-                      <TableHead>ACTION</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {treatments.map((item, index) => (
-                      <TableRow key={index}>
-                        <TableCell>{index + 1}</TableCell>
-                        <TableCell className="font-medium">{item}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <DeleteConfirmDialog
-                              title="Delete Treatment"
-                              description={`Are you sure you want to delete "${item}"? This action cannot be undone.`}
-                              onConfirm={() => console.log("Delete treatment:", item)}
-                            >
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" title="Delete">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </DeleteConfirmDialog>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="medicines" className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Input placeholder="Search medicines..." className="max-w-sm" />
-                <MasterDataForm title="Medicine" fieldLabel="Medicine Name">
-                  <Button size="sm" className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Add Medicine
-                  </Button>
-                </MasterDataForm>
-              </div>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>SR. NO.</TableHead>
-                      <TableHead>NAME</TableHead>
-                      <TableHead>ACTION</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {medicines.map((item, index) => (
-                      <TableRow key={index}>
-                        <TableCell>{index + 1}</TableCell>
-                        <TableCell className="font-medium">{item}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <DeleteConfirmDialog
-                              title="Delete Medicine"
-                              description={`Are you sure you want to delete "${item}"? This action cannot be undone.`}
-                              onConfirm={() => console.log("Delete medicine:", item)}
-                            >
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" title="Delete">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </DeleteConfirmDialog>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="surgeries" className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Input placeholder="Search surgeries..." className="max-w-sm" />
-                <MasterDataForm title="Surgery" fieldLabel="Surgery Name">
-                  <Button size="sm" className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Add Surgery
-                  </Button>
-                </MasterDataForm>
-              </div>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>SR. NO.</TableHead>
-                      <TableHead>NAME</TableHead>
-                      <TableHead>ACTION</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {surgeries.map((item, index) => (
-                      <TableRow key={index}>
-                        <TableCell>{index + 1}</TableCell>
-                        <TableCell className="font-medium">{item}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <DeleteConfirmDialog
-                              title="Delete Surgery"
-                              description={`Are you sure you want to delete "${item}"? This action cannot be undone.`}
-                              onConfirm={() => console.log("Delete surgery:", item)}
-                            >
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" title="Delete">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </DeleteConfirmDialog>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="tests" className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Input placeholder="Search tests..." className="max-w-sm" />
-                <MasterDataForm title="Diagnostic Test" fieldLabel="Test Name">
-                  <Button size="sm" className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Add Test
-                  </Button>
-                </MasterDataForm>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Diagnostic Tests: {diagnosticTests.join(", ")}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="conditions" className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Input placeholder="Search conditions..." className="max-w-sm" />
-                <MasterDataForm title="Eye Condition" fieldLabel="Condition Name">
-                  <Button size="sm" className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Add Condition
-                  </Button>
-                </MasterDataForm>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Eye Conditions: {eyeConditions.join(", ")}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="payment" className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Input placeholder="Search payment methods..." className="max-w-sm" />
-                <MasterDataForm title="Payment Method" fieldLabel="Method Name">
-                  <Button size="sm" className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Add Payment Method
-                  </Button>
-                </MasterDataForm>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Payment Methods: {paymentMethods.join(", ")}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="insurance" className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Input placeholder="Search insurance providers..." className="max-w-sm" />
-                <MasterDataForm title="Insurance Provider" fieldLabel="Provider Name">
-                  <Button size="sm" className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Add Insurance Provider
-                  </Button>
-                </MasterDataForm>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Insurance Providers: {insuranceProviders.join(", ")}
-              </div>
-            </TabsContent>
+            {categories.map(cat => (
+              <TabsContent key={cat.key} value={cat.key}>
+                <CategoryTab
+                  category={cat.key}
+                  title={cat.title}
+                  data={masterData[cat.key]}
+                  onAdd={(value) => handleAdd(cat.key, value)}
+                  onDelete={(value) => handleDelete(cat.key, value)}
+                />
+              </TabsContent>
+            ))}
           </Tabs>
         </CardContent>
       </Card>
