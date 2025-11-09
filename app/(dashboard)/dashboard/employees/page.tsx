@@ -237,7 +237,7 @@ export default function EmployeesPage() {
             Manage staff members and employee records
           </p>
         </div>
-        <EmployeeForm>
+        <EmployeeForm onSubmit={handleAddEmployee}>
           <Button className="gap-2">
             <Plus className="h-4 w-4" />
             Add Employee
@@ -329,7 +329,10 @@ export default function EmployeesPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <EmployeeForm>
+                          <EmployeeForm
+                            employee={employee}
+                            onSubmit={(values) => handleUpdateEmployee(employee.id, values)}
+                          >
                             <Button
                               variant="ghost"
                               size="icon"

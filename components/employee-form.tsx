@@ -50,22 +50,50 @@ export type EmployeeFormData = z.infer<typeof employeeFormSchema>
 
 interface EmployeeFormProps {
   children: React.ReactNode
+  employee?: any // Employee data for editing
   onSubmit?: (data: EmployeeFormData) => void | Promise<void>
 }
 
-export function EmployeeForm({ children, onSubmit: onSubmitCallback }: EmployeeFormProps) {
+export function EmployeeForm({ children, employee, onSubmit: onSubmitCallback }: EmployeeFormProps) {
   const masterData = useMasterData()
   const [open, setOpen] = React.useState(false)
   const [isLoading, setIsLoading] = React.useState(false)
 
   const form = useForm<z.infer<typeof employeeFormSchema>>({
     resolver: zodResolver(employeeFormSchema),
-    defaultValues: {
+    defaultValues: employee ? {
+      full_name: employee.full_name || '',
+      employee_id: employee.employee_id || '',
+      role: employee.role || '',
+      email: employee.email || '',
+      phone: employee.phone || '',
+      address: employee.address || '',
+      joining_date: employee.hire_date || new Date().toISOString().split("T")[0],
+      qualifications: employee.qualifications || '',
+      permissions: '',
+    } : {
       employee_id: "EMP" + new Date().getFullYear() + "001",
       joining_date: new Date().toISOString().split("T")[0],
       role: "Doctor",
     },
   })
+  
+  // Reset form when employee changes or dialog opens
+  React.useEffect(() => {
+    if (open && employee) {
+      form.reset({
+        full_name: employee.full_name || '',
+        employee_id: employee.employee_id || '',
+        role: employee.role || '',
+        email: employee.email || '',
+        phone: employee.phone || '',
+        address: employee.address || '',
+        joining_date: employee.hire_date || new Date().toISOString().split("T")[0],
+        qualifications: employee.qualifications || '',
+        permissions: '',
+      })
+    }
+  }, [open, employee, form])
 
   // Load roles from master data
   React.useEffect(() => {
@@ -102,9 +130,9 @@ export function EmployeeForm({ children, onSubmit: onSubmitCallback }: EmployeeF
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add Employee</DialogTitle>
+          <DialogTitle>{employee ? 'Edit Employee' : 'Add Employee'}</DialogTitle>
           <DialogDescription>
-            Add new staff member with role and permissions
+            {employee ? 'Update employee information' : 'Add new staff member with role and permissions'}
           </DialogDescription>
         </DialogHeader>
 
