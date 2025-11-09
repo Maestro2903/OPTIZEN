@@ -446,7 +446,23 @@ export default function CasesPage() {
                             <Edit className="h-4 w-4" />
                           </Button>
                         </CaseForm>
-                        <CasePrint caseData={caseItem}>
+                        <CasePrint caseData={{
+                          id: caseItem.id,
+                          case_no: caseItem.case_no,
+                          case_date: caseItem.encounter_date,
+                          patient_name: caseItem.patients?.full_name || 'N/A',
+                          patient_id: caseItem.patients?.patient_id,
+                          gender: caseItem.patients?.gender,
+                          mobile: caseItem.patients?.mobile,
+                          chief_complaint: caseItem.chief_complaint,
+                          history: caseItem.history_of_present_illness,
+                          examination: caseItem.examination_findings,
+                          diagnosis: caseItem.diagnosis,
+                          treatment: caseItem.treatment_plan,
+                          prescription: caseItem.medications_prescribed,
+                          notes: caseItem.follow_up_instructions,
+                          status: caseItem.status,
+                        }}>
                           <Button
                             variant="ghost"
                             size="icon"
