@@ -170,7 +170,7 @@ export async function GET(request: NextRequest) {
       
       // Fallback: Try using database function to bypass cache
       const { data: roleFromRpc, error: rpcError } = await serviceClient
-        .rpc('get_role_by_name', { role_name: roleName })
+        .rpc('get_role_by_name', { role_name: roleName } as any)
       
       if (rpcError || !roleFromRpc || roleFromRpc.length === 0) {
         console.error('❌ RPC fallback also failed:', rpcError)

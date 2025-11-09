@@ -358,7 +358,7 @@ export default function OperationsPage() {
                               operation_date: operation.operation_date,
                               operation_time: operation.begin_time,
                               operation_type: operation.operation_name,
-                              surgeon: operation.doctor_id || 'N/A',
+                              surgeon: 'N/A',
                               status: operation.status,
                               duration: operation.end_time ?
                                 `${operation.begin_time} - ${operation.end_time}` : undefined,
