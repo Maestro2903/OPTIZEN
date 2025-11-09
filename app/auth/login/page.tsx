@@ -3,6 +3,7 @@
 import * as React from "react"
 import { useRouter } from "next/navigation"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -63,11 +64,17 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo/Branding */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600 text-white mb-4">
-            <Eye className="h-8 w-8" />
+          <div className="inline-flex items-center justify-center w-20 h-20 mb-4">
+            <Image 
+              src="/logo.svg" 
+              alt="EyeZen Logo" 
+              width={80} 
+              height={80}
+              priority
+            />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">OpticNauts</h1>
-          <p className="text-sm text-muted-foreground mt-1">Eye Care Hospital Management System</p>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">EyeZen</h1>
+          <p className="text-sm text-muted-foreground mt-1">Hospital Management System</p>
         </div>
 
         {/* Login Card */}
@@ -86,7 +93,7 @@ export default function LoginPage() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="admin@eyecare.com"
+                  placeholder="admin@eyezen.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -152,15 +159,6 @@ export default function LoginPage() {
                 )}
               </Button>
             </form>
-
-            {/* Demo Credentials */}
-            <div className="mt-6 p-4 rounded-lg bg-blue-50 border border-blue-200">
-              <p className="text-xs font-medium text-blue-900 mb-2">Demo Credentials:</p>
-              <div className="space-y-1 text-xs text-blue-700">
-                <p><span className="font-medium">Email:</span> admin@eyecare.com</p>
-                <p><span className="font-medium">Password:</span> [Your password]</p>
-              </div>
-            </div>
           </CardContent>
         </Card>
 

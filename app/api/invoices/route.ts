@@ -1,10 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { requirePermission } from '@/lib/middleware/rbac'
 import { parseArrayParam, validateArrayParam, applyArrayFilter } from '@/lib/utils/query-params'
 
 // GET /api/invoices - List invoices with pagination, filtering, and sorting
 export async function GET(request: NextRequest) {
   try {
+    // RBAC check
+    const authCheck = await requirePermission('invoices', 'view')
+    if (!authCheck.authorized) return authCheck.response
+    const { context } = authCheck
+
     const supabase = createClient()
     const { searchParams } = new URL(request.url)
 

@@ -2,8 +2,8 @@ import type { Metadata } from "next"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "Eye Care Hospital CRM",
-  description: "Comprehensive Hospital Management System for Eye Care Clinics",
+  title: "EyeZen",
+  description: "Comprehensive Hospital Management System",
 }
 
 export default function RootLayout({

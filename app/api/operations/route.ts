@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { requirePermission } from '@/lib/middleware/rbac'
 import * as z from 'zod'
 
 // Validation schema for operations
@@ -25,75 +26,12 @@ const operationSchema = z.object({
   status: z.enum(['scheduled', 'in-progress', 'completed', 'cancelled']).default('scheduled'),
 })
 
-async function authenticate(request: NextRequest) {
-  const supabase = createClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    return null
-  }
-
-  return user
-}
-
-async function authorize(user: any, action: string) {
-  // Check if user has appropriate permissions for operations
-  const allowedRoles = ['admin', 'doctor', 'nurse']
-
-  // Validate user object
-  if (!user) {
-    return false
-  }
-
-  // Get user role(s) - accumulate from all sources
-  let userRoles: string[] = []
-
-  // Check if user has a single role (string)
-  if (user.role && typeof user.role === 'string') {
-    userRoles.push(user.role.toLowerCase())
-  }
-
-  // Check if user has multiple roles (array) - concatenate to existing
-  if (user.roles && Array.isArray(user.roles)) {
-    userRoles = userRoles.concat(user.roles.map((role: string) => role.toLowerCase()))
-  }
-
-  // Check metadata for roles (common in auth providers)
-  if (user.user_metadata?.role && typeof user.user_metadata.role === 'string') {
-    userRoles.push(user.user_metadata.role.toLowerCase())
-  }
-
-  if (user.app_metadata?.role && typeof user.app_metadata.role === 'string') {
-    userRoles.push(user.app_metadata.role.toLowerCase())
-  }
-
-  // Deduplicate roles and normalize allowed roles to lowercase
-  const uniqueUserRoles = [...new Set(userRoles)]
-  const normalizedAllowedRoles = allowedRoles.map(role => role.toLowerCase())
-
-  // Check if user has any allowed role
-  return uniqueUserRoles.some(role => normalizedAllowedRoles.includes(role))
-}
-
 export async function GET(request: NextRequest) {
   try {
-    // Authentication check
-    const user = await authenticate(request)
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: 'Authentication required' },
-        { status: 401 }
-      )
-    }
-
-    // Authorization check
-    const authorized = await authorize(user, 'read_operations')
-    if (!authorized) {
-      return NextResponse.json(
-        { success: false, error: 'Insufficient permissions' },
-        { status: 403 }
-      )
-    }
+    // RBAC check
+    const authCheck = await requirePermission('operations', 'view')
+    if (!authCheck.authorized) return authCheck.response
+    const { context } = authCheck
 
     const supabase = createClient()
     const { searchParams } = new URL(request.url)
@@ -207,23 +145,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Authentication check
-    const user = await authenticate(request)
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: 'Authentication required' },
-        { status: 401 }
-      )
-    }
-
-    // Authorization check
-    const authorized = await authorize(user, 'create_operations')
-    if (!authorized) {
-      return NextResponse.json(
-        { success: false, error: 'Insufficient permissions' },
-        { status: 403 }
-      )
-    }
+    // RBAC check
+    const authCheck = await requirePermission('operations', 'create')
+    if (!authCheck.authorized) return authCheck.response
+    const { context } = authCheck
 
     const body = await request.json()
 

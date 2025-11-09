@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { requirePermission } from '@/lib/middleware/rbac'
 
 // Allowed master data categories
 const ALLOWED_CATEGORIES = [
@@ -54,6 +55,11 @@ const ALLOWED_CATEGORIES = [
 // GET /api/master-data - List master data items by category with pagination
 export async function GET(request: NextRequest) {
   try {
+    // RBAC check
+    const authCheck = await requirePermission('master_data', 'view')
+    if (!authCheck.authorized) return authCheck.response
+    const { context } = authCheck
+
     const supabase = createClient()
     const { searchParams } = new URL(request.url)
 
@@ -196,14 +202,12 @@ export async function GET(request: NextRequest) {
 // POST /api/master-data - Create a new master data item
 export async function POST(request: NextRequest) {
   try {
+    // RBAC check
+    const authCheck = await requirePermission('master_data', 'create')
+    if (!authCheck.authorized) return authCheck.response
+    const { context } = authCheck
+
     const supabase = createClient()
-
-    // Check authentication (bypass in development)
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session && process.env.NODE_ENV === 'production') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const body = await request.json()
 
     // Validate required fields

@@ -1,9 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { requirePermission } from '@/lib/middleware/rbac'
 
 // GET /api/pharmacy - List pharmacy items with stock information
 export async function GET(request: NextRequest) {
   try {
+    // RBAC check
+    const authCheck = await requirePermission('pharmacy', 'view')
+    if (!authCheck.authorized) return authCheck.response
+    const { context } = authCheck
+
     const supabase = createClient()
     const { searchParams } = new URL(request.url)
 

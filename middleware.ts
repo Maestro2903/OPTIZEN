@@ -4,11 +4,6 @@ import type { NextRequest } from 'next/server'
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
-  
-  // TEMPORARILY DISABLED FOR DEVELOPMENT
-  // Uncomment below when Supabase authentication is configured
-  
-  /*
   const supabase = createMiddlewareClient({ req, res })
 
   const {
@@ -23,6 +18,39 @@ export async function middleware(req: NextRequest) {
       redirectUrl.searchParams.set('redirectedFrom', req.nextUrl.pathname)
       return NextResponse.redirect(redirectUrl)
     }
+
+    // Check for super_admin access to /dashboard/access-control
+    if (req.nextUrl.pathname.startsWith('/dashboard/access-control')) {
+      // Try to get role from session metadata first (faster)
+      const userRole = session.user.user_metadata?.role || session.user.app_metadata?.role
+      
+      // If role not in session, fall back to DB lookup
+      if (!userRole) {
+        const { data: user, error } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', session.user.id)
+          .single()
+
+        if (error) {
+          console.error('Error fetching user role in middleware:', error)
+          const redirectUrl = req.nextUrl.clone()
+          redirectUrl.pathname = '/dashboard/cases'
+          redirectUrl.searchParams.set('error', 'db_error')
+          return NextResponse.redirect(redirectUrl)
+        }
+
+        if (!user || user.role !== 'super_admin') {
+          const redirectUrl = req.nextUrl.clone()
+          redirectUrl.pathname = '/dashboard/cases'
+          return NextResponse.redirect(redirectUrl)
+        }
+      } else if (userRole !== 'super_admin') {
+        const redirectUrl = req.nextUrl.clone()
+        redirectUrl.pathname = '/dashboard/cases'
+        return NextResponse.redirect(redirectUrl)
+      }
+    }
   }
 
   // Protect patient portal routes
@@ -34,11 +62,12 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // Redirect authenticated users away from auth pages
-  if (req.nextUrl.pathname.startsWith('/auth') && session) {
-    return NextResponse.redirect(new URL('/dashboard', req.url))
+  // Redirect authenticated users away from auth pages (except logout)
+  if (req.nextUrl.pathname.startsWith('/auth') && 
+      !req.nextUrl.pathname.startsWith('/auth/logout') && 
+      session) {
+    return NextResponse.redirect(new URL('/dashboard/cases', req.url))
   }
-  */
 
   return res
 }

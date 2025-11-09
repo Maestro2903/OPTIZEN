@@ -1,9 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { parseArrayParam, validateArrayParam, applyArrayFilter } from '@/lib/utils/query-params'
+import { requirePermission } from '@/lib/middleware/rbac'
 
 // GET /api/cases - List cases with pagination, filtering, and sorting
 export async function GET(request: NextRequest) {
+  // Authorization check
+  const authCheck = await requirePermission('cases', 'view')
+  if (!authCheck.authorized) return authCheck.response
+  const { context } = authCheck
+
   try {
     const supabase = createClient()
     const { searchParams } = new URL(request.url)
@@ -38,12 +44,6 @@ export async function GET(request: NextRequest) {
     ]
     if (!allowedSortColumns.includes(sortBy)) {
       sortBy = 'created_at'
-    }
-
-    // Check authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Calculate offset for pagination
@@ -131,15 +131,13 @@ export async function GET(request: NextRequest) {
 
 // POST /api/cases - Create a new case/encounter
 export async function POST(request: NextRequest) {
+  // Authorization check
+  const authCheck = await requirePermission('cases', 'create')
+  if (!authCheck.authorized) return authCheck.response
+  const { context } = authCheck
+
   try {
     const supabase = createClient()
-
-    // Check authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const body = await request.json()
 
     // Validate required fields

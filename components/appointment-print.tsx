@@ -157,7 +157,7 @@ export function AppointmentPrint({ appointment, children }: AppointmentPrintProp
               <strong>Phone:</strong> +91 98765 43210<br />
               <strong>Address:</strong> 123 Medical Plaza, Healthcare District, City - 123456<br />
               <strong>Emergency:</strong> +91 98765 43211 (24/7)<br />
-              <strong>Email:</strong> appointments@eyecare.com
+              <strong>Email:</strong> appointments@eyezen.com
             </div>
           </div>
 

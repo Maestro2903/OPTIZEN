@@ -2,30 +2,12 @@
 
 import * as React from "react"
 import {
-  AudioWaveform,
-  BookOpen,
-  Bot,
-  Command,
-  Frame,
-  GalleryVerticalEnd,
-  Map,
-  PieChart,
-  Settings2,
   Users,
   Calendar,
   FileText,
   CreditCard,
   Package,
   Stethoscope,
-  BarChart3,
-  Settings,
-  Eye,
-  BellRing,
-  Search,
-  Sparkles,
-  ChevronRight,
-  MoreHorizontal,
-  Plus,
   FolderOpen,
   Award,
   Database,
@@ -33,121 +15,155 @@ import {
   Clock,
   TrendingUp,
   Bed,
+  Shield,
 } from "lucide-react"
+import { Logo } from "@/components/logo"
 
 import { NavMain } from "@/components/nav-main"
-import { NavProjects } from "@/components/nav-projects"
 import { NavUser } from "@/components/nav-user"
-import { TeamSwitcher } from "@/components/team-switcher"
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarMenuAction,
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarGroupContent,
+  useSidebar,
 } from "@/components/ui/sidebar"
+import { useUser } from "@/contexts/user-context"
 
-// This is sample data.
-const data = {
-  user: {
-    name: "Dr. Admin",
-    email: "admin@eyecare.com",
-    avatar: "/avatars/shadcn.jpg",
+// Map navigation items to their required permissions
+const navigationItems = [
+  {
+    title: "Patients",
+    url: "/dashboard/patients",
+    icon: Users,
+    requiredPermission: "patients" as const,
   },
-  teams: [
-    {
-      name: "OpticNauts",
-      logo: Eye,
-      plan: "Ophthalmology System",
-    },
-  ],
-  navMain: [
-    {
-      title: "Patients",
-      url: "/dashboard/patients",
-      icon: Users,
-    },
-    {
-      title: "Appointments",
-      url: "/dashboard/appointments",
-      icon: Calendar,
-    },
-    {
-      title: "Cases",
-      url: "/dashboard/cases",
-      icon: FolderOpen,
-    },
-    {
-      title: "Operations",
-      url: "/dashboard/operations",
-      icon: Stethoscope,
-    },
-    {
-      title: "Discharges",
-      url: "/dashboard/discharges",
-      icon: FileText,
-    },
-    {
-      title: "Billing",
-      url: "/dashboard/billing",
-      icon: CreditCard,
-    },
-    {
-      title: "Pharmacy",
-      url: "/dashboard/pharmacy",
-      icon: Package,
-    },
-    {
-      title: "Revenue",
-      url: "/dashboard/revenue",
-      icon: TrendingUp,
-    },
-    {
-      title: "Beds",
-      url: "/dashboard/beds",
-      icon: Bed,
-    },
-    {
-      title: "Certificates",
-      url: "/dashboard/certificates",
-      icon: Award,
-    },
-    {
-      title: "Attendance",
-      url: "/dashboard/attendance",
-      icon: Clock,
-    },
-    {
-      title: "Employees",
-      url: "/dashboard/employees",
-      icon: UserCog,
-    },
-    {
-      title: "Master",
-      url: "/dashboard/master",
-      icon: Database,
-    },
-  ],
-}
+  {
+    title: "Appointments",
+    url: "/dashboard/appointments",
+    icon: Calendar,
+    requiredPermission: "appointments" as const,
+  },
+  {
+    title: "Cases",
+    url: "/dashboard/cases",
+    icon: FolderOpen,
+    requiredPermission: "cases" as const,
+  },
+  {
+    title: "Operations",
+    url: "/dashboard/operations",
+    icon: Stethoscope,
+    requiredPermission: "operations" as const,
+  },
+  {
+    title: "Discharges",
+    url: "/dashboard/discharges",
+    icon: FileText,
+    requiredPermission: "discharges" as const,
+  },
+  {
+    title: "Billing",
+    url: "/dashboard/billing",
+    icon: CreditCard,
+    requiredPermission: "invoices" as const,
+  },
+  {
+    title: "Pharmacy",
+    url: "/dashboard/pharmacy",
+    icon: Package,
+    requiredPermission: "pharmacy" as const,
+  },
+  {
+    title: "Revenue",
+    url: "/dashboard/revenue",
+    icon: TrendingUp,
+    requiredPermission: "revenue" as const,
+  },
+  {
+    title: "Beds",
+    url: "/dashboard/beds",
+    icon: Bed,
+    requiredPermission: "beds" as const,
+  },
+  {
+    title: "Certificates",
+    url: "/dashboard/certificates",
+    icon: Award,
+    requiredPermission: "certificates" as const,
+  },
+  {
+    title: "Attendance",
+    url: "/dashboard/attendance",
+    icon: Clock,
+    requiredPermission: "attendance" as const,
+  },
+  {
+    title: "Employees",
+    url: "/dashboard/employees",
+    icon: UserCog,
+    requiredPermission: "employees" as const,
+  },
+  {
+    title: "Master Data",
+    url: "/dashboard/master",
+    icon: Database,
+    requiredPermission: "master_data" as const,
+  },
+]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { hasModuleAccess, isSuperAdmin, loading } = useUser()
+  const { state } = useSidebar()
+
+  // Filter navigation items based on user permissions
+  const filteredNavItems = React.useMemo(() => {
+    // During loading, show all items in disabled state
+    if (loading) {
+      const allItems = [...navigationItems]
+      return allItems
+    }
+    
+    const items = navigationItems.filter(item => 
+      hasModuleAccess(item.requiredPermission)
+    )
+
+    // Add Access Control for super admin
+    if (isSuperAdmin()) {
+      items.push({
+        title: "Access Control",
+        url: "/dashboard/access-control",
+        icon: Shield,
+        requiredPermission: "roles" as const,
+      })
+    }
+
+    return items
+  }, [hasModuleAccess, isSuperAdmin, loading])
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <TeamSwitcher teams={data.teams} />
+        {state === "collapsed" ? (
+          <div className="flex items-center justify-center py-4">
+            <Logo className="size-8" width={32} height={32} />
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 px-3 py-4">
+            <Logo className="size-10 shrink-0" width={40} height={40} />
+            <div className="grid flex-1 text-left text-sm leading-tight">
+              <span className="truncate font-semibold text-base">EyeZen</span>
+              <span className="truncate text-xs text-muted-foreground">Hospital Management</span>
+            </div>
+          </div>
+        )}
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={filteredNavItems} isLoading={loading} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

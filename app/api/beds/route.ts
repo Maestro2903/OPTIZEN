@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { requirePermission } from '@/lib/middleware/rbac'
 import * as z from 'zod'
 
 // Validation schema for beds
@@ -14,42 +15,12 @@ const bedSchema = z.object({
   description: z.string().optional(),
 })
 
-async function authenticate(request: NextRequest) {
-  const supabase = createClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    return null
-  }
-
-  return user
-}
-
-async function authorize(user: any, action: string) {
-  // Check if user has appropriate permissions for bed management
-  const allowedRoles = ['admin', 'nurse', 'receptionist']
-  return true // Placeholder - implement proper role checking
-}
-
 export async function GET(request: NextRequest) {
   try {
-    // Authentication check
-    const user = await authenticate(request)
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: 'Authentication required' },
-        { status: 401 }
-      )
-    }
-
-    // Authorization check
-    const authorized = await authorize(user, 'read_beds')
-    if (!authorized) {
-      return NextResponse.json(
-        { success: false, error: 'Insufficient permissions' },
-        { status: 403 }
-      )
-    }
+    // RBAC check
+    const authCheck = await requirePermission('beds', 'view')
+    if (!authCheck.authorized) return authCheck.response
+    const { context } = authCheck
 
     const supabase = createClient()
     const { searchParams } = new URL(request.url)
@@ -177,6 +148,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // RBAC check
+    const authCheck = await requirePermission('beds', 'create')
+    if (!authCheck.authorized) return authCheck.response
+    const { context } = authCheck
+
     const supabase = createClient()
     const body = await request.json()
 
