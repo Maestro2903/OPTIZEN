@@ -210,8 +210,8 @@ export default function DischargesPage() {
                                   <p>{data?.discharge_date ?? '-'}</p>
                                 </div>
                                 <div className="col-span-2">
-                                  <p className="text-muted-foreground">Notes</p>
-                                  <p className="text-muted-foreground">{data?.notes ?? '-'}</p>
+                                  <p className="text-muted-foreground">Discharge Summary</p>
+                                  <p className="text-muted-foreground">{data?.discharge_summary ?? '-'}</p>
                                 </div>
                               </div>
                             )}
