@@ -82,7 +82,7 @@ WHERE r.name = 'super_admin';
 
 **Fix:**
 1. Click the red "Log out" button
-2. Log back in with: `superadmin@eyecare.local` / `Test@123456`
+2. Log back in with your dev superadmin credentials (see your environment configuration or internal secrets manager)
 3. Try again
 
 ### Issue 5: 403 Forbidden Error
@@ -180,7 +180,7 @@ npm run dev
 
 # 4. Login again
 # Go to http://localhost:3000/auth/login
-# Login with: superadmin@eyecare.local / Test@123456
+# Login with your dev superadmin credentials
 
 # 5. Go to Access Control
 # Should work now

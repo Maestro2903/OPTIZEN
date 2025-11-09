@@ -43,9 +43,10 @@ export function NavMain({
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <div className="flex items-center gap-2 opacity-50">
+                  <div className="flex items-center gap-2 opacity-50" aria-busy="true" aria-label="loading">
                     {item.icon && <item.icon />}
                     <span>{item.title}</span>
+                    {item.badge && <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>}
                   </div>
                 ) : (
                   <Link href={item.url}>

@@ -113,16 +113,24 @@ async function createTestUser(userData) {
       if (authError.message.includes('already registered')) {
         console.log(`⚠️  User already exists in auth: ${userData.email}`);
         
-        // Get existing user
-        const { data: users } = await supabase.auth.admin.listUsers();
-        const existingUser = users.users.find(u => u.email === userData.email);
+        // Get existing user by querying public.users table instead of listing all auth users
+        const { data: existingPublicUser, error: publicUserError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('email', userData.email)
+          .single();
         
-        if (!existingUser) {
+        if (publicUserError || !existingPublicUser) {
           console.error(`❌ Could not find existing user: ${userData.email}`);
           return null;
         }
         
-        authData.user = existingUser;
+        // Initialize authData properly if it's undefined
+        if (!authData) {
+          authData = { user: { id: existingPublicUser.id, email: userData.email } };
+        } else {
+          authData.user = { id: existingPublicUser.id, email: userData.email };
+        }
       } else {
         throw authError;
       }
@@ -172,13 +180,16 @@ async function createTestUser(userData) {
     } else if (userRoles && userRoles.length > 0) {
       console.log(`✅ Role synced: ${userRoles[0].roles.name}`);
       
-      // Get permission count
-      const { data: permCount } = await supabase
+      // Get permission count - read count from response root, not data
+      const { count: permCount, error: permCountError } = await supabase
         .from('role_permissions')
         .select('id', { count: 'exact', head: true })
         .eq('role_id', userRoles[0].role_id);
       
-      console.log(`✅ Permissions assigned: ${permCount?.count || 0}`);
+      if (permCountError) {
+        console.warn(`⚠️  Could not fetch permission count: ${permCountError.message}`);
+      }
+      console.log(`✅ Permissions assigned: ${permCount || 0}`);
     } else {
       console.warn(`⚠️  No role assignment found - trigger may not have fired`);
     }
@@ -244,10 +255,14 @@ async function verifyPermissions() {
     
     let permCount = 0;
     if (roleData) {
-      const { count } = await supabase
+      const { count, error: countError } = await supabase
         .from('role_permissions')
         .select('id', { count: 'exact', head: true })
         .eq('role_id', roleData.id);
+      
+      if (countError) {
+        console.warn(`⚠️  Could not fetch permission count for ${roleName}: ${countError.message}`);
+      }
       permCount = count || 0;
     }
     

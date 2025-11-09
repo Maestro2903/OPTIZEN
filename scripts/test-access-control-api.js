@@ -1,9 +1,21 @@
 const { createClient } = require('@supabase/supabase-js')
 require('dotenv').config({ path: '.env.local' })
 
+// Validate environment variables
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('❌ Missing required environment variables')
+  if (!supabaseUrl) console.error('   - NEXT_PUBLIC_SUPABASE_URL is not set')
+  if (!supabaseServiceKey) console.error('   - SUPABASE_SERVICE_ROLE_KEY is not set')
+  console.error('\nPlease ensure these variables are set in .env.local')
+  process.exit(1)
+}
+
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  supabaseUrl,
+  supabaseServiceKey,
   {
     auth: {
       autoRefreshToken: false,

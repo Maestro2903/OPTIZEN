@@ -121,7 +121,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const filteredNavItems = React.useMemo(() => {
     // During loading, show all items in disabled state
     if (loading) {
-      const allItems = [...navigationItems]
+      const allItems = navigationItems.map(item => ({ ...item, disabled: true }))
       return allItems
     }
     

@@ -73,74 +73,108 @@ export default function AccessControlPage() {
 
   // Fetch permissions from database when role changes
   useEffect(() => {
-    fetchPermissions()
-  }, [selectedRole])
-
-  const fetchPermissions = async () => {
-    console.log('📥 Fetching permissions from database for role:', selectedRole)
-    setLoading(true)
+    const controller = new AbortController()
+    const signal = controller.signal
     
-    try {
-      const response = await fetch(`/api/access-control?role=${selectedRole}`)
+    const fetchPermissions = async () => {
+      console.log('📥 Fetching permissions from database for role:', selectedRole)
+      setLoading(true)
       
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error('❌ Failed to fetch permissions:', response.status, errorData)
+      try {
+        const response = await fetch(`/api/access-control?role=${selectedRole}`, { signal })
         
-        toast({
-          title: 'Error Loading Permissions',
-          description: errorData.error || 'Failed to load permissions',
-          variant: 'destructive',
-        })
+        // Check if request was aborted
+        if (signal.aborted) {
+          console.log('⚠️ Request aborted for role:', selectedRole)
+          return
+        }
         
-        // Initialize empty permissions
-        const emptyPermissions: Record<string, boolean> = {}
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          console.error('❌ Failed to fetch permissions:', response.status, errorData)
+          
+          if (!signal.aborted) {
+            toast({
+              title: 'Error Loading Permissions',
+              description: errorData.error || 'Failed to load permissions',
+              variant: 'destructive',
+            })
+            
+            // Initialize empty permissions
+            const emptyPermissions: Record<string, boolean> = {}
+            MODULES.forEach(module => {
+              ACTIONS.forEach(action => {
+                const key = `${module.key}-${action.key}`
+                emptyPermissions[key] = false
+              })
+            })
+            setPermissions(emptyPermissions)
+          }
+          return
+        }
+
+        const data = await response.json()
+        
+        // Check again if aborted after receiving data
+        if (signal.aborted) {
+          console.log('⚠️ Request aborted after receiving data for role:', selectedRole)
+          return
+        }
+        
+        console.log('✅ Fetched permissions:', data)
+        
+        // Convert nested structure to flat key-value pairs
+        const flatPermissions: Record<string, boolean> = {}
         MODULES.forEach(module => {
           ACTIONS.forEach(action => {
             const key = `${module.key}-${action.key}`
-            emptyPermissions[key] = false
+            flatPermissions[key] = data.permissions?.[module.key]?.[action.key] === true
           })
         })
-        setPermissions(emptyPermissions)
-        return
+        
+        console.log('📊 Loaded permissions count:', Object.values(flatPermissions).filter(v => v).length)
+        setPermissions(flatPermissions)
+        
+      } catch (error: any) {
+        // Don't show errors for aborted requests
+        if (error.name === 'AbortError' || signal.aborted) {
+          console.log('⚠️ Fetch aborted for role:', selectedRole)
+          return
+        }
+        
+        console.error('💥 Error fetching permissions:', error)
+        
+        if (!signal.aborted) {
+          toast({
+            title: 'Connection Error',
+            description: 'Failed to connect to database',
+            variant: 'destructive',
+          })
+          
+          // Initialize empty permissions
+          const emptyPermissions: Record<string, boolean> = {}
+          MODULES.forEach(module => {
+            ACTIONS.forEach(action => {
+              const key = `${module.key}-${action.key}`
+              emptyPermissions[key] = false
+            })
+          })
+          setPermissions(emptyPermissions)
+        }
+      } finally {
+        if (!signal.aborted) {
+          setLoading(false)
+        }
       }
-
-      const data = await response.json()
-      console.log('✅ Fetched permissions:', data)
-      
-      // Convert nested structure to flat key-value pairs
-      const flatPermissions: Record<string, boolean> = {}
-      MODULES.forEach(module => {
-        ACTIONS.forEach(action => {
-          const key = `${module.key}-${action.key}`
-          flatPermissions[key] = data.permissions?.[module.key]?.[action.key] === true
-        })
-      })
-      
-      console.log('📊 Loaded permissions count:', Object.values(flatPermissions).filter(v => v).length)
-      setPermissions(flatPermissions)
-      
-    } catch (error) {
-      console.error('💥 Error fetching permissions:', error)
-      toast({
-        title: 'Connection Error',
-        description: 'Failed to connect to database',
-        variant: 'destructive',
-      })
-      
-      // Initialize empty permissions
-      const emptyPermissions: Record<string, boolean> = {}
-      MODULES.forEach(module => {
-        ACTIONS.forEach(action => {
-          const key = `${module.key}-${action.key}`
-          emptyPermissions[key] = false
-        })
-      })
-      setPermissions(emptyPermissions)
-    } finally {
-      setLoading(false)
     }
-  }
+    
+    fetchPermissions()
+    
+    // Cleanup: abort the fetch when role changes or component unmounts
+    return () => {
+      controller.abort()
+    }
+  }, [selectedRole, toast])
 
   // Handle toggle with proper state management
   const handleToggle = async (module: string, action: string) => {

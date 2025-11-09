@@ -2,6 +2,102 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, createServiceClient } from '@/lib/supabase/server'
 
 /**
+ * Helper function to fetch and transform permissions for a role
+ */
+async function fetchAndTransformPermissions(serviceClient: any, roleId: string) {
+  const { data: permissions, error: permError } = await serviceClient
+    .from('role_permissions')
+    .select(`
+      permission_id,
+      permissions (
+        id,
+        action,
+        resource,
+        description
+      )
+    `)
+    .eq('role_id', roleId)
+
+  if (permError) {
+    console.error('Error fetching permissions:', permError)
+    return {
+      error: permError,
+      status: 500
+    }
+  }
+
+  // Transform permissions into a structured format
+  const permissionsMap: Record<string, Record<string, boolean>> = {}
+  
+  if (permissions) {
+    permissions.forEach((rp: any) => {
+      const perm = rp.permissions
+      if (perm) {
+        if (!permissionsMap[perm.resource]) {
+          permissionsMap[perm.resource] = {}
+        }
+        permissionsMap[perm.resource][perm.action] = true
+      }
+    })
+  }
+
+  return { permissionsMap }
+}
+
+/**
+ * Helper function to toggle (insert/delete) a permission
+ */
+async function togglePermission(
+  serviceClient: any,
+  roleId: string,
+  permissionId: string,
+  enabled: boolean,
+  userId: string
+) {
+  if (enabled) {
+    // Add permission
+    console.log('➕ Adding permission to database...')
+    const { data: insertData, error: insertError } = await serviceClient
+      .from('role_permissions')
+      .insert({
+        role_id: roleId,
+        permission_id: permissionId,
+        created_by: userId
+      })
+      .select()
+
+    if (insertError && insertError.code !== '23505') { // Ignore unique constraint errors
+      console.error('❌ Error adding permission:', insertError)
+      return {
+        error: insertError,
+        success: false
+      }
+    }
+    console.log('✅ Permission added successfully:', insertData)
+  } else {
+    // Remove permission
+    console.log('➖ Removing permission from database...')
+    const { data: deleteData, error: deleteError } = await serviceClient
+      .from('role_permissions')
+      .delete()
+      .eq('role_id', roleId)
+      .eq('permission_id', permissionId)
+      .select()
+
+    if (deleteError) {
+      console.error('❌ Error removing permission:', deleteError)
+      return {
+        error: deleteError,
+        success: false
+      }
+    }
+    console.log('✅ Permission removed successfully:', deleteData)
+  }
+
+  return { success: true }
+}
+
+/**
  * GET: Fetch all role permissions for a specific role
  * SECURITY: Only super_admin can access - they have full control to view/edit all permissions
  */
@@ -92,91 +188,37 @@ export async function GET(request: NextRequest) {
       const roleDataFromRpc = roleFromRpc[0]
       console.log('✅ Role found via RPC fallback:', roleDataFromRpc.name)
       
-      // Continue with roleDataFromRpc as roleData
-      const { data: permissions, error: permError } = await serviceClient
-        .from('role_permissions')
-        .select(`
-          permission_id,
-          permissions (
-            id,
-            action,
-            resource,
-            description
-          )
-        `)
-        .eq('role_id', roleDataFromRpc.id)
-
-      if (permError) {
-        console.error('Error fetching permissions:', permError)
+      // Use helper function to fetch and transform permissions
+      const result = await fetchAndTransformPermissions(serviceClient, roleDataFromRpc.id)
+      
+      if (result.error) {
         return NextResponse.json(
           { error: 'Failed to fetch permissions' },
-          { status: 500 }
+          { status: result.status || 500 }
         )
-      }
-
-      // Transform permissions into a structured format
-      const permissionsMap: Record<string, Record<string, boolean>> = {}
-      
-      if (permissions) {
-        permissions.forEach((rp: any) => {
-          const perm = rp.permissions
-          if (perm) {
-            if (!permissionsMap[perm.resource]) {
-              permissionsMap[perm.resource] = {}
-            }
-            permissionsMap[perm.resource][perm.action] = true
-          }
-        })
       }
 
       return NextResponse.json({
         role: roleDataFromRpc,
-        permissions: permissionsMap
+        permissions: result.permissionsMap
       })
     }
 
     // Fetch all permissions for this role using the role ID
     // This connects the Permission Matrix UI to the actual database role IDs
-    // Use service client for consistent cache-free access
-    const { data: permissions, error: permError } = await serviceClient
-      .from('role_permissions')
-      .select(`
-        permission_id,
-        permissions (
-          id,
-          action,
-          resource,
-          description
-        )
-      `)
-      .eq('role_id', roleData.id)
-
-    if (permError) {
-      console.error('Error fetching permissions:', permError)
+    // Use service client for consistent cache-free access and helper function
+    const result = await fetchAndTransformPermissions(serviceClient, roleData.id)
+    
+    if (result.error) {
       return NextResponse.json(
         { error: 'Failed to fetch permissions' },
-        { status: 500 }
+        { status: result.status || 500 }
       )
-    }
-
-    // Transform permissions into a structured format
-    const permissionsMap: Record<string, Record<string, boolean>> = {}
-    
-    if (permissions) {
-      permissions.forEach((rp: any) => {
-        const perm = rp.permissions
-        if (perm) {
-          if (!permissionsMap[perm.resource]) {
-            permissionsMap[perm.resource] = {}
-          }
-          permissionsMap[perm.resource][perm.action] = true
-        }
-      })
     }
 
     return NextResponse.json({
       role: roleData,
-      permissions: permissionsMap
+      permissions: result.permissionsMap
     })
   } catch (error) {
     console.error('Error in GET /api/access-control:', error)
@@ -324,45 +366,20 @@ export async function POST(request: NextRequest) {
       const permDataFromRpc = permFromRpc[0]
       console.log('✅ Permission found via RPC:', permDataFromRpc.resource, permDataFromRpc.action, 'ID:', permDataFromRpc.id)
       
-      // Continue with insert/delete using the permission from RPC
-      if (enabled) {
-        // Add permission
-        console.log('➕ Adding permission to database...')
-        const { data: insertData, error: insertError } = await serviceClient
-          .from('role_permissions')
-          .insert({
-            role_id: roleData.id,
-            permission_id: permDataFromRpc.id,
-            created_by: session.user.id
-          })
-          .select()
+      // Use helper function to toggle permission
+      const toggleResult = await togglePermission(
+        serviceClient,
+        roleData.id,
+        permDataFromRpc.id,
+        enabled,
+        session.user.id
+      )
 
-        if (insertError && insertError.code !== '23505') { // Ignore unique constraint errors
-          console.error('❌ Error adding permission:', insertError)
-          return NextResponse.json(
-            { error: 'Failed to add permission', details: insertError.message },
-            { status: 500 }
-          )
-        }
-        console.log('✅ Permission added successfully:', insertData)
-      } else {
-        // Remove permission
-        console.log('➖ Removing permission from database...')
-        const { data: deleteData, error: deleteError } = await serviceClient
-          .from('role_permissions')
-          .delete()
-          .eq('role_id', roleData.id)
-          .eq('permission_id', permDataFromRpc.id)
-          .select()
-
-        if (deleteError) {
-          console.error('❌ Error removing permission:', deleteError)
-          return NextResponse.json(
-            { error: 'Failed to remove permission', details: deleteError.message },
-            { status: 500 }
-          )
-        }
-        console.log('✅ Permission removed successfully:', deleteData)
+      if (!toggleResult.success) {
+        return NextResponse.json(
+          { error: `Failed to ${enabled ? 'add' : 'remove'} permission`, details: toggleResult.error?.message },
+          { status: 500 }
+        )
       }
 
       console.log('✅ Operation completed successfully')
@@ -374,44 +391,20 @@ export async function POST(request: NextRequest) {
     }
     console.log('✅ Permission found:', permData.resource, permData.action, 'ID:', permData.id)
 
-    if (enabled) {
-      // Add permission using service client for cache-free operation
-      console.log('➕ Adding permission to database...')
-      const { data: insertData, error: insertError } = await serviceClient
-        .from('role_permissions')
-        .insert({
-          role_id: roleData.id,
-          permission_id: permData.id,
-          created_by: session.user.id
-        })
-        .select()
+    // Use helper function to toggle permission
+    const toggleResult = await togglePermission(
+      serviceClient,
+      roleData.id,
+      permData.id,
+      enabled,
+      session.user.id
+    )
 
-      if (insertError && insertError.code !== '23505') { // Ignore unique constraint errors
-        console.error('❌ Error adding permission:', insertError)
-        return NextResponse.json(
-          { error: 'Failed to add permission', details: insertError.message },
-          { status: 500 }
-        )
-      }
-      console.log('✅ Permission added successfully:', insertData)
-    } else {
-      // Remove permission using service client for cache-free operation
-      console.log('➖ Removing permission from database...')
-      const { data: deleteData, error: deleteError } = await serviceClient
-        .from('role_permissions')
-        .delete()
-        .eq('role_id', roleData.id)
-        .eq('permission_id', permData.id)
-        .select()
-
-      if (deleteError) {
-        console.error('❌ Error removing permission:', deleteError)
-        return NextResponse.json(
-          { error: 'Failed to remove permission', details: deleteError.message },
-          { status: 500 }
-        )
-      }
-      console.log('✅ Permission removed successfully:', deleteData)
+    if (!toggleResult.success) {
+      return NextResponse.json(
+        { error: `Failed to ${enabled ? 'add' : 'remove'} permission`, details: toggleResult.error?.message },
+        { status: 500 }
+      )
     }
 
     console.log('✅ Operation completed successfully')

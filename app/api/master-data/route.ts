@@ -58,7 +58,6 @@ export async function GET(request: NextRequest) {
     // RBAC check
     const authCheck = await requirePermission('master_data', 'view')
     if (!authCheck.authorized) return authCheck.response
-    const { context } = authCheck
 
     const supabase = createClient()
     const { searchParams } = new URL(request.url)
@@ -103,11 +102,6 @@ export async function GET(request: NextRequest) {
       sortBy = 'sort_order'
     }
 
-    // Check authentication (bypass in development)
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session && process.env.NODE_ENV === 'production') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
 
     // If no category specified, return all categories with counts
     if (!category) {
@@ -291,7 +285,7 @@ export async function POST(request: NextRequest) {
           is_active,
           sort_order: finalSortOrder,
           metadata,
-          created_by: session?.user?.id || '00000000-0000-0000-0000-000000000000'
+          created_by: context.user.id
         }
       ])
       .select()

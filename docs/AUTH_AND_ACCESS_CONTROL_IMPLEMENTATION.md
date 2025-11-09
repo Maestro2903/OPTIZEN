@@ -24,11 +24,14 @@ A comprehensive role-based access control (RBAC) system has been implemented wit
 ### 2. RBAC Middleware Updates
 **File:** `lib/middleware/rbac.ts`
 
-- ✅ Updated `PERMISSIONS` object with all modules (see permission matrix below for complete list)
-- ✅ Added **PRINT** permission action to all modules
-- ✅ Added `hasModuleAccess()` helper function
-- ✅ Updated `hasPermission()` to support 'print' action
-- ✅ Updated `requirePermission()` to support 'print' action
+- ✅ Re-exports RBAC functionality from `@/lib/rbac-client` package
+- ✅ The canonical `PERMISSIONS` matrix is now defined in `@/lib/rbac-client` (not locally in middleware)
+- ✅ `lib/middleware/rbac.ts` acts as an adapter layer exposing:
+  - `hasModuleAccess()` - Check if user can view a module
+  - `hasPermission()` - Check specific resource/action permission (supports 'view', 'create', 'edit', 'delete', 'print')
+  - `requirePermission()` - Middleware function for API route protection
+- ✅ All permission checks reference the imported PERMISSIONS matrix from rbac-client
+- ✅ Supports **PRINT** permission action across all modules
 
 ### 3. Authentication Middleware
 **File:** `middleware.ts`

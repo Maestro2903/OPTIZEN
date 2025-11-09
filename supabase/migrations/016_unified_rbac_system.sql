@@ -144,12 +144,13 @@ WHERE r.name = 'super_admin'
 ON CONFLICT (role_id, permission_id) DO NOTHING;
 
 -- HOSPITAL ADMIN (admin): Full access except delete on sensitive modules
+-- Note: Only excluding delete for resources that actually have permissions defined
 INSERT INTO public.role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM public.roles r
 CROSS JOIN public.permissions p
 WHERE r.name = 'admin'
-AND NOT (p.action = 'delete' AND p.resource IN ('employees', 'revenue', 'attendance', 'roles', 'users'))
+AND NOT (p.action = 'delete' AND p.resource IN ('employees', 'revenue', 'attendance'))
 ON CONFLICT (role_id, permission_id) DO NOTHING;
 
 -- DOCTOR (ophthalmologist/optometrist): Full access to medical modules
@@ -191,12 +192,13 @@ AND (
 ON CONFLICT (role_id, permission_id) DO NOTHING;
 
 -- BILLING STAFF (finance): Financial operations
+-- Note: 'reports' resource doesn't exist in permissions table, using only defined resources
 INSERT INTO public.role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM public.roles r
 CROSS JOIN public.permissions p
 WHERE r.name = 'finance'
-AND p.resource IN ('revenue', 'invoices', 'reports', 'patients')
+AND p.resource IN ('revenue', 'invoices', 'patients')
 ON CONFLICT (role_id, permission_id) DO NOTHING;
 
 -- PHARMACY: Full pharmacy module access
@@ -241,14 +243,15 @@ BEGIN
 
     -- If role exists in roles table, sync to user_roles
     IF role_uuid IS NOT NULL THEN
-        -- Delete existing role assignments for this user
-        DELETE FROM public.user_roles WHERE user_id = NEW.id;
-        
-        -- Insert new role assignment
-        INSERT INTO public.user_roles (user_id, role_id, scope_type, is_active)
-        VALUES (NEW.id, role_uuid, 'global', NEW.is_active)
+        -- Only sync the global scope role, preserve other scoped roles
+        -- Use INSERT ... ON CONFLICT to upsert the global role assignment
+        INSERT INTO public.user_roles (user_id, role_id, scope_type, scope_id, is_active)
+        VALUES (NEW.id, role_uuid, 'global', NULL, NEW.is_active)
         ON CONFLICT (user_id, role_id, scope_type, scope_id) 
-        DO UPDATE SET is_active = NEW.is_active, updated_at = NOW();
+        DO UPDATE SET 
+            role_id = EXCLUDED.role_id,
+            is_active = EXCLUDED.is_active, 
+            updated_at = NOW();
     END IF;
 
     RETURN NEW;
@@ -311,19 +314,21 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Sync existing users to user_roles table
-INSERT INTO public.user_roles (user_id, role_id, scope_type, is_active)
+-- Use upsert to handle role changes (not just new users)
+INSERT INTO public.user_roles (user_id, role_id, scope_type, scope_id, is_active)
 SELECT 
     u.id,
     r.id,
     'global',
+    NULL,
     u.is_active
 FROM public.users u
 JOIN public.roles r ON r.name = u.role
-WHERE NOT EXISTS (
-    SELECT 1 FROM public.user_roles ur 
-    WHERE ur.user_id = u.id AND ur.role_id = r.id
-)
-ON CONFLICT (user_id, role_id, scope_type, scope_id) DO NOTHING;
+ON CONFLICT (user_id, scope_type, scope_id) 
+DO UPDATE SET 
+    role_id = EXCLUDED.role_id,
+    is_active = EXCLUDED.is_active,
+    updated_at = NOW();
 
 -- Add comments
 COMMENT ON FUNCTION public.sync_user_role() IS 'Automatically syncs users.role column with user_roles table';
