@@ -209,7 +209,6 @@ export default function AccessControlPage() {
           title: `❌ Failed (${response.status})`,
           description: errorData.error || 'Could not save to database',
           variant: 'destructive',
-          duration: 5000,
         })
         return
       }
@@ -226,7 +225,6 @@ export default function AccessControlPage() {
       toast({
         title: '✅ Saved',
         description: `${module}.${action} is now ${newValue ? 'enabled' : 'disabled'}`,
-        duration: 2000,
       })
       
     } catch (error) {
@@ -236,7 +234,6 @@ export default function AccessControlPage() {
         title: '💥 Connection Error',
         description: error instanceof Error ? error.message : 'Network error',
         variant: 'destructive',
-        duration: 5000,
       })
     } finally {
       // Remove from saving set
