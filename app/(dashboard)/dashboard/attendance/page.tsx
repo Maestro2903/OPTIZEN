@@ -415,7 +415,7 @@ export default function AttendancePage() {
                           <AttendancePrint attendance={{
                             id: record.id,
                             employee_name: record.employees?.full_name || 'N/A',
-                            employee_id: record.employee_id,
+                            employee_id: record.employees?.employee_id || record.user_id,
                             date: record.attendance_date,
                             check_in_time: record.check_in_time,
                             check_out_time: record.check_out_time,
