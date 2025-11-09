@@ -46,8 +46,17 @@ function generateSecurePassword(length = 16) {
     password += allChars[crypto.randomInt(allChars.length)]
   }
   
-  // Shuffle the password
-  return password.split('').sort(() => crypto.randomInt(3) - 1).join('')
+  // Shuffle using Fisher-Yates algorithm for uniform distribution
+  const arr = password.split('')
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(i + 1)
+    // Swap arr[i] and arr[j]
+    const temp = arr[i]
+    arr[i] = arr[j]
+    arr[j] = temp
+  }
+  
+  return arr.join('')
 }
 
 // Prompt user for confirmation

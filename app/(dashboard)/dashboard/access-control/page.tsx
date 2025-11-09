@@ -62,6 +62,18 @@ const ROLES = [
   { value: 'lab_technician', label: 'Lab Technician', color: 'bg-indigo-500' },
 ]
 
+// Helper function to build empty permissions object
+function buildEmptyPermissions() {
+  const emptyPermissions: Record<string, boolean> = {}
+  MODULES.forEach(module => {
+    ACTIONS.forEach(action => {
+      const key = `${module.key}-${action.key}`
+      emptyPermissions[key] = false
+    })
+  })
+  return emptyPermissions
+}
+
 export default function AccessControlPage() {
   const router = useRouter()
   const { toast } = useToast()
@@ -100,15 +112,7 @@ export default function AccessControlPage() {
               variant: 'destructive',
             })
             
-            // Initialize empty permissions
-            const emptyPermissions: Record<string, boolean> = {}
-            MODULES.forEach(module => {
-              ACTIONS.forEach(action => {
-                const key = `${module.key}-${action.key}`
-                emptyPermissions[key] = false
-              })
-            })
-            setPermissions(emptyPermissions)
+            setPermissions(buildEmptyPermissions())
           }
           return
         }
@@ -151,15 +155,7 @@ export default function AccessControlPage() {
             variant: 'destructive',
           })
           
-          // Initialize empty permissions
-          const emptyPermissions: Record<string, boolean> = {}
-          MODULES.forEach(module => {
-            ACTIONS.forEach(action => {
-              const key = `${module.key}-${action.key}`
-              emptyPermissions[key] = false
-            })
-          })
-          setPermissions(emptyPermissions)
+          setPermissions(buildEmptyPermissions())
         }
       } finally {
         if (!signal.aborted) {
