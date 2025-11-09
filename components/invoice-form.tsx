@@ -171,7 +171,7 @@ export function InvoiceForm({ children, invoiceData, mode = "add", onSubmit: onS
     if (open) {
       masterData.fetchCategory('paymentMethods')
     }
-  }, [open])
+  }, [open, masterData])
 
   // Watch patient selection
   const selectedPatientId = form.watch("patient_id")

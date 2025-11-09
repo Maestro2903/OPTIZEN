@@ -140,7 +140,7 @@ export function CertificateForms({ children }: CertificateFormsProps) {
     if (open) {
       masterData.fetchMultiple(['visualAcuity', 'colorVisionTypes', 'drivingFitnessTypes', 'diagnosis'])
     }
-  }, [open])
+  }, [open, masterData])
 
   function onSubmitFitness(values: z.infer<typeof fitnessCertSchema>) {
     console.log("Fitness:", values)

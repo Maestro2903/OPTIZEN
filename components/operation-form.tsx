@@ -219,7 +219,7 @@ export function OperationForm({ children, onSubmit, operationData, mode = "creat
     if (open) {
       masterData.fetchMultiple(['diagnosis', 'anesthesiaTypes'])
     }
-  }, [open])
+  }, [open, masterData])
 
   // Load surgery types from master data
   React.useEffect(() => {

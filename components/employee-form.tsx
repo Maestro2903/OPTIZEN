@@ -100,7 +100,7 @@ export function EmployeeForm({ children, employee, onSubmit: onSubmitCallback }:
     if (open) {
       masterData.fetchCategory('roles')
     }
-  }, [open])
+  }, [open, masterData])
 
   async function onSubmit(values: z.infer<typeof employeeFormSchema>) {
     if (onSubmitCallback) {

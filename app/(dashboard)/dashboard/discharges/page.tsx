@@ -275,7 +275,23 @@ export default function DischargesPage() {
                           <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit">
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <DischargePrint discharge={discharge}>
+                          <DischargePrint discharge={{
+                            id: discharge.id,
+                            discharge_no: discharge.id.slice(0, 8).toUpperCase(),
+                            discharge_date: discharge.discharge_date,
+                            patient_name: discharge.patients?.full_name || 'N/A',
+                            patient_id: discharge.patients?.patient_id,
+                            admission_date: discharge.admission_date,
+                            case_no: discharge.cases?.case_no,
+                            primary_diagnosis: discharge.final_diagnosis,
+                            discharge_summary: discharge.discharge_summary,
+                            discharge_medications: discharge.medications,
+                            follow_up_instructions: discharge.instructions,
+                            follow_up_date: discharge.follow_up_date,
+                            final_condition: discharge.condition_on_discharge,
+                            vital_signs: discharge.vitals_at_discharge,
+                            procedures_performed: discharge.treatment_given,
+                          }}>
                             <Button variant="ghost" size="icon" className="h-8 w-8" title="Print Discharge Summary">
                               <Printer className="h-4 w-4" />
                             </Button>

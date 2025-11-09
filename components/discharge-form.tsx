@@ -79,7 +79,7 @@ export function DischargeForm({ children }: DischargeFormProps) {
     if (open) {
       masterData.fetchMultiple(['diagnosis', 'anesthesiaTypes', 'treatments', 'medicines'])
     }
-  }, [open])
+  }, [open, masterData])
 
   // Load data when dialog opens
   React.useEffect(() => {

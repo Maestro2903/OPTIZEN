@@ -119,7 +119,7 @@ export default function AttendancePage() {
       }
     }
     loadSummary()
-  }, [selectedDate])
+  }, [selectedDate, toast])
 
   // Handle search with debouncing
   React.useEffect(() => {

@@ -3,6 +3,7 @@
 import * as React from "react"
 import { Printer } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import "@/styles/print.css"
 
 interface PrintLayoutProps {
   documentType: string
@@ -75,13 +76,10 @@ export function PrintLayout({
             minute: '2-digit'
           })}</div>
           <div style={{ fontSize: '8pt', marginTop: '5pt' }}>
-            This is a computer-generated document. For verification, please contact the clinic.
-          </div>
+          This is a computer-generated document. For verification, please contact the clinic.
         </div>
       </div>
-
-      {/* Load print styles */}
-      <link href="/styles/print.css" rel="stylesheet" media="print" />
+    </div>
     </>
   )
 }
