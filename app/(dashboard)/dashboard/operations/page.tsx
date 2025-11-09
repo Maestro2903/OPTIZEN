@@ -351,18 +351,18 @@ export default function OperationsPage() {
                             <Edit className="h-4 w-4" />
                           </Button>
                           <OperationPrint
-                            operation={{
+                            operation=                            {{
                               id: operation.id,
                               patient_name: operation.patients?.full_name || 'Unknown Patient',
                               patient_id: operation.patient_id,
                               operation_date: operation.operation_date,
                               operation_time: operation.begin_time,
                               operation_type: operation.operation_name,
-                              surgeon: operation.doctor_name,
+                              surgeon: operation.doctor_id || 'N/A',
                               status: operation.status,
                               duration: operation.end_time ?
                                 `${operation.begin_time} - ${operation.end_time}` : undefined,
-                              notes: operation.notes
+                              notes: operation.operation_notes
                             }}
                           >
                             <Button
