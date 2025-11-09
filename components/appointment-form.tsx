@@ -108,7 +108,7 @@ export function AppointmentForm({ children, appointmentData, mode = "create", on
     loadPatients()
   }, [isOpen, toast])
 
-  // Load doctors from employees
+  // Load doctors from employees (all active staff members)
   React.useEffect(() => {
     const controller = new AbortController()
 
@@ -116,23 +116,24 @@ export function AppointmentForm({ children, appointmentData, mode = "create", on
       if (!isOpen) return
       setLoadingDoctors(true)
       try {
-        const response = await employeesApi.list({ role: 'Doctor', limit: 1000, status: 'active' })
+        // Load all active employees - staff includes all roles
+        const response = await employeesApi.list({ limit: 1000, status: 'active' })
         if (response.success && response.data && !controller.signal.aborted) {
           setDoctors(
-            response.data.map((doctor) => ({
-              value: doctor.id,
-              label: `${doctor.full_name} - ${doctor.role}`,
+            response.data.map((employee) => ({
+              value: employee.id,
+              label: `${employee.full_name} - ${employee.role}`,
             }))
           )
         }
       } catch (error: any) {
         if (error.name === 'AbortError') return
-        console.error("Error loading doctors:", error)
+        console.error("Error loading staff:", error)
         if (!controller.signal.aborted) {
           toast({
             variant: "destructive",
             title: "Error",
-            description: "Failed to load doctors list."
+            description: "Failed to load staff list."
           })
         }
       } finally {

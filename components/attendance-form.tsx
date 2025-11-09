@@ -82,7 +82,7 @@ export function AttendanceForm({ children, attendanceData, mode = "create", onSu
           setStaffMembers(
             response.data.map((employee) => ({
               value: employee.id,
-              label: `${employee.full_name} - ${employee.role} (${employee.employee_id})`,
+              label: `${employee.full_name} - ${employee.role}`,
             }))
           )
         }
