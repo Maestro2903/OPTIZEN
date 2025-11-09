@@ -28,14 +28,7 @@ import { ViewEditDialog } from "@/components/view-edit-dialog"
 import { DischargePrint } from "@/components/discharge-print"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Textarea } from "@/components/ui/textarea"
-
-interface Discharge {
-  id: string
-  patient_name: string
-  admission_date: string
-  discharge_date: string
-  notes?: string
-}
+import { type Discharge } from "@/lib/services/api"
 
 // Sample data removed for production - should be fetched from API
 const discharges: Discharge[] = [
@@ -124,10 +117,10 @@ export default function DischargesPage() {
     if (!searchTerm.trim()) return dischargeList
     const q = searchTerm.trim().toLowerCase()
     return dischargeList.filter(d =>
-      (d.patient_name || '').toLowerCase().includes(q) ||
+      (d.patients?.full_name || '').toLowerCase().includes(q) ||
       (d.admission_date || '').toLowerCase().includes(q) ||
       (d.discharge_date || '').toLowerCase().includes(q) ||
-      (d.notes || '').toLowerCase().includes(q)
+      (d.discharge_summary || '').toLowerCase().includes(q)
     )
   }, [searchTerm, dischargeList])
 
@@ -194,19 +187,19 @@ export default function DischargesPage() {
                     <TableRow key={index}>
                       <TableCell>{index + 1}</TableCell>
                       <TableCell>{discharge.admission_date}</TableCell>
-                      <TableCell className="font-medium">{discharge.patient_name}</TableCell>
+                      <TableCell className="font-medium">{discharge.patients?.full_name || 'N/A'}</TableCell>
                       <TableCell>{discharge.discharge_date}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <ViewEditDialog
-                            title={`Discharge - ${discharge?.patient_name ?? "Record"}`}
+                            title={`Discharge - ${discharge?.patients?.full_name ?? "Record"}`}
                             description={`Admission: ${discharge?.admission_date ?? "-"}`}
                             data={discharge}
                             renderViewAction={(data?: Discharge) => (
                               <div className="grid grid-cols-2 gap-4 text-sm">
                                 <div>
                                   <p className="text-muted-foreground">Patient</p>
-                                  <p className="font-medium">{data?.patient_name ?? '-'}</p>
+                                  <p className="font-medium">{data?.patients?.full_name ?? '-'}</p>
                                 </div>
                                 <div>
                                   <p className="text-muted-foreground">Admission Date</p>
