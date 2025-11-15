@@ -563,7 +563,9 @@ export async function DELETE(
 ) {
   // Authorization check
   const authCheck = await requirePermission('cases', 'delete')
-  if (!authCheck.authorized) return authCheck.response
+  if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
   
   try {
     const supabase = createClient()

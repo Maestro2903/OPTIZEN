@@ -7,7 +7,9 @@ import { requirePermission } from '@/lib/middleware/rbac'
 export async function GET(request: NextRequest) {
   // Authorization check
   const authCheck = await requirePermission('employees', 'view')
-  if (!authCheck.authorized) return authCheck.response
+  if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
   const { context } = authCheck
 
   try {
@@ -139,7 +141,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   // Authorization check
   const authCheck = await requirePermission('employees', 'create')
-  if (!authCheck.authorized) return authCheck.response
+  if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
   const { context } = authCheck
 
   try {

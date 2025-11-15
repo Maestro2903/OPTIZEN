@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
   try {
     const authResult = await requirePermission('attendance', 'create')
     if (!authResult.authorized) {
-      return authResult.response
+      return (authResult as { authorized: false; response: NextResponse }).response
     }
 
     const supabase = createClient()

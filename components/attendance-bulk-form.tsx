@@ -74,7 +74,7 @@ export function BulkAttendanceForm({ children, onSubmit: onSubmitProp }: BulkAtt
       setLoadingEmployees(true)
       try {
         const response = await employeesApi.list({ 
-          is_active: true, 
+          status: 'active', 
           limit: 100,
           search: searchTerm || undefined
         })

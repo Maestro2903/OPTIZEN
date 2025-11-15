@@ -7,7 +7,9 @@ export async function GET(request: NextRequest) {
   try {
     // RBAC check
     const authCheck = await requirePermission('finance', 'view')
-    if (!authCheck.authorized) return authCheck.response
+    if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
 
     const supabase = createClient()
     const { searchParams } = new URL(request.url)

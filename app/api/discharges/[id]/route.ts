@@ -8,7 +8,9 @@ export async function GET(
 ) {
   // Authorization check
   const authCheck = await requirePermission('discharges', 'view')
-  if (!authCheck.authorized) return authCheck.response
+  if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
 
   try {
     const supabase = createClient()
@@ -73,7 +75,9 @@ export async function PUT(
 ) {
   // Authorization check
   const authCheck = await requirePermission('discharges', 'edit')
-  if (!authCheck.authorized) return authCheck.response
+  if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
 
   try {
     const supabase = createClient()
@@ -157,7 +161,9 @@ export async function DELETE(
 ) {
   // Authorization check
   const authCheck = await requirePermission('discharges', 'delete')
-  if (!authCheck.authorized) return authCheck.response
+  if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
 
   try {
     const supabase = createClient()

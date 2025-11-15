@@ -9,7 +9,9 @@ export async function PATCH(
 ) {
   // Authorization check - need edit permission
   const authCheck = await requirePermission('appointments', 'edit')
-  if (!authCheck.authorized) return authCheck.response
+  if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
   const { context } = authCheck
 
   try {

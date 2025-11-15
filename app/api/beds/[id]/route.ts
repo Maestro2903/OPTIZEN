@@ -9,7 +9,9 @@ export async function PUT(
   try {
     // RBAC check
     const authCheck = await requirePermission('beds', 'edit')
-    if (!authCheck.authorized) return authCheck.response
+    if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
 
     const supabase = createClient()
     const { id } = await params
@@ -107,7 +109,9 @@ export async function DELETE(
   try {
     // RBAC check
     const authCheck = await requirePermission('beds', 'delete')
-    if (!authCheck.authorized) return authCheck.response
+    if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
 
     const supabase = createClient()
     const { id } = await params

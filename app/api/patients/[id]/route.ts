@@ -9,7 +9,9 @@ export async function GET(
 ) {
   // Authorization check
   const authCheck = await requirePermission('patients', 'view')
-  if (!authCheck.authorized) return authCheck.response
+  if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
   const { context } = authCheck
 
   try {
@@ -55,7 +57,9 @@ export async function PUT(
 ) {
   // Authorization check
   const authCheck = await requirePermission('patients', 'edit')
-  if (!authCheck.authorized) return authCheck.response
+  if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
   const { context } = authCheck
 
   try {
@@ -166,7 +170,9 @@ export async function DELETE(
 ) {
   // Authorization check
   const authCheck = await requirePermission('patients', 'delete')
-  if (!authCheck.authorized) return authCheck.response
+  if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
   const { context } = authCheck
 
   try {

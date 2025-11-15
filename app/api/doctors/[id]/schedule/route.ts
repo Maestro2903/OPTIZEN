@@ -9,7 +9,9 @@ export async function GET(
 ) {
   // Authorization check
   const authCheck = await requirePermission('appointments', 'view')
-  if (!authCheck.authorized) return authCheck.response
+  if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
   const { context } = authCheck
 
   try {

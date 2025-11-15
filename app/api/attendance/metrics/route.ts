@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
     // Check permission
     const authResult = await requirePermission('attendance', 'view')
     if (!authResult.authorized) {
-      return authResult.response
+      return (authResult as { authorized: false; response: NextResponse }).response
     }
 
     const supabase = createClient()

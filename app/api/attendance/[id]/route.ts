@@ -10,7 +10,7 @@ export async function GET(
   try {
     const authResult = await requirePermission('attendance', 'view')
     if (!authResult.authorized) {
-      return authResult.response
+      return (authResult as { authorized: false; response: NextResponse }).response
     }
 
     const supabase = createClient()
@@ -69,7 +69,7 @@ export async function PUT(
   try {
     const authResult = await requirePermission('attendance', 'edit')
     if (!authResult.authorized) {
-      return authResult.response
+      return (authResult as { authorized: false; response: NextResponse }).response
     }
 
     const supabase = createClient()
@@ -210,7 +210,7 @@ export async function DELETE(
   try {
     const authResult = await requirePermission('attendance', 'delete')
     if (!authResult.authorized) {
-      return authResult.response
+      return (authResult as { authorized: false; response: NextResponse }).response
     }
 
     const supabase = createClient()

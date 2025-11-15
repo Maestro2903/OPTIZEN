@@ -9,7 +9,9 @@ export async function GET(
   try {
     // RBAC check
     const authCheck = await requirePermission('certificates', 'view')
-    if (!authCheck.authorized) return authCheck.response
+    if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
     
     const supabase = createClient()
     const { id } = params
@@ -70,7 +72,9 @@ export async function PUT(
   try {
     // RBAC check
     const authCheck = await requirePermission('certificates', 'edit')
-    if (!authCheck.authorized) return authCheck.response
+    if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
     
     const supabase = createClient()
     const { id } = await params
@@ -151,7 +155,9 @@ export async function DELETE(
   try {
     // RBAC check
     const authCheck = await requirePermission('certificates', 'delete')
-    if (!authCheck.authorized) return authCheck.response
+    if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
     
     const supabase = createClient()
     const { id } = await params

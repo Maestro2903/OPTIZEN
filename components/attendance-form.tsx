@@ -80,7 +80,7 @@ export function AttendanceForm({ children, attendanceData, mode = "create", onSu
       setLoadingStaff(true)
       try {
         const response = await employeesApi.list({ 
-          is_active: true, 
+          status: 'active', 
           limit: 50,
           search: staffSearch || undefined
         })

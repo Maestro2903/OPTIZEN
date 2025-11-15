@@ -100,7 +100,9 @@ export async function GET(
   try {
     // RBAC check
     const authCheck = await requirePermission('operations', 'view')
-    if (!authCheck.authorized) return authCheck.response
+    if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
 
     const { id } = await params
 
@@ -182,7 +184,9 @@ export async function PUT(
   try {
     // RBAC check
     const authCheck = await requirePermission('operations', 'edit')
-    if (!authCheck.authorized) return authCheck.response
+    if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
     const { context } = authCheck
 
     const { id } = await params
@@ -345,7 +349,9 @@ export async function DELETE(
   try {
     // RBAC check
     const authCheck = await requirePermission('operations', 'delete')
-    if (!authCheck.authorized) return authCheck.response
+    if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
     const { context } = authCheck
 
     const { id } = await params

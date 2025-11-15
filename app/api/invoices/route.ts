@@ -8,7 +8,9 @@ export async function GET(request: NextRequest) {
   try {
     // RBAC check
     const authCheck = await requirePermission('invoices', 'view')
-    if (!authCheck.authorized) return authCheck.response
+    if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
     const { context } = authCheck
 
     const supabase = createClient()
@@ -159,7 +161,9 @@ export async function POST(request: NextRequest) {
   try {
     // RBAC check
     const authCheck = await requirePermission('invoices', 'create')
-    if (!authCheck.authorized) return authCheck.response
+    if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
     const { context } = authCheck
 
     const supabase = createClient()

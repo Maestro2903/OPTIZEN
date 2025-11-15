@@ -11,7 +11,9 @@ import { requirePermission } from '@/lib/middleware/rbac'
 export async function GET(request: NextRequest) {
   // Authorization check - requires patients view permission
   const authCheck = await requirePermission('patients', 'view')
-  if (!authCheck.authorized) return authCheck.response
+  if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
 
   try {
     const supabase = createClient()
