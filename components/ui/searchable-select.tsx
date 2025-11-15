@@ -28,6 +28,10 @@ interface SearchableSelectProps {
   disabled?: boolean
   className?: string
   loading?: boolean
+  dropdownClassName?: string
+  dropdownMinWidth?: string | number
+  id?: string
+  name?: string
 }
 
 export function SearchableSelect({
@@ -40,6 +44,10 @@ export function SearchableSelect({
   disabled = false,
   className,
   loading = false,
+  dropdownClassName,
+  dropdownMinWidth,
+  id,
+  name,
 }: SearchableSelectProps) {
   const [open, setOpen] = React.useState(false)
   const [searchQuery, setSearchQuery] = React.useState("")
@@ -78,6 +86,8 @@ export function SearchableSelect({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
+          id={id}
+          name={name}
           type="button"
           variant="outline"
           role="combobox"
@@ -107,23 +117,46 @@ export function SearchableSelect({
           </span>
           <div className="flex items-center gap-1 ml-2">
             {value && !loading && (
-              <button
-                type="button"
+              <span
+                role="button"
+                tabIndex={0}
                 onClick={handleClear}
-                className="rounded-sm opacity-70 hover:opacity-100 hover:bg-accent p-0.5 transition-opacity"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    handleClear(e as any)
+                  }
+                }}
+                className="rounded-sm opacity-70 hover:opacity-100 hover:bg-accent p-0.5 transition-opacity cursor-pointer"
                 aria-label="Clear selection"
               >
                 <X className="h-3.5 w-3.5" />
-              </button>
+              </span>
             )}
             <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
           </div>
         </Button>
       </PopoverTrigger>
       <PopoverContent 
-        className="w-[--radix-popover-trigger-width] p-0" 
+        className={cn(
+          "p-0",
+          dropdownMinWidth && !dropdownClassName && "!w-auto",
+          !dropdownMinWidth && !dropdownClassName && "w-[--radix-popover-trigger-width]",
+          dropdownClassName
+        )}
         align="start"
         sideOffset={4}
+        style={
+          dropdownMinWidth && !dropdownClassName
+            ? { 
+                minWidth: typeof dropdownMinWidth === "number" ? `${dropdownMinWidth}px` : dropdownMinWidth,
+                width: "auto",
+                maxWidth: "min(90vw, 400px)"
+              }
+            : !dropdownMinWidth && !dropdownClassName
+            ? { width: "var(--radix-popover-trigger-width)" }
+            : undefined
+        }
       >
         <div className="flex flex-col bg-popover text-popover-foreground rounded-md border shadow-md">
           {/* Search Input */}
@@ -183,7 +216,7 @@ export function SearchableSelect({
                             isSelected ? "opacity-100" : "opacity-0"
                           )}
                         />
-                        <span className="flex-1 truncate text-left">
+                        <span className="flex-1 text-left whitespace-normal break-words">
                           {option.label}
                         </span>
                       </button>

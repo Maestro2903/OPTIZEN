@@ -47,15 +47,28 @@ const appointmentSchema = z.object({
 })
 
 interface AppointmentFormProps {
-  children: React.ReactNode
+  children?: React.ReactNode
   appointmentData?: any
   mode?: "create" | "edit"
   onSubmit?: (data: any) => Promise<void>
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
-export function AppointmentForm({ children, appointmentData, mode = "create", onSubmit: onSubmitProp }: AppointmentFormProps) {
+export function AppointmentForm({ 
+  children, 
+  appointmentData, 
+  mode = "create", 
+  onSubmit: onSubmitProp,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange 
+}: AppointmentFormProps) {
   const { toast } = useToast()
-  const [isOpen, setIsOpen] = React.useState(false)
+  const [internalOpen, setInternalOpen] = React.useState(false)
+  
+  // Use controlled state if provided, otherwise use internal state
+  const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen
+  const setIsOpen = controlledOnOpenChange || setInternalOpen
   
   // State for searchable dropdowns
   const [patients, setPatients] = React.useState<SearchableSelectOption[]>([])
@@ -194,7 +207,10 @@ export function AppointmentForm({ children, appointmentData, mode = "create", on
         return
       }
 
+      console.log('Form submitting with values:', values)
       await onSubmitProp(values)
+      
+      // Only close dialog and reset form if submission was successful
       setIsOpen(false)
 
       // Reset form to original values in edit mode, defaults in create mode
@@ -213,23 +229,20 @@ export function AppointmentForm({ children, appointmentData, mode = "create", on
         form.reset()
       }
 
-      toast({
-        title: "Success",
-        description: mode === "edit" ? "Appointment updated successfully." : "Appointment booked successfully."
-      })
-    } catch (error) {
+      // Success toast is shown by the page component's onSuccess callback
+    } catch (error: any) {
       console.error("Error submitting appointment:", error)
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to save appointment. Please try again."
+        description: error?.message || error?.error || "Failed to save appointment. Please try again."
       })
     }
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+      {children && <DialogTrigger asChild>{children}</DialogTrigger>}
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>{mode === "edit" ? "Edit Appointment" : "Book New Appointment"}</DialogTitle>

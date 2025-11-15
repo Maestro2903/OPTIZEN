@@ -31,25 +31,19 @@ export async function GET(request: NextRequest) {
       sortOrder = 'desc'
     }
 
-    // Validate sortBy against allowlist
+    // Validate sortBy against allowlist (using database column names)
     const allowedSortColumns = [
       'created_at',
-      'item_name',
+      'name',
       'category',
       'unit_price',
-      'selling_price',
-      'current_stock',
+      'mrp',
+      'stock_quantity',
       'reorder_level',
       'expiry_date'
     ]
     if (!allowedSortColumns.includes(sortBy)) {
       sortBy = 'created_at'
-    }
-
-    // Check authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Calculate offset for pagination
@@ -67,7 +61,7 @@ export async function GET(request: NextRequest) {
         .replace(/\\/g, '\\\\')
         .replace(/%/g, '\\%')
         .replace(/_/g, '\\_')
-      query = query.or(`item_name.ilike.%${sanitizedSearch}%,generic_name.ilike.%${sanitizedSearch}%,manufacturer.ilike.%${sanitizedSearch}%,batch_number.ilike.%${sanitizedSearch}%`)
+      query = query.or(`name.ilike.%${sanitizedSearch}%,generic_name.ilike.%${sanitizedSearch}%,manufacturer.ilike.%${sanitizedSearch}%,batch_number.ilike.%${sanitizedSearch}%`)
     }
 
     // Apply category filter
@@ -120,69 +114,68 @@ export async function GET(request: NextRequest) {
 // POST /api/pharmacy - Add new pharmacy item
 export async function POST(request: NextRequest) {
   try {
+    // RBAC check
+    const authCheck = await requirePermission('pharmacy', 'create')
+    if (!authCheck.authorized) return authCheck.response
+    const { context } = authCheck
+
     const supabase = createClient()
-
-    // Check authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const body = await request.json()
 
     // Validate required fields
     const {
-      item_name,
+      name,
       generic_name,
       manufacturer,
       category,
+      supplier,
       unit_price,
-      selling_price,
-      current_stock,
+      mrp,
+      stock_quantity,
       reorder_level,
       batch_number,
       expiry_date,
-      description
+      hsn_code,
+      gst_percentage,
+      prescription_required,
+      dosage_form,
+      strength,
+      storage_instructions,
+      description,
+      image_url
     } = body
 
-    if (!item_name || !category || !unit_price || !selling_price) {
+    if (!name || !category || !unit_price || !mrp) {
       return NextResponse.json(
-        { error: 'Missing required fields: item_name, category, unit_price, selling_price' },
+        { error: 'Missing required fields: name, category, unit_price, mrp' },
         { status: 400 }
       )
     }
 
     // Validate price types and ranges
     const parsedUnitPrice = Number(unit_price)
-    const parsedSellingPrice = Number(selling_price)
+    const parsedMrp = Number(mrp)
     
-    if (!Number.isFinite(parsedUnitPrice) || parsedUnitPrice <= 0) {
+    if (!Number.isFinite(parsedUnitPrice) || parsedUnitPrice < 0) {
       return NextResponse.json(
-        { error: 'unit_price must be a positive number greater than 0' },
+        { error: 'unit_price must be a non-negative number' },
         { status: 400 }
       )
     }
     
-    if (!Number.isFinite(parsedSellingPrice) || parsedSellingPrice <= 0) {
+    if (!Number.isFinite(parsedMrp) || parsedMrp < 0) {
       return NextResponse.json(
-        { error: 'selling_price must be a positive number greater than 0' },
-        { status: 400 }
-      )
-    }
-    
-    if (parsedSellingPrice < parsedUnitPrice) {
-      return NextResponse.json(
-        { error: 'selling_price must be greater than or equal to unit_price' },
+        { error: 'mrp must be a non-negative number' },
         { status: 400 }
       )
     }
 
     // Validate stock quantities if provided
-    if (current_stock !== undefined && current_stock !== null) {
-      const parsedStock = Number(current_stock)
+    if (stock_quantity !== undefined && stock_quantity !== null) {
+      const parsedStock = Number(stock_quantity)
       if (!Number.isInteger(parsedStock) || parsedStock < 0) {
         return NextResponse.json(
-          { error: 'current_stock must be a non-negative integer' },
+          { error: 'stock_quantity must be a non-negative integer' },
           { status: 400 }
         )
       }
@@ -203,18 +196,25 @@ export async function POST(request: NextRequest) {
       .from('pharmacy_items')
       .insert([
         {
-          item_name,
+          name,
           generic_name,
           manufacturer,
           category,
+          supplier,
           unit_price,
-          selling_price,
-          current_stock: current_stock || 0,
-          reorder_level: reorder_level || 0,
+          mrp,
+          stock_quantity: stock_quantity || 0,
+          reorder_level: reorder_level || 10,
           batch_number,
           expiry_date,
+          hsn_code,
+          gst_percentage: gst_percentage || 0,
+          prescription_required: prescription_required || false,
+          dosage_form,
+          strength,
+          storage_instructions,
           description,
-          created_by: session.user.id
+          image_url
         }
       ])
       .select()

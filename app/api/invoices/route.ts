@@ -50,43 +50,17 @@ export async function GET(request: NextRequest) {
       sortBy = 'invoice_date'
     }
 
-    // Check authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     // Calculate offset for pagination
     const offset = (page - 1) * limit
 
-    // Build query with joins to get patient information and invoice items
+    // Build query for invoices - fetch without join first
     let query = supabase
       .from('invoices')
-      .select(`
-        *,
-        patients:patient_id (
-          id,
-          patient_id,
-          full_name,
-          email,
-          mobile,
-          gender
-        ),
-        invoice_items (
-          id,
-          item_description,
-          quantity,
-          unit_price,
-          total_price
-        )
-      `, { count: 'exact' })
+      .select('*', { count: 'exact' })
 
-    // Apply search filter - separate parent table and joined table searches
+    // Apply search filter - search in invoice columns only (patient search done post-fetch)
     if (search) {
-      // Search in invoice columns (parent table)
-      query = query.or(`invoice_number.ilike.%${search}%`)
-      // Search in patient columns (joined table)
-      query = query.or(`full_name.ilike.%${search}%,mobile.ilike.%${search}%`, { referencedTable: 'patients' })
+      query = query.ilike('invoice_number', `%${search}%`)
     }
 
     // Parse and validate status parameter (supports arrays)
@@ -125,7 +99,35 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Database error:', error)
-      return NextResponse.json({ error: 'Failed to fetch invoices' }, { status: 500 })
+      console.error('Error details:', JSON.stringify(error, null, 2))
+      return NextResponse.json({ 
+        error: 'Failed to fetch invoices',
+        details: error.message,
+        hint: error.hint,
+        code: error.code
+      }, { status: 500 })
+    }
+
+    // Fetch patient data for all invoices
+    if (invoices && invoices.length > 0) {
+      const patientIds = [...new Set(invoices.map(inv => inv.patient_id))]
+      const { data: patients, error: patientsError } = await supabase
+        .from('patients')
+        .select('id, patient_id, full_name, email, mobile, gender')
+        .in('id', patientIds)
+
+      if (!patientsError && patients) {
+        // Create a map for quick lookup
+        const patientMap = new Map(patients.map(p => [p.id, p]))
+        
+        // Attach patient data to each invoice
+        invoices.forEach(invoice => {
+          const patient = patientMap.get(invoice.patient_id)
+          if (patient) {
+            (invoice as any).patients = patient
+          }
+        })
+      }
     }
 
     // Calculate pagination metadata
@@ -155,14 +157,12 @@ export async function GET(request: NextRequest) {
 // POST /api/invoices - Create a new invoice
 export async function POST(request: NextRequest) {
   try {
+    // RBAC check
+    const authCheck = await requirePermission('invoices', 'create')
+    if (!authCheck.authorized) return authCheck.response
+    const { context } = authCheck
+
     const supabase = createClient()
-
-    // Check authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const body = await request.json()
 
     // Validate required fields
@@ -211,7 +211,7 @@ export async function POST(request: NextRequest) {
       payment_status = 'partial'
     }
 
-    // Start a transaction to create invoice and items
+    // Create invoice with items stored as JSONB
     const { data: invoice, error: invoiceError } = await supabase
       .from('invoices')
       .insert([
@@ -225,12 +225,11 @@ export async function POST(request: NextRequest) {
           tax_amount,
           total_amount,
           amount_paid,
-          balance_due,
           payment_status,
           payment_method,
           notes,
           status,
-          created_by: session.user.id
+          items: items // Store items as JSONB
         }
       ])
       .select()
@@ -244,26 +243,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create invoice' }, { status: 500 })
     }
 
-    // Create invoice items
-    const invoiceItems = items.map((item: any) => ({
-      ...item,
-      invoice_id: invoice.id,
-      total_price: item.quantity * item.unit_price
-    }))
-
-    const { data: createdItems, error: itemsError } = await supabase
-      .from('invoice_items')
-      .insert(invoiceItems)
-      .select()
-
-    if (itemsError) {
-      console.error('Database error creating invoice items:', itemsError)
-      // Rollback - delete the invoice
-      await supabase.from('invoices').delete().eq('id', invoice.id)
-      return NextResponse.json({ error: 'Failed to create invoice items' }, { status: 500 })
-    }
-
-    // Return invoice with items and patient info
+    // Return invoice with patient info
     const { data: fullInvoice, error: fetchError } = await supabase
       .from('invoices')
       .select(`
@@ -275,13 +255,6 @@ export async function POST(request: NextRequest) {
           email,
           mobile,
           gender
-        ),
-        invoice_items (
-          id,
-          item_description,
-          quantity,
-          unit_price,
-          total_price
         )
       `)
       .eq('id', invoice.id)

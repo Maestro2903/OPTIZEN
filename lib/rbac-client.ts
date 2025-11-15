@@ -50,6 +50,7 @@ type PermissionActions = {
 export const PERMISSIONS: Record<UserRole, {
   patients: PermissionActions
   appointments: PermissionActions
+  doctor_schedule: PermissionActions
   cases: PermissionActions
   invoices: PermissionActions
   pharmacy: PermissionActions
@@ -60,6 +61,8 @@ export const PERMISSIONS: Record<UserRole, {
   certificates: PermissionActions
   discharges: PermissionActions
   revenue: PermissionActions
+  expenses: PermissionActions
+  finance: PermissionActions
   attendance: PermissionActions
   lens: PermissionActions
   complaint: PermissionActions
@@ -74,6 +77,7 @@ export const PERMISSIONS: Record<UserRole, {
   super_admin: {
     patients: { view: true, create: true, print: true, edit: true, delete: true },
     appointments: { view: true, create: true, print: true, edit: true, delete: true },
+    doctor_schedule: { view: true, create: true, print: true, edit: true, delete: true },
     cases: { view: true, create: true, print: true, edit: true, delete: true },
     invoices: { view: true, create: true, print: true, edit: true, delete: true },
     pharmacy: { view: true, create: true, print: true, edit: true, delete: true },
@@ -84,6 +88,8 @@ export const PERMISSIONS: Record<UserRole, {
     certificates: { view: true, create: true, print: true, edit: true, delete: true },
     discharges: { view: true, create: true, print: true, edit: true, delete: true },
     revenue: { view: true, create: true, print: true, edit: true, delete: true },
+    expenses: { view: true, create: true, print: true, edit: true, delete: true },
+    finance: { view: true, create: true, print: true, edit: true, delete: true },
     attendance: { view: true, create: true, print: true, edit: true, delete: true },
     lens: { view: true, create: true, print: true, edit: true, delete: true },
     complaint: { view: true, create: true, print: true, edit: true, delete: true },
@@ -98,6 +104,7 @@ export const PERMISSIONS: Record<UserRole, {
   hospital_admin: {
     patients: { view: true, create: true, print: true, edit: true, delete: true },
     appointments: { view: true, create: true, print: true, edit: true, delete: true },
+    doctor_schedule: { view: true, create: true, print: true, edit: true, delete: true },
     cases: { view: true, create: true, print: true, edit: true, delete: true },
     invoices: { view: true, create: true, print: true, edit: true, delete: true },
     pharmacy: { view: true, create: true, print: true, edit: true, delete: true },
@@ -108,6 +115,8 @@ export const PERMISSIONS: Record<UserRole, {
     certificates: { view: true, create: true, print: true, edit: true, delete: true },
     discharges: { view: true, create: true, print: true, edit: true, delete: true },
     revenue: { view: true, create: true, print: true, edit: true, delete: false },
+    expenses: { view: true, create: true, print: true, edit: true, delete: true },
+    finance: { view: true, create: true, print: true, edit: true, delete: false },
     attendance: { view: true, create: true, print: true, edit: true, delete: false },
     lens: { view: true, create: true, print: true, edit: true, delete: true },
     complaint: { view: true, create: true, print: true, edit: true, delete: true },
@@ -122,6 +131,7 @@ export const PERMISSIONS: Record<UserRole, {
   receptionist: {
     patients: { view: true, create: true, print: true, edit: true, delete: false },
     appointments: { view: true, create: true, print: true, edit: true, delete: false },
+    doctor_schedule: { view: true, create: false, print: true, edit: false, delete: false },
     cases: { view: true, create: false, print: false, edit: false, delete: false },
     invoices: { view: true, create: false, print: false, edit: false, delete: false },
     pharmacy: { view: true, create: false, print: false, edit: false, delete: false },
@@ -132,6 +142,8 @@ export const PERMISSIONS: Record<UserRole, {
     certificates: { view: true, create: true, print: true, edit: false, delete: false },
     discharges: { view: true, create: false, print: false, edit: false, delete: false },
     revenue: { view: false, create: false, print: false, edit: false, delete: false },
+    expenses: { view: false, create: false, print: false, edit: false, delete: false },
+    finance: { view: false, create: false, print: false, edit: false, delete: false },
     attendance: { view: true, create: true, print: true, edit: true, delete: false },
     lens: { view: true, create: false, print: false, edit: false, delete: false },
     complaint: { view: true, create: false, print: false, edit: false, delete: false },
@@ -146,6 +158,7 @@ export const PERMISSIONS: Record<UserRole, {
   optometrist: {
     patients: { view: true, create: true, print: true, edit: true, delete: false },
     appointments: { view: true, create: true, print: true, edit: true, delete: false },
+    doctor_schedule: { view: true, create: true, print: true, edit: true, delete: false },
     cases: { view: true, create: true, print: true, edit: true, delete: false },
     invoices: { view: true, create: false, print: false, edit: false, delete: false },
     pharmacy: { view: true, create: true, print: true, edit: true, delete: false },
@@ -156,6 +169,8 @@ export const PERMISSIONS: Record<UserRole, {
     certificates: { view: true, create: true, print: true, edit: true, delete: false },
     discharges: { view: true, create: true, print: true, edit: true, delete: false },
     revenue: { view: false, create: false, print: false, edit: false, delete: false },
+    expenses: { view: false, create: false, print: false, edit: false, delete: false },
+    finance: { view: false, create: false, print: false, edit: false, delete: false },
     attendance: { view: true, create: true, print: true, edit: true, delete: false },
     lens: { view: true, create: true, print: true, edit: true, delete: false },
     complaint: { view: true, create: true, print: true, edit: true, delete: false },
@@ -170,6 +185,7 @@ export const PERMISSIONS: Record<UserRole, {
   ophthalmologist: {
     patients: { view: true, create: true, print: true, edit: true, delete: false },
     appointments: { view: true, create: true, print: true, edit: true, delete: false },
+    doctor_schedule: { view: true, create: true, print: true, edit: true, delete: false },
     cases: { view: true, create: true, print: true, edit: true, delete: false },
     invoices: { view: true, create: true, print: true, edit: true, delete: false },
     pharmacy: { view: true, create: true, print: true, edit: true, delete: false },
@@ -180,6 +196,8 @@ export const PERMISSIONS: Record<UserRole, {
     certificates: { view: true, create: true, print: true, edit: true, delete: false },
     discharges: { view: true, create: true, print: true, edit: true, delete: false },
     revenue: { view: false, create: false, print: false, edit: false, delete: false },
+    expenses: { view: false, create: false, print: false, edit: false, delete: false },
+    finance: { view: false, create: false, print: false, edit: false, delete: false },
     attendance: { view: true, create: true, print: true, edit: true, delete: false },
     lens: { view: true, create: true, print: true, edit: true, delete: false },
     complaint: { view: true, create: true, print: true, edit: true, delete: false },
@@ -194,6 +212,7 @@ export const PERMISSIONS: Record<UserRole, {
   technician: {
     patients: { view: true, create: false, print: false, edit: false, delete: false },
     appointments: { view: true, create: false, print: false, edit: false, delete: false },
+    doctor_schedule: { view: false, create: false, print: false, edit: false, delete: false },
     cases: { view: true, create: false, print: true, edit: true, delete: false },
     invoices: { view: false, create: false, print: false, edit: false, delete: false },
     pharmacy: { view: true, create: false, print: false, edit: false, delete: false },
@@ -204,6 +223,8 @@ export const PERMISSIONS: Record<UserRole, {
     certificates: { view: false, create: false, print: false, edit: false, delete: false },
     discharges: { view: false, create: false, print: false, edit: false, delete: false },
     revenue: { view: false, create: false, print: false, edit: false, delete: false },
+    expenses: { view: false, create: false, print: false, edit: false, delete: false },
+    finance: { view: false, create: false, print: false, edit: false, delete: false },
     attendance: { view: true, create: true, print: true, edit: true, delete: false },
     lens: { view: true, create: false, print: false, edit: false, delete: false },
     complaint: { view: true, create: false, print: false, edit: false, delete: false },
@@ -218,6 +239,7 @@ export const PERMISSIONS: Record<UserRole, {
   billing_staff: {
     patients: { view: true, create: false, print: false, edit: false, delete: false },
     appointments: { view: true, create: false, print: false, edit: false, delete: false },
+    doctor_schedule: { view: false, create: false, print: false, edit: false, delete: false },
     cases: { view: true, create: false, print: false, edit: false, delete: false },
     invoices: { view: true, create: true, print: true, edit: true, delete: false },
     pharmacy: { view: true, create: false, print: false, edit: true, delete: false },
@@ -228,6 +250,8 @@ export const PERMISSIONS: Record<UserRole, {
     certificates: { view: false, create: false, print: false, edit: false, delete: false },
     discharges: { view: false, create: false, print: false, edit: false, delete: false },
     revenue: { view: true, create: true, print: true, edit: true, delete: false },
+    expenses: { view: true, create: true, print: true, edit: true, delete: false },
+    finance: { view: true, create: false, print: true, edit: false, delete: false },
     attendance: { view: true, create: true, print: true, edit: true, delete: false },
     lens: { view: false, create: false, print: false, edit: false, delete: false },
     complaint: { view: false, create: false, print: false, edit: false, delete: false },
@@ -242,6 +266,7 @@ export const PERMISSIONS: Record<UserRole, {
   patient: {
     patients: { view: false, create: false, print: false, edit: false, delete: false },
     appointments: { view: false, create: false, print: false, edit: false, delete: false },
+    doctor_schedule: { view: false, create: false, print: false, edit: false, delete: false },
     cases: { view: false, create: false, print: false, edit: false, delete: false },
     invoices: { view: false, create: false, print: false, edit: false, delete: false },
     pharmacy: { view: false, create: false, print: false, edit: false, delete: false },
@@ -252,6 +277,8 @@ export const PERMISSIONS: Record<UserRole, {
     certificates: { view: false, create: false, print: false, edit: false, delete: false },
     discharges: { view: false, create: false, print: false, edit: false, delete: false },
     revenue: { view: false, create: false, print: false, edit: false, delete: false },
+    expenses: { view: false, create: false, print: false, edit: false, delete: false },
+    finance: { view: false, create: false, print: false, edit: false, delete: false },
     attendance: { view: false, create: false, print: false, edit: false, delete: false },
     lens: { view: false, create: false, print: false, edit: false, delete: false },
     complaint: { view: false, create: false, print: false, edit: false, delete: false },

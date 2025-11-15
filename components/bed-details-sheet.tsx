@@ -20,19 +20,27 @@ import {
   CreditCard,
   LogOut,
   ArrowRight,
+  Building2,
+  CheckCircle2,
+  Edit,
+  Trash2,
 } from "lucide-react"
 
 interface BedDetailsSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   bedData: {
+    id?: string
     bed_number: string
     ward_name: string
     ward_type: string
+    bed_type?: string
     floor_number: number
     room_number?: string
     status: string
     daily_rate: number
+    facilities?: string[]
+    description?: string
   } | null
   assignmentData?: {
     patient_name: string
@@ -50,6 +58,8 @@ interface BedDetailsSheetProps {
   onDischarge?: () => void
   onTransfer?: () => void
   onUpdate?: () => void
+  onEdit?: () => void
+  onDelete?: () => void
 }
 
 export function BedDetailsSheet({
@@ -60,6 +70,8 @@ export function BedDetailsSheet({
   onDischarge,
   onTransfer,
   onUpdate,
+  onEdit,
+  onDelete,
 }: BedDetailsSheetProps) {
   if (!bedData) return null
 
@@ -108,18 +120,64 @@ export function BedDetailsSheet({
         </SheetHeader>
 
         <div className="mt-6 space-y-6">
-          {/* Bed Status */}
+          {/* Bed Information */}
           <div>
-            <h3 className="text-sm font-semibold mb-2">Bed Status</h3>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className={getStatusColor(bedData.status)}>
-                {bedData.status.charAt(0).toUpperCase() + bedData.status.slice(1)}
-              </Badge>
-              <span className="text-sm text-muted-foreground">
-                • ₹{bedData.daily_rate}/day
-              </span>
+            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <Building2 className="h-4 w-4" />
+              Bed Information
+            </h3>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Status:</span>
+                <Badge variant="outline" className={getStatusColor(bedData.status)}>
+                  {bedData.status.charAt(0).toUpperCase() + bedData.status.slice(1)}
+                </Badge>
+              </div>
+              {bedData.bed_type && (
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Bed Type:</span>
+                  <span className="text-sm font-medium">{bedData.bed_type}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Ward Type:</span>
+                <span className="text-sm font-medium capitalize">{bedData.ward_type.replace('_', ' ')}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Daily Rate:</span>
+                <span className="text-sm font-semibold">₹{bedData.daily_rate.toLocaleString()}/day</span>
+              </div>
             </div>
           </div>
+
+          {bedData.facilities && bedData.facilities.length > 0 && (
+            <>
+              <Separator />
+              <div>
+                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Facilities
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {bedData.facilities.map((facility, index) => (
+                    <Badge key={index} variant="secondary" className="text-xs">
+                      {facility}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          {bedData.description && (
+            <>
+              <Separator />
+              <div>
+                <h3 className="text-sm font-semibold mb-2">Description</h3>
+                <p className="text-sm text-muted-foreground">{bedData.description}</p>
+              </div>
+            </>
+          )}
 
           <Separator />
 
@@ -249,7 +307,7 @@ export function BedDetailsSheet({
                 </div>
               </div>
 
-              {/* Action Buttons */}
+              {/* Action Buttons for Occupied Beds */}
               <div className="space-y-2 pt-4">
                 <Button variant="outline" className="w-full justify-between" onClick={onUpdate}>
                   Update Details
@@ -266,15 +324,36 @@ export function BedDetailsSheet({
               </div>
             </>
           ) : (
-            <div className="text-center py-8">
+            <div className="text-center py-8 space-y-4">
               <p className="text-muted-foreground">This bed is currently {bedData.status}</p>
               {bedData.status === 'available' && (
-                <Button className="mt-4" onClick={onUpdate}>
+                <Button className="w-full" onClick={onUpdate}>
                   Assign Patient
                 </Button>
               )}
             </div>
           )}
+
+          {/* Bed Management Actions - Always Show */}
+          <Separator />
+          <div className="grid grid-cols-2 gap-2 pt-2">
+            {onEdit && (
+              <Button variant="outline" className="w-full justify-between" onClick={onEdit}>
+                <span className="flex items-center gap-2">
+                  <Edit className="h-4 w-4" />
+                  Edit Bed
+                </span>
+              </Button>
+            )}
+            {onDelete && bedData.status !== 'occupied' && (
+              <Button variant="outline" className="w-full justify-between text-destructive hover:bg-destructive hover:text-destructive-foreground" onClick={onDelete}>
+                <span className="flex items-center gap-2">
+                  <Trash2 className="h-4 w-4" />
+                  Delete
+                </span>
+              </Button>
+            )}
+          </div>
         </div>
       </SheetContent>
     </Sheet>

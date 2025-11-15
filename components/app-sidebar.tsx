@@ -16,6 +16,7 @@ import {
   TrendingUp,
   Bed,
   Shield,
+  CalendarClock,
 } from "lucide-react"
 import { Logo } from "@/components/logo"
 
@@ -46,6 +47,12 @@ const navigationItems = [
     requiredPermission: "appointments" as const,
   },
   {
+    title: "My Schedule",
+    url: "/dashboard/doctor-schedule",
+    icon: CalendarClock,
+    requiredPermission: "doctor_schedule" as const,
+  },
+  {
     title: "Cases",
     url: "/dashboard/cases",
     icon: FolderOpen,
@@ -70,16 +77,16 @@ const navigationItems = [
     requiredPermission: "invoices" as const,
   },
   {
+    title: "Finance",
+    url: "/dashboard/finance",
+    icon: TrendingUp,
+    requiredPermission: "finance" as const,
+  },
+  {
     title: "Pharmacy",
     url: "/dashboard/pharmacy",
     icon: Package,
     requiredPermission: "pharmacy" as const,
-  },
-  {
-    title: "Revenue",
-    url: "/dashboard/revenue",
-    icon: TrendingUp,
-    requiredPermission: "revenue" as const,
   },
   {
     title: "Beds",
@@ -135,7 +142,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         title: "Access Control",
         url: "/dashboard/access-control",
         icon: Shield,
-        requiredPermission: "roles" as const,
+        requiredPermission: "roles" as any,
       })
     }
 

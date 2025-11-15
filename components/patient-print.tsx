@@ -61,124 +61,149 @@ export function PatientPrint({ patient, children }: PatientPrintProps) {
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <PrintLayout
           documentType="Patient Record"
-          documentTitle="Patient Information Record"
+          documentTitle="Medical Record Card"
         >
-          {/* Patient Basic Information */}
-          <PrintSection title="Patient Details">
-            <PrintRow>
-              <PrintCol>
-                <PrintField label="Patient ID" value={patient.patient_id} uppercase />
-                <PrintField label="Full Name" value={patient.full_name} uppercase />
-                <PrintField label="Gender" value={patient.gender} uppercase />
-              </PrintCol>
-              <PrintCol>
-                <PrintField
-                  label="Date of Birth"
-                  value={patient.date_of_birth ? formatDate(patient.date_of_birth) : undefined}
-                />
-                <PrintField
-                  label="Age"
-                  value={calculateAge(patient.date_of_birth)}
-                  center
-                />
-                <PrintField label="Registration Date" value={formatDate(patient.created_at)} />
-              </PrintCol>
-            </PrintRow>
-          </PrintSection>
+          {/* Medical Record Card Container */}
+          <div className="print-medical-card">
+            {/* Photo Placeholder and Header */}
+            <div style={{ overflow: 'hidden', marginBottom: '10pt' }}>
+              <div className="print-photo-placeholder">
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '10pt', marginBottom: '4pt' }}>PHOTO</div>
+                  <div style={{ fontSize: '8pt', color: '#999' }}>80x100pt</div>
+                </div>
+              </div>
+              <div style={{ marginLeft: '92pt' }}>
+                <div className="print-patient-id-large">
+                  PATIENT ID: {patient.patient_id}
+                </div>
+                <div style={{ fontSize: '10pt', marginBottom: '6pt' }}>
+                  Registration Date: {formatDate(patient.created_at)}
+                </div>
+              </div>
+            </div>
 
-          {/* Contact Information */}
-          <PrintSection title="Contact Information">
-            <PrintRow>
-              <PrintCol>
-                <PrintField label="Mobile Number" value={patient.mobile} />
-                <PrintField label="Email Address" value={patient.email} />
-              </PrintCol>
-              <PrintCol>
-                <PrintField label="Emergency Contact" value={patient.emergency_contact} />
-                <PrintField label="Emergency Phone" value={patient.emergency_phone} />
-              </PrintCol>
-            </PrintRow>
-            <PrintRow>
-              <PrintCol>
-                <PrintField label="Country" value={patient.country} />
-                <PrintField label="State/Province" value={patient.state} />
-              </PrintCol>
-              <PrintCol>
-                <PrintField label="City" value={patient.city} />
-                <PrintField label="Postal Code" value={patient.postal_code} />
-              </PrintCol>
-            </PrintRow>
+            {/* Demographics - Compact Grid */}
+            <div className="print-compact-grid" style={{ clear: 'both', marginTop: '8pt' }}>
+              <div>
+                <div className="print-label">Full Name</div>
+                <div className="print-value uppercase" style={{ fontSize: '11pt', fontWeight: 'bold' }}>
+                  {patient.full_name}
+                </div>
+              </div>
+              <div>
+                <div className="print-label">Gender</div>
+                <div className="print-value uppercase">{patient.gender}</div>
+              </div>
+              <div>
+                <div className="print-label">Date of Birth</div>
+                <div className="print-value">
+                  {patient.date_of_birth ? formatDate(patient.date_of_birth) : '-'}
+                </div>
+              </div>
+              <div>
+                <div className="print-label">Age</div>
+                <div className="print-value">
+                  {calculateAge(patient.date_of_birth) ? `${calculateAge(patient.date_of_birth)} years` : '-'}
+                </div>
+              </div>
+            </div>
+
+            {/* Contact Information - Single Row */}
+            <div style={{ marginTop: '10pt', borderTop: '1px solid #ddd', paddingTop: '8pt' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8pt', fontSize: '9pt' }}>
+                <div>
+                  <div className="print-label">Mobile</div>
+                  <div className="print-value" style={{ borderBottom: 'none', minHeight: 'auto' }}>{patient.mobile}</div>
+                </div>
+                <div>
+                  <div className="print-label">Email</div>
+                  <div className="print-value" style={{ borderBottom: 'none', minHeight: 'auto' }}>{patient.email || '-'}</div>
+                </div>
+                <div>
+                  <div className="print-label">Status</div>
+                  <div className="print-value uppercase" style={{ borderBottom: 'none', minHeight: 'auto', fontWeight: 'bold' }}>
+                    {patient.status}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Address */}
             {patient.address && (
-              <PrintRow>
-                <PrintCol className="w-full">
-                  <PrintField label="Address" value={patient.address} />
-                </PrintCol>
-              </PrintRow>
-            )}
-          </PrintSection>
-
-          {/* Medical Information */}
-          <PrintSection title="Medical Information">
-            {patient.medical_history && (
-              <PrintRow>
-                <PrintCol className="w-full">
-                  <PrintField label="Medical History" value={patient.medical_history} />
-                </PrintCol>
-              </PrintRow>
-            )}
-            {patient.current_medications && (
-              <PrintRow>
-                <PrintCol className="w-full">
-                  <PrintField label="Current Medications" value={patient.current_medications} />
-                </PrintCol>
-              </PrintRow>
-            )}
-            {patient.allergies && (
-              <PrintRow>
-                <PrintCol className="w-full">
-                  <PrintField label="Allergies" value={patient.allergies} />
-                </PrintCol>
-              </PrintRow>
-            )}
-            {!patient.medical_history && !patient.current_medications && !patient.allergies && (
-              <div className="print-field">
-                <div style={{ fontStyle: 'italic', color: '#666', textAlign: 'center', padding: '20px' }}>
-                  No medical information recorded
+              <div style={{ marginTop: '8pt', fontSize: '9pt' }}>
+                <div className="print-label">Address</div>
+                <div className="print-value" style={{ borderBottom: 'none', minHeight: 'auto' }}>
+                  {patient.address}
+                  {patient.city && `, ${patient.city}`}
+                  {patient.state && `, ${patient.state}`}
+                  {patient.postal_code && ` - ${patient.postal_code}`}
+                  {patient.country && `, ${patient.country}`}
                 </div>
               </div>
             )}
-          </PrintSection>
 
-          {/* Insurance Information */}
-          <PrintSection title="Insurance Information">
-            <PrintRow>
-              <PrintCol>
-                <PrintField label="Insurance Provider" value={patient.insurance_provider} />
-              </PrintCol>
-              <PrintCol>
-                <PrintField label="Insurance Number" value={patient.insurance_number} />
-              </PrintCol>
-            </PrintRow>
-          </PrintSection>
+            {/* Emergency Contact */}
+            {(patient.emergency_contact || patient.emergency_phone) && (
+              <div style={{ marginTop: '8pt', fontSize: '9pt' }}>
+                <div className="print-label">Emergency Contact</div>
+                <div className="print-value" style={{ borderBottom: 'none', minHeight: 'auto' }}>
+                  {patient.emergency_contact || '-'}
+                  {patient.emergency_phone && ` (${patient.emergency_phone})`}
+                </div>
+              </div>
+            )}
 
-          {/* Status and Notes */}
-          <PrintSection title="Account Status">
-            <PrintRow>
-              <PrintCol>
-                <PrintField label="Status" value={patient.status} uppercase />
-              </PrintCol>
-              <PrintCol>
-                <PrintField label="Last Updated" value={formatDate(patient.created_at)} />
-              </PrintCol>
-            </PrintRow>
-          </PrintSection>
+            {/* Medical Information - Condensed */}
+            {(patient.medical_history || patient.current_medications || patient.allergies) && (
+              <div style={{ marginTop: '10pt', borderTop: '1px solid #ddd', paddingTop: '8pt' }}>
+                {patient.medical_history && (
+                  <div style={{ marginBottom: '6pt', fontSize: '9pt' }}>
+                    <div className="print-label">Medical History</div>
+                    <div className="print-value" style={{ borderBottom: 'none', minHeight: 'auto', fontSize: '9pt' }}>
+                      {patient.medical_history}
+                    </div>
+                  </div>
+                )}
+                {patient.current_medications && (
+                  <div style={{ marginBottom: '6pt', fontSize: '9pt' }}>
+                    <div className="print-label">Current Medications</div>
+                    <div className="print-value" style={{ borderBottom: 'none', minHeight: 'auto', fontSize: '9pt' }}>
+                      {patient.current_medications}
+                    </div>
+                  </div>
+                )}
+                {patient.allergies && (
+                  <div style={{ marginBottom: '6pt', fontSize: '9pt' }}>
+                    <div className="print-label">Allergies</div>
+                    <div className="print-value" style={{ borderBottom: 'none', minHeight: 'auto', fontSize: '9pt', fontWeight: 'bold', color: '#cc0000' }}>
+                      {patient.allergies}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
-          {/* Visit History Placeholder */}
-          <PrintSection title="Recent Visits" className="print-spacing-lg">
-            <div style={{ textAlign: 'center', fontStyle: 'italic', padding: '20px', color: '#666' }}>
-              Visit history will be populated from case records
-            </div>
-          </PrintSection>
+            {/* Insurance Information - Bottom Section */}
+            {(patient.insurance_provider || patient.insurance_number) && (
+              <div style={{ marginTop: '10pt', borderTop: '1px solid #ddd', paddingTop: '8pt', fontSize: '9pt' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8pt' }}>
+                  <div>
+                    <div className="print-label">Insurance Provider</div>
+                    <div className="print-value" style={{ borderBottom: 'none', minHeight: 'auto' }}>
+                      {patient.insurance_provider || '-'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="print-label">Insurance Number</div>
+                    <div className="print-value" style={{ borderBottom: 'none', minHeight: 'auto' }}>
+                      {patient.insurance_number || '-'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Signature */}
           <PrintSignature date={formatDate(new Date().toISOString())} />

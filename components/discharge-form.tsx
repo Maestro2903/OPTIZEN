@@ -6,7 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Button } from "@/components/ui/button"
 import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
-import { patientsApi, operationsApi } from "@/lib/services/api"
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/multi-select"
+import { patientsApi, operationsApi, dischargesApi, casesApi } from "@/lib/services/api"
 import { useMasterData } from "@/hooks/use-master-data"
 import { useToast } from "@/hooks/use-toast"
 import {
@@ -37,49 +38,116 @@ import {
 } from "@/components/ui/select"
 
 const dischargeFormSchema = z.object({
-  ipd_number: z.string().min(1, "IPD number is required"),
   patient_id: z.string().min(1, "Patient is required"),
-  operation_id: z.string().optional(),
+  case_id: z.string().min(1, "Case is required"),
   admission_date: z.string().min(1, "Admission date is required"),
-  admission_time: z.string().min(1, "Admission time is required"),
   discharge_date: z.string().min(1, "Discharge date is required"),
-  discharge_time: z.string().min(1, "Discharge time is required"),
-  diagnosis: z.string().optional(),
-  operation_details: z.string().optional(),
-  anesthesia: z.string().optional(),
-  treatment: z.string().optional(),
-  advice: z.string().optional(),
-  medicines: z.string().optional(),
+  discharge_summary: z.string().optional(),
+  final_diagnosis: z.array(z.string()).optional(), // Changed to array
+  treatment_given: z.array(z.string()).optional(), // Changed to array
+  condition_on_discharge: z.string().optional(),
+  instructions: z.string().optional(),
+  follow_up_date: z.string().optional(),
+  medications: z.array(z.string()).optional(), // Changed to array
+  dosages: z.array(z.string()).optional(), // New field
+  discharge_type: z.string().optional(),
+  status: z.string().optional(),
 })
 
 interface DischargeFormProps {
   children: React.ReactNode
+  dischargeData?: any
+  mode?: "add" | "edit"
+  onSuccess?: () => void
 }
 
-export function DischargeForm({ children }: DischargeFormProps) {
+export function DischargeForm({ children, dischargeData, mode = "add", onSuccess }: DischargeFormProps) {
   const { toast } = useToast()
   const masterData = useMasterData()
   const [open, setOpen] = React.useState(false)
   const [patients, setPatients] = React.useState<SearchableSelectOption[]>([])
-  const [operations, setOperations] = React.useState<SearchableSelectOption[]>([])
+  const [cases, setCases] = React.useState<SearchableSelectOption[]>([])
   const [loadingPatients, setLoadingPatients] = React.useState(false)
-  const [loadingOperations, setLoadingOperations] = React.useState(false)
+  const [loadingCases, setLoadingCases] = React.useState(false)
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
+  
+  // Master data options as MultiSelectOption arrays
+  const diagnosisOptions: MultiSelectOption[] = React.useMemo(
+    () => masterData.data.diagnosis.map(d => ({ value: d.value, label: d.label })),
+    [masterData.data.diagnosis]
+  )
+  const treatmentOptions: MultiSelectOption[] = React.useMemo(
+    () => masterData.data.treatments.map(t => ({ value: t.value, label: t.label })),
+    [masterData.data.treatments]
+  )
+  const medicineOptions: MultiSelectOption[] = React.useMemo(
+    () => masterData.data.medicines.map(m => ({ value: m.value, label: m.label })),
+    [masterData.data.medicines]
+  )
+  const dosageOptions: MultiSelectOption[] = React.useMemo(
+    () => masterData.data.dosages.map(d => ({ value: d.value, label: d.label })),
+    [masterData.data.dosages]
+  )
 
   const form = useForm<z.infer<typeof dischargeFormSchema>>({
     resolver: zodResolver(dischargeFormSchema),
-    defaultValues: {
-      ipd_number: "IPD" + new Date().getFullYear() + "001",
+    defaultValues: dischargeData ? {
+      patient_id: dischargeData.patient_id || "",
+      case_id: dischargeData.case_id || "",
+      admission_date: dischargeData.admission_date || new Date().toISOString().split("T")[0],
+      discharge_date: dischargeData.discharge_date || new Date().toISOString().split("T")[0],
+      discharge_summary: dischargeData.discharge_summary || "",
+      final_diagnosis: dischargeData.final_diagnosis?.ids || [],
+      treatment_given: dischargeData.treatment_given?.ids || [],
+      medications: dischargeData.medications?.medicines?.ids || [],
+      dosages: dischargeData.medications?.dosages?.ids || [],
+      condition_on_discharge: dischargeData.condition_on_discharge || "",
+      instructions: dischargeData.instructions || "",
+      follow_up_date: dischargeData.follow_up_date || "",
+      discharge_type: dischargeData.discharge_type || "regular",
+      status: dischargeData.status || "completed",
+    } : {
       admission_date: new Date().toISOString().split("T")[0],
       discharge_date: new Date().toISOString().split("T")[0],
+      discharge_type: "regular",
+      status: "completed",
+      final_diagnosis: [],
+      treatment_given: [],
+      medications: [],
+      dosages: [],
     },
   })
 
   // Load master data when dialog opens
   React.useEffect(() => {
     if (open) {
-      masterData.fetchMultiple(['diagnosis', 'anesthesiaTypes', 'treatments', 'medicines'])
+      masterData.fetchMultiple(['diagnosis', 'treatments', 'medicines', 'dosages'])
     }
-  }, [open, masterData])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  // Reset form with discharge data when dialog opens in edit mode
+  React.useEffect(() => {
+    if (open && mode === "edit" && dischargeData) {
+      form.reset({
+        patient_id: dischargeData.patient_id || "",
+        case_id: dischargeData.case_id || "",
+        admission_date: dischargeData.admission_date || new Date().toISOString().split("T")[0],
+        discharge_date: dischargeData.discharge_date || new Date().toISOString().split("T")[0],
+        discharge_summary: dischargeData.discharge_summary || "",
+        final_diagnosis: dischargeData.final_diagnosis?.ids || [],
+        treatment_given: dischargeData.treatment_given?.ids || [],
+        medications: dischargeData.medications?.medicines?.ids || [],
+        dosages: dischargeData.medications?.dosages?.ids || [],
+        condition_on_discharge: dischargeData.condition_on_discharge || "",
+        instructions: dischargeData.instructions || "",
+        follow_up_date: dischargeData.follow_up_date || "",
+        discharge_type: dischargeData.discharge_type || "regular",
+        status: dischargeData.status || "completed",
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, mode, dischargeData])
 
   // Load data when dialog opens
   React.useEffect(() => {
@@ -128,45 +196,45 @@ export function DischargeForm({ children }: DischargeFormProps) {
         }
       }
 
-      // Load operations
+      // Load cases
       if (cancelled) return
-      setLoadingOperations(true)
+      setLoadingCases(true)
       try {
-        const response = await operationsApi.list({})
+        const response = await casesApi.list({ limit: 1000, sortBy: 'encounter_date', sortOrder: 'desc' })
         if (cancelled) return
         
         if (response.success && response.data) {
-          const safeOperations = response.data
-            .filter((operation) => operation?.id)
-            .map((operation) => ({
-              value: operation.id,
-              label: `${operation.operation_name || 'Operation'} - ${operation.operation_date || 'N/A'}`,
+          const safeCases = response.data
+            .filter((case_) => case_?.id)
+            .map((case_) => ({
+              value: case_.id,
+              label: `${case_.case_no || 'Case'} - ${case_.patients?.full_name || 'N/A'}`,
             }))
           
           if (!cancelled) {
-            setOperations(safeOperations)
+            setCases(safeCases)
           }
         } else {
           if (!cancelled) {
             toast({
-              title: "Failed to load operations",
-              description: "Unable to fetch operations list. Please try again.",
+              title: "Failed to load cases",
+              description: "Unable to fetch cases list. Please try again.",
               variant: "destructive",
             })
           }
         }
       } catch (error: any) {
         if (!cancelled) {
-          console.error("Error loading operations:", error)
+          console.error("Error loading cases:", error)
           toast({
-            title: "Failed to load operations",
+            title: "Failed to load cases",
             description: error?.message ?? "An unexpected error occurred",
             variant: "destructive",
           })
         }
       } finally {
         if (!cancelled) {
-          setLoadingOperations(false)
+          setLoadingCases(false)
         }
       }
     }
@@ -177,12 +245,97 @@ export function DischargeForm({ children }: DischargeFormProps) {
       cancelled = true
       abortController.abort()
     }
-  }, [open, toast])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
-  function onSubmit(values: z.infer<typeof dischargeFormSchema>) {
-    console.log(values)
-    setOpen(false)
-    form.reset()
+  async function onSubmit(values: z.infer<typeof dischargeFormSchema>) {
+    if (isSubmitting) return
+
+    try {
+      setIsSubmitting(true)
+
+      // Convert arrays to JSONB format with both IDs and labels
+      const diagnosisData = values.final_diagnosis && values.final_diagnosis.length > 0
+        ? {
+            ids: values.final_diagnosis,
+            labels: diagnosisOptions
+              .filter(d => values.final_diagnosis?.includes(d.value))
+              .map(d => d.label)
+          }
+        : undefined
+
+      const treatmentData = values.treatment_given && values.treatment_given.length > 0
+        ? {
+            ids: values.treatment_given,
+            labels: treatmentOptions
+              .filter(t => values.treatment_given?.includes(t.value))
+              .map(t => t.label)
+          }
+        : undefined
+
+      const medicationData = (values.medications && values.medications.length > 0) || 
+                             (values.dosages && values.dosages.length > 0)
+        ? {
+            medicines: {
+              ids: values.medications || [],
+              labels: medicineOptions
+                .filter(m => values.medications?.includes(m.value))
+                .map(m => m.label)
+            },
+            dosages: {
+              ids: values.dosages || [],
+              labels: dosageOptions
+                .filter(d => values.dosages?.includes(d.value))
+                .map(d => d.label)
+            }
+          }
+        : undefined
+
+      const payload = {
+        patient_id: values.patient_id,
+        case_id: values.case_id,
+        admission_date: values.admission_date,
+        discharge_date: values.discharge_date,
+        discharge_summary: values.discharge_summary || undefined,
+        final_diagnosis: diagnosisData || null, // Store as JSONB with IDs and labels, null if empty
+        treatment_given: treatmentData || null, // Store as JSONB with IDs and labels, null if empty
+        condition_on_discharge: values.condition_on_discharge || undefined,
+        instructions: values.instructions || undefined,
+        follow_up_date: values.follow_up_date || undefined,
+        medications: medicationData || null, // Store as JSONB with IDs and labels, null if empty
+        discharge_type: (values.discharge_type as any) || 'regular',
+        status: (values.status as any) || 'completed',
+      }
+
+      const response = mode === "edit" && dischargeData?.id
+        ? await dischargesApi.update(dischargeData.id, payload)
+        : await dischargesApi.create(payload)
+
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: mode === "edit" ? "Discharge record updated successfully" : "Discharge record created successfully",
+        })
+        setOpen(false)
+        form.reset()
+        onSuccess?.()
+      } else {
+        toast({
+          title: "Error",
+          description: response.error || `Failed to ${mode === "edit" ? "update" : "create"} discharge record`,
+          variant: "destructive",
+        })
+      }
+    } catch (error: any) {
+      console.error("Error submitting discharge:", error)
+      toast({
+        title: "Error",
+        description: error?.message || "An unexpected error occurred",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -190,28 +343,15 @@ export function DischargeForm({ children }: DischargeFormProps) {
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add Discharge Record</DialogTitle>
+          <DialogTitle>{mode === "edit" ? "Edit Discharge Record" : "Add Discharge Record"}</DialogTitle>
           <DialogDescription>
-            Create discharge summary with IPD details and advice
+            {mode === "edit" ? "Update discharge summary with IPD details and advice" : "Create discharge summary with IPD details and advice"}
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="ipd_number"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>IPD Number *</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
               <FormField
                 control={form.control}
                 name="patient_id"
@@ -226,6 +366,28 @@ export function DischargeForm({ children }: DischargeFormProps) {
                         placeholder="Select patient"
                         searchPlaceholder="Search patients..."
                         loading={loadingPatients}
+                        disabled={mode === "edit"}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="case_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Case *</FormLabel>
+                    <FormControl>
+                      <SearchableSelect
+                        options={cases}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="Select case"
+                        searchPlaceholder="Search cases..."
+                        loading={loadingCases}
+                        disabled={mode === "edit"}
                       />
                     </FormControl>
                     <FormMessage />
@@ -233,27 +395,6 @@ export function DischargeForm({ children }: DischargeFormProps) {
                 )}
               />
             </div>
-
-            <FormField
-              control={form.control}
-              name="operation_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Related Operation</FormLabel>
-                  <FormControl>
-                    <SearchableSelect
-                      options={operations}
-                      value={field.value || ""}
-                      onValueChange={field.onChange}
-                      placeholder="Select operation (optional)"
-                      searchPlaceholder="Search operations..."
-                      loading={loadingOperations}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             <div className="grid grid-cols-2 gap-4">
               <FormField
@@ -271,22 +412,6 @@ export function DischargeForm({ children }: DischargeFormProps) {
               />
               <FormField
                 control={form.control}
-                name="admission_time"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Admission Time *</FormLabel>
-                    <FormControl>
-                      <Input type="time" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
                 name="discharge_date"
                 render={({ field }) => (
                   <FormItem>
@@ -298,35 +423,22 @@ export function DischargeForm({ children }: DischargeFormProps) {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="discharge_time"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Discharge Time *</FormLabel>
-                    <FormControl>
-                      <Input type="time" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             </div>
 
             <FormField
               control={form.control}
-              name="diagnosis"
+              name="final_diagnosis"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Diagnosis</FormLabel>
+                  <FormLabel>Final Diagnosis</FormLabel>
                   <FormControl>
-                    <SearchableSelect
-                      options={masterData.data.diagnosis || []}
-                      value={field.value || ""}
+                    <MultiSelect
+                      options={diagnosisOptions}
+                      value={field.value || []}
                       onValueChange={field.onChange}
-                      placeholder="Select diagnosis"
+                      placeholder="Select diagnosis..."
                       searchPlaceholder="Search diagnosis..."
-                      emptyText="No diagnosis found."
+                      emptyText="No diagnosis found"
                       loading={masterData.loading.diagnosis}
                     />
                   </FormControl>
@@ -337,12 +449,12 @@ export function DischargeForm({ children }: DischargeFormProps) {
 
             <FormField
               control={form.control}
-              name="operation_details"
+              name="discharge_summary"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Operation Details</FormLabel>
+                  <FormLabel>Discharge Summary</FormLabel>
                   <FormControl>
-                    <Textarea rows={3} placeholder="Surgical procedure details..." {...field} />
+                    <Textarea rows={3} placeholder="Summary of treatment and discharge..." {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -351,40 +463,18 @@ export function DischargeForm({ children }: DischargeFormProps) {
 
             <FormField
               control={form.control}
-              name="anesthesia"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Anesthesia</FormLabel>
-                  <FormControl>
-                    <SearchableSelect
-                      options={masterData.data.anesthesiaTypes || []}
-                      value={field.value || ""}
-                      onValueChange={field.onChange}
-                      placeholder="Select anesthesia type"
-                      searchPlaceholder="Search anesthesia..."
-                      emptyText="No anesthesia types found."
-                      loading={masterData.loading.anesthesiaTypes}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="treatment"
+              name="treatment_given"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Treatment Given</FormLabel>
                   <FormControl>
-                    <SearchableSelect
-                      options={masterData.data.treatments || []}
-                      value={field.value || ""}
+                    <MultiSelect
+                      options={treatmentOptions}
+                      value={field.value || []}
                       onValueChange={field.onChange}
-                      placeholder="Select treatment"
+                      placeholder="Select treatments..."
                       searchPlaceholder="Search treatments..."
-                      emptyText="No treatments found."
+                      emptyText="No treatments found"
                       loading={masterData.loading.treatments}
                     />
                   </FormControl>
@@ -395,12 +485,71 @@ export function DischargeForm({ children }: DischargeFormProps) {
 
             <FormField
               control={form.control}
-              name="advice"
+              name="condition_on_discharge"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Discharge Advice</FormLabel>
+                  <FormLabel>Condition on Discharge</FormLabel>
                   <FormControl>
-                    <Textarea rows={3} placeholder="Post-discharge instructions..." {...field} />
+                    <Input placeholder="Patient condition at discharge..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="medications"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Medications Prescribed</FormLabel>
+                    <FormControl>
+                      <MultiSelect
+                        options={medicineOptions}
+                        value={field.value || []}
+                        onValueChange={field.onChange}
+                        placeholder="Select medications..."
+                        searchPlaceholder="Search medications..."
+                        emptyText="No medications found"
+                        loading={masterData.loading.medicines}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="dosages"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Dosages</FormLabel>
+                    <FormControl>
+                      <MultiSelect
+                        options={dosageOptions}
+                        value={field.value || []}
+                        onValueChange={field.onChange}
+                        placeholder="Select dosages..."
+                        searchPlaceholder="Search dosages..."
+                        emptyText="No dosages found"
+                        loading={masterData.loading.dosages}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="instructions"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Discharge Instructions</FormLabel>
+                  <FormControl>
+                    <Textarea rows={3} placeholder="Post-discharge care instructions..." {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -409,20 +558,12 @@ export function DischargeForm({ children }: DischargeFormProps) {
 
             <FormField
               control={form.control}
-              name="medicines"
+              name="follow_up_date"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Medicines Prescribed</FormLabel>
+                  <FormLabel>Follow-up Date</FormLabel>
                   <FormControl>
-                    <SearchableSelect
-                      options={masterData.data.medicines || []}
-                      value={field.value || ""}
-                      onValueChange={field.onChange}
-                      placeholder="Select medicine"
-                      searchPlaceholder="Search medicines..."
-                      emptyText="No medicines found."
-                      loading={masterData.loading.medicines}
-                    />
+                    <Input type="date" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -430,10 +571,12 @@ export function DischargeForm({ children }: DischargeFormProps) {
             />
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isSubmitting}>
                 Cancel
               </Button>
-              <Button type="submit">Save Discharge</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (mode === "edit" ? "Updating..." : "Saving...") : (mode === "edit" ? "Update Discharge" : "Save Discharge")}
+              </Button>
             </DialogFooter>
           </form>
         </Form>

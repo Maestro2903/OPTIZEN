@@ -58,172 +58,151 @@ export function DischargePrint({ discharge, children }: DischargePrintProps) {
           documentType="Discharge Summary"
           documentTitle="Hospital Discharge Summary"
         >
-          {/* Discharge Header Information */}
-          <PrintSection title="Discharge Information">
-            <PrintRow>
-              <PrintCol>
-                <PrintField label="Discharge No." value={discharge.discharge_no} uppercase />
-                <PrintField label="Discharge Date" value={formatDate(discharge.discharge_date)} />
-                <PrintField label="Room Number" value={discharge.room_number} />
-              </PrintCol>
-              <PrintCol>
-                <PrintField label="Patient Name" value={discharge.patient_name} uppercase />
-                <PrintField label="Patient ID" value={discharge.patient_id} />
-                <PrintField label="Case No." value={discharge.case_no} />
-              </PrintCol>
-            </PrintRow>
-          </PrintSection>
-
-          {/* Admission Details */}
-          <PrintSection title="Admission & Stay Details">
-            <PrintRow>
-              <PrintCol>
-                <PrintField label="Admission Date" value={discharge.admission_date ? formatDate(discharge.admission_date) : undefined} />
-                <PrintField label="Duration of Stay" value={calculateStayDuration()} />
-              </PrintCol>
-              <PrintCol>
-                <PrintField label="Final Condition" value={discharge.final_condition} />
-                <PrintField label="Status" value={discharge.status} uppercase />
-              </PrintCol>
-            </PrintRow>
-          </PrintSection>
-
-          {/* Medical Summary */}
-          <PrintSection title="Medical Summary">
-            {discharge.primary_diagnosis && (
+          <div className="print-discharge-summary">
+            {/* Discharge Header */}
+            <div className="print-discharge-header">
               <PrintRow>
-                <PrintCol className="w-full">
-                  <PrintField label="Primary Diagnosis" value={discharge.primary_diagnosis} />
+                <PrintCol>
+                  <PrintField label="Discharge No." value={discharge.discharge_no} uppercase />
+                  <PrintField label="Discharge Date" value={formatDate(discharge.discharge_date)} />
+                  <PrintField label="Case No." value={discharge.case_no} />
+                </PrintCol>
+                <PrintCol>
+                  <PrintField label="Patient Name" value={discharge.patient_name} uppercase />
+                  <PrintField label="Patient ID" value={discharge.patient_id} />
+                  <PrintField label="Room Number" value={discharge.room_number} />
                 </PrintCol>
               </PrintRow>
+            </div>
+
+            {/* Admission Summary */}
+            <PrintSection title="Admission & Stay Details">
+              <PrintRow>
+                <PrintCol>
+                  <PrintField label="Admission Date" value={discharge.admission_date ? formatDate(discharge.admission_date) : undefined} />
+                  <PrintField label="Duration of Stay" value={calculateStayDuration()} />
+                </PrintCol>
+                <PrintCol>
+                  <PrintField label="Status" value={discharge.status} uppercase />
+                </PrintCol>
+              </PrintRow>
+            </PrintSection>
+
+            {/* Diagnoses - Primary and Secondary (Prominent) */}
+            {discharge.primary_diagnosis && (
+              <div className="print-diagnosis-primary">
+                <div style={{ fontSize: '10pt', marginBottom: '4pt', textTransform: 'uppercase' }}>Primary Diagnosis</div>
+                <div style={{ fontSize: '13pt' }}>{discharge.primary_diagnosis}</div>
+              </div>
             )}
 
             {discharge.secondary_diagnosis && (
-              <PrintRow>
-                <PrintCol className="w-full">
-                  <PrintField label="Secondary Diagnosis" value={discharge.secondary_diagnosis} />
-                </PrintCol>
-              </PrintRow>
-            )}
-
-            {discharge.procedures_performed && (
-              <PrintRow>
-                <PrintCol className="w-full">
-                  <PrintField label="Procedures Performed" value={discharge.procedures_performed} />
-                </PrintCol>
-              </PrintRow>
-            )}
-
-            {discharge.complications && (
-              <PrintRow>
-                <PrintCol className="w-full">
-                  <PrintField label="Complications" value={discharge.complications} />
-                </PrintCol>
-              </PrintRow>
-            )}
-          </PrintSection>
-
-          {/* Clinical Data */}
-          {(discharge.vital_signs || discharge.lab_results) && (
-            <PrintSection title="Clinical Data at Discharge">
-              {discharge.vital_signs && (
-                <PrintRow>
-                  <PrintCol className="w-full">
-                    <PrintField label="Vital Signs" value={discharge.vital_signs} />
-                  </PrintCol>
-                </PrintRow>
-              )}
-
-              {discharge.lab_results && (
-                <PrintRow>
-                  <PrintCol className="w-full">
-                    <PrintField label="Lab Results" value={discharge.lab_results} />
-                  </PrintCol>
-                </PrintRow>
-              )}
-            </PrintSection>
-          )}
-
-          {/* Discharge Medications */}
-          {discharge.discharge_medications && (
-            <PrintSection title="Discharge Medications" className="print-prescription">
-              <div className="print-rx-header">℞ DISCHARGE MEDICATIONS</div>
-              <div style={{ whiteSpace: 'pre-wrap', fontSize: '12pt', lineHeight: '1.5', marginTop: '10pt' }}>
-                {discharge.discharge_medications}
+              <div className="print-diagnosis-secondary">
+                <div style={{ fontSize: '9pt', marginBottom: '4pt', textTransform: 'uppercase' }}>Secondary Diagnosis</div>
+                <div style={{ fontSize: '11pt' }}>{discharge.secondary_diagnosis}</div>
               </div>
-            </PrintSection>
-          )}
-
-          {/* Follow-up Instructions */}
-          <PrintSection title="Post-Discharge Instructions">
-            {discharge.follow_up_instructions && (
-              <PrintRow>
-                <PrintCol className="w-full">
-                  <PrintField label="Follow-up Instructions" value={discharge.follow_up_instructions} />
-                </PrintCol>
-              </PrintRow>
             )}
 
-            <PrintRow>
-              <PrintCol>
-                <PrintField
-                  label="Next Follow-up Date"
-                  value={discharge.follow_up_date ? formatDate(discharge.follow_up_date) : 'As per instructions'}
-                />
-              </PrintCol>
-              <PrintCol>
-                <PrintField label="Emergency Contact" value="Clinic 24x7 Helpline" />
-              </PrintCol>
-            </PrintRow>
+            {/* Procedures Performed - List Format */}
+            {discharge.procedures_performed && (
+              <PrintSection title="Procedures Performed">
+                <div style={{ fontSize: '11pt', lineHeight: '1.5' }}>
+                  {discharge.procedures_performed.split('\n').filter(line => line.trim()).map((item, index) => (
+                    <div key={index} style={{ marginBottom: '4pt' }}>
+                      {index + 1}. {item.trim()}
+                    </div>
+                  ))}
+                </div>
+              </PrintSection>
+            )}
 
+            {/* Complications */}
+            {discharge.complications && (
+              <PrintSection title="Complications">
+                <div style={{ fontSize: '11pt', lineHeight: '1.5' }}>{discharge.complications}</div>
+              </PrintSection>
+            )}
+
+            {/* Hospital Course - Summary Paragraph */}
             {discharge.discharge_summary && (
+              <div className="print-hospital-course">
+                <div style={{ fontSize: '10pt', marginBottom: '6pt', textTransform: 'uppercase', fontWeight: 'bold' }}>Hospital Course</div>
+                <div style={{ fontSize: '11pt', textAlign: 'justify' }}>{discharge.discharge_summary}</div>
+              </div>
+            )}
+
+            {/* Clinical Data at Discharge */}
+            {(discharge.vital_signs || discharge.lab_results) && (
+              <PrintSection title="Clinical Data at Discharge">
+                {discharge.vital_signs && (
+                  <div style={{ marginBottom: '8pt', fontSize: '10pt' }}>
+                    <div className="print-label">Vital Signs</div>
+                    <div style={{ fontSize: '11pt', marginTop: '4pt' }}>{discharge.vital_signs}</div>
+                  </div>
+                )}
+
+                {discharge.lab_results && (
+                  <div style={{ fontSize: '10pt' }}>
+                    <div className="print-label">Lab Results</div>
+                    <div style={{ fontSize: '11pt', marginTop: '4pt' }}>{discharge.lab_results}</div>
+                  </div>
+                )}
+              </PrintSection>
+            )}
+
+            {/* Discharge Medications - Prescription Format */}
+            {discharge.discharge_medications && (
+              <PrintSection title="Discharge Medications" className="print-prescription">
+                <div style={{ fontSize: '24pt', fontWeight: 'bold', marginBottom: '8pt' }}>℞</div>
+                <div style={{ whiteSpace: 'pre-wrap', fontSize: '12pt', lineHeight: '1.6', fontFamily: 'Times New Roman, serif' }}>
+                  {discharge.discharge_medications}
+                </div>
+              </PrintSection>
+            )}
+
+            {/* Discharge Instructions - Numbered List with Checkboxes */}
+            <PrintSection title="Post-Discharge Instructions">
+              {discharge.follow_up_instructions ? (
+                <ul className="print-instruction-checklist">
+                  {discharge.follow_up_instructions.split('\n').filter(line => line.trim()).map((item, index) => (
+                    <li key={index}>{item.trim()}</li>
+                  ))}
+                </ul>
+              ) : (
+                <div style={{ fontSize: '11pt', fontStyle: 'italic', color: '#666', padding: '10pt' }}>
+                  Standard post-discharge care instructions apply
+                </div>
+              )}
+
               <PrintRow>
-                <PrintCol className="w-full">
-                  <PrintField label="Discharge Summary" value={discharge.discharge_summary} />
+                <PrintCol>
+                  <PrintField
+                    label="Next Follow-up Date"
+                    value={discharge.follow_up_date ? formatDate(discharge.follow_up_date) : 'As per instructions'}
+                  />
+                </PrintCol>
+                <PrintCol>
+                  <PrintField label="Follow-up Location" value="Outpatient Department" />
                 </PrintCol>
               </PrintRow>
+
+              <PrintRow>
+                <PrintCol>
+                  <PrintField label="Emergency Contact" value="Clinic 24x7 Helpline: +91 98765 43210" />
+                </PrintCol>
+              </PrintRow>
+            </PrintSection>
+
+            {/* Final Condition - Highlighted */}
+            {discharge.final_condition && (
+              <div className="print-final-condition">
+                <div style={{ fontSize: '10pt', marginBottom: '6pt', textTransform: 'uppercase' }}>Final Condition at Discharge</div>
+                <div style={{ fontSize: '14pt' }}>{discharge.final_condition}</div>
+              </div>
             )}
-          </PrintSection>
 
-          {/* Post-Discharge Care Instructions */}
-          <div className="print-medical-section">
-            <h4 style={{ fontSize: '12pt', fontWeight: 'bold', marginBottom: '10pt', borderBottom: '1px solid #000' }}>
-              GENERAL POST-DISCHARGE CARE INSTRUCTIONS
-            </h4>
-            <ul style={{ fontSize: '11pt', lineHeight: '1.4', paddingLeft: '20pt' }}>
-              <li>Take all prescribed medications as directed</li>
-              <li>Follow all activity restrictions and lifestyle modifications</li>
-              <li>Keep all follow-up appointments</li>
-              <li>Monitor for any warning signs or symptoms</li>
-              <li>Maintain proper wound care if applicable</li>
-              <li>Contact healthcare provider immediately if condition worsens</li>
-              <li>Follow dietary recommendations if provided</li>
-            </ul>
-          </div>
-
-          {/* Emergency Contact Information */}
-          <div className="print-emergency">
-            <h4 style={{ fontSize: '12pt', fontWeight: 'bold', marginBottom: '8pt', color: '#d00' }}>
-              🚨 EMERGENCY CONTACT INFORMATION
-            </h4>
-            <p style={{ fontSize: '11pt', lineHeight: '1.3' }}>
-              <strong>24-Hour Emergency Helpline:</strong> +91 98765 43210<br />
-              <strong>Clinic Address:</strong> 123 Medical Plaza, Healthcare District, City - 123456<br />
-              <strong>Patient should seek immediate medical attention if experiencing:</strong><br />
-              • Severe pain or discomfort • High fever • Difficulty breathing • Unusual bleeding or discharge
-            </p>
-          </div>
-
-          {/* Doctor Signature */}
-          <PrintSignature date={formatDate(discharge.discharge_date)} />
-
-          {/* Discharge Reference Footer */}
-          <div style={{ marginTop: '20pt', padding: '10pt', border: '1px solid #ccc', backgroundColor: '#f9f9f9' }}>
-            <div style={{ fontSize: '10pt', textAlign: 'center' }}>
-              <strong>DISCHARGE REFERENCE</strong><br />
-              Discharge No: {discharge.discharge_no} | Date: {formatDate(discharge.discharge_date)} | Patient: {discharge.patient_name}<br />
-              This document serves as official discharge summary. Keep this document safe for future medical reference.
-            </div>
+            {/* Doctor Signature */}
+            <PrintSignature date={formatDate(discharge.discharge_date)} />
           </div>
         </PrintLayout>
       </DialogContent>

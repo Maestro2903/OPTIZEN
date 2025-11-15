@@ -54,9 +54,7 @@ export function PrintLayout({
         <div className="print-header">
           <div className="print-clinic-name">{clinicName}</div>
           <div className="print-clinic-details">
-            {clinicAddress}
-            <br />
-            Phone: {clinicPhone}
+            {clinicAddress} | Phone: {clinicPhone}
           </div>
           <div className="print-document-title">{documentTitle}</div>
         </div>
@@ -68,18 +66,16 @@ export function PrintLayout({
 
         {/* Footer */}
         <div className="print-footer">
-          <div>Generated on: {new Date().toLocaleDateString('en-GB', {
+          Generated on: {new Date().toLocaleDateString('en-GB', {
             day: '2-digit',
             month: '2-digit',
-            year: 'numeric',
+            year: 'numeric'
+          })} at {new Date().toLocaleTimeString('en-GB', {
             hour: '2-digit',
             minute: '2-digit'
-          })}</div>
-          <div style={{ fontSize: '8pt', marginTop: '5pt' }}>
-          This is a computer-generated document. For verification, please contact the clinic.
+          })}
         </div>
       </div>
-    </div>
     </>
   )
 }

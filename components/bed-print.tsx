@@ -72,187 +72,157 @@ export function BedPrint({ bed, children }: BedPrintProps) {
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <PrintLayout
           documentType="Bed Management"
-          documentTitle="Bed Allocation & Status Report"
+          documentTitle="Bed Management Report"
         >
-          {/* Bed Information */}
-          <PrintSection title="Bed Information">
-            <PrintRow>
-              <PrintCol>
-                <PrintField label="Bed Number" value={bed.bed_number} uppercase />
-                <PrintField label="Room Number" value={bed.room_number} />
-                <PrintField label="Ward" value={bed.ward} />
-              </PrintCol>
-              <PrintCol>
-                <PrintField label="Bed Type" value={bed.bed_type} />
-                <PrintField label="Current Status" value={getStatusDisplay(bed.status)} uppercase />
-                <PrintField label="Daily Rate" value={formatCurrency(bed.daily_rate)} />
-              </PrintCol>
-            </PrintRow>
-          </PrintSection>
+          <div className="print-bed-report">
+            {/* Bed Identification - Prominent */}
+            <div className="print-bed-identification">
+              <div className="print-bed-number-large">
+                BED {bed.bed_number}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8pt', marginTop: '8pt', fontSize: '10pt' }}>
+                <div>
+                  <div className="print-label" style={{ fontSize: '9pt' }}>Room Number</div>
+                  <div style={{ fontSize: '11pt', fontWeight: 'bold' }}>{bed.room_number || '-'}</div>
+                </div>
+                <div>
+                  <div className="print-label" style={{ fontSize: '9pt' }}>Ward</div>
+                  <div style={{ fontSize: '11pt', fontWeight: 'bold' }}>{bed.ward || '-'}</div>
+                </div>
+                <div>
+                  <div className="print-label" style={{ fontSize: '9pt' }}>Bed Type</div>
+                  <div style={{ fontSize: '11pt' }}>{bed.bed_type || 'Standard'}</div>
+                </div>
+              </div>
+              <div style={{ marginTop: '10pt', textAlign: 'center' }}>
+                <div className="print-label" style={{ fontSize: '9pt', marginBottom: '4pt' }}>Current Status</div>
+                <div className={`print-status-badge ${bed.status}`}>
+                  {getStatusDisplay(bed.status)}
+                </div>
+              </div>
+            </div>
 
-          {/* Current Occupancy */}
-          {bed.status === 'occupied' && (
-            <PrintSection title="Current Occupancy Details">
-              <PrintRow>
-                <PrintCol>
-                  <PrintField label="Patient Name" value={bed.patient_name} uppercase />
-                  <PrintField label="Patient ID" value={bed.patient_id} />
-                </PrintCol>
-                <PrintCol>
-                  <PrintField label="Admission Date" value={bed.admission_date ? formatDate(bed.admission_date) : undefined} />
-                  <PrintField label="Duration of Stay" value={calculateOccupancyDuration()} />
-                </PrintCol>
-              </PrintRow>
-
-              {bed.discharge_date && (
+            {/* Current Occupancy Details */}
+            {bed.status === 'occupied' && (
+              <PrintSection title="Current Occupancy Details">
                 <PrintRow>
                   <PrintCol>
-                    <PrintField label="Expected Discharge" value={formatDate(bed.discharge_date)} />
+                    <PrintField label="Patient Name" value={bed.patient_name} uppercase />
+                    <PrintField label="Patient ID" value={bed.patient_id} />
                   </PrintCol>
                   <PrintCol>
-                    <PrintField label="Assigned Nurse" value={bed.assigned_nurse} />
+                    <PrintField label="Admission Date" value={bed.admission_date ? formatDate(bed.admission_date) : undefined} />
+                    <PrintField label="Duration of Stay" value={calculateOccupancyDuration()} />
                   </PrintCol>
                 </PrintRow>
-              )}
-            </PrintSection>
-          )}
 
-          {/* Bed Specifications */}
-          <PrintSection title="Bed Specifications & Equipment">
-            <PrintRow>
-              <PrintCol>
-                <PrintField label="Bed Type" value={bed.bed_type || 'Standard Hospital Bed'} />
-                <PrintField label="Special Equipment" value={bed.special_equipment || 'Standard equipment'} />
-              </PrintCol>
-              <PrintCol>
-                <PrintField label="Last Cleaned" value={bed.last_cleaned ? formatDate(bed.last_cleaned) : 'Needs update'} />
-                <PrintField label="Maintenance Status" value={bed.status === 'maintenance' ? 'Under maintenance' : 'Operational'} />
-              </PrintCol>
-            </PrintRow>
-          </PrintSection>
-
-          {/* Bed History Table */}
-          <PrintSection title="Recent Bed Usage History">
-            <table className="print-table">
-              <thead>
-                <tr>
-                  <th>Date Range</th>
-                  <th>Patient</th>
-                  <th>Duration</th>
-                  <th>Status</th>
-                  <th>Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bed.status === 'occupied' && bed.admission_date ? (
-                  <tr>
-                    <td>{formatDate(bed.admission_date)} - Current</td>
-                    <td>{bed.patient_name || 'Current Patient'}</td>
-                    <td>{calculateOccupancyDuration()}</td>
-                    <td>Occupied</td>
-                    <td>{bed.notes || 'Active admission'}</td>
-                  </tr>
-                ) : (
-                  <tr>
-                    <td>Current</td>
-                    <td>-</td>
-                    <td>-</td>
-                    <td>{getStatusDisplay(bed.status)}</td>
-                    <td>{bed.notes || 'Available for admission'}</td>
-                  </tr>
+                {bed.discharge_date && (
+                  <PrintRow>
+                    <PrintCol>
+                      <PrintField label="Expected Discharge" value={formatDate(bed.discharge_date)} />
+                    </PrintCol>
+                    <PrintCol>
+                      <PrintField label="Assigned Nurse" value={bed.assigned_nurse || '-'} />
+                    </PrintCol>
+                  </PrintRow>
                 )}
-                <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', fontStyle: 'italic', color: '#666' }}>
-                    Historical data would be populated from bed management system
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </PrintSection>
+              </PrintSection>
+            )}
 
-          {/* Maintenance & Cleaning Schedule */}
-          <PrintSection title="Maintenance & Cleaning Information">
-            <PrintRow>
-              <PrintCol>
-                <PrintField label="Last Deep Clean" value={bed.last_cleaned ? formatDate(bed.last_cleaned) : 'Schedule required'} />
-                <PrintField label="Next Scheduled Clean" value="Daily after discharge" />
-              </PrintCol>
-              <PrintCol>
-                <PrintField label="Maintenance Due" value="Monthly inspection" />
-                <PrintField label="Equipment Check" value="Weekly verification" />
-              </PrintCol>
-            </PrintRow>
-          </PrintSection>
-
-          {/* Additional Notes */}
-          {bed.notes && (
-            <PrintSection title="Special Instructions & Notes">
+            {/* Bed Specifications */}
+            <PrintSection title="Bed Specifications">
               <PrintRow>
-                <PrintCol className="w-full">
-                  <PrintField label="Notes" value={bed.notes} />
+                <PrintCol>
+                  <PrintField label="Bed Type" value={bed.bed_type || 'Standard Hospital Bed'} />
+                  <PrintField label="Special Equipment" value={bed.special_equipment || 'Standard equipment'} />
+                </PrintCol>
+                <PrintCol>
+                  <PrintField label="Daily Rate" value={formatCurrency(bed.daily_rate)} />
+                  <PrintField label="Maintenance Status" value={bed.status === 'maintenance' ? 'Under maintenance' : 'Operational'} />
                 </PrintCol>
               </PrintRow>
             </PrintSection>
-          )}
 
-          {/* Bed Management Guidelines */}
-          <div className="print-medical-section">
-            <h4 style={{ fontSize: '12pt', fontWeight: 'bold', marginBottom: '10pt', borderBottom: '1px solid #000' }}>
-              BED MANAGEMENT PROTOCOLS
-            </h4>
-            <ul style={{ fontSize: '11pt', lineHeight: '1.4', paddingLeft: '20pt' }}>
-              <li>Bed allocation follows hospital admission guidelines</li>
-              <li>Daily cleaning and sanitization after each patient discharge</li>
-              <li>Equipment inspection before each new patient admission</li>
-              <li>Maintenance requests should be submitted immediately</li>
-              <li>Patient privacy and comfort protocols must be followed</li>
-              <li>Emergency bed allocation procedures available 24/7</li>
-            </ul>
-          </div>
+            {/* Occupancy History Table */}
+            <PrintSection title="Bed Usage History">
+              <table className="print-occupancy-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '20%' }}>Date Range</th>
+                    <th style={{ width: '25%' }}>Patient</th>
+                    <th style={{ width: '15%' }}>Duration</th>
+                    <th style={{ width: '15%' }}>Status</th>
+                    <th style={{ width: '25%' }}>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bed.status === 'occupied' && bed.admission_date ? (
+                    <tr>
+                      <td>{formatDate(bed.admission_date)} - Current</td>
+                      <td>{bed.patient_name || 'Current Patient'}</td>
+                      <td>{calculateOccupancyDuration()}</td>
+                      <td>Occupied</td>
+                      <td>{bed.notes || 'Active admission'}</td>
+                    </tr>
+                  ) : (
+                    <tr>
+                      <td>Current</td>
+                      <td>-</td>
+                      <td>-</td>
+                      <td>{getStatusDisplay(bed.status)}</td>
+                      <td>{bed.notes || 'Available for admission'}</td>
+                    </tr>
+                  )}
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: 'center', fontStyle: 'italic', color: '#666', fontSize: '9pt' }}>
+                      Historical data would be populated from bed management system
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </PrintSection>
 
-          {/* Contact Information */}
-          <div style={{ marginTop: '20pt', padding: '15pt', border: '1px solid #000', backgroundColor: '#f0f8ff' }}>
-            <h4 style={{ fontSize: '12pt', fontWeight: 'bold', marginBottom: '8pt', textAlign: 'center' }}>
-              HOUSEKEEPING & MAINTENANCE CONTACT
-            </h4>
-            <div style={{ fontSize: '11pt', lineHeight: '1.3', textAlign: 'center' }}>
-              <strong>Housekeeping Department:</strong> Extension 2001<br />
-              <strong>Maintenance Department:</strong> Extension 2002<br />
-              <strong>Nursing Station:</strong> Extension 2003<br />
-              <strong>Emergency Bed Allocation:</strong> Extension 2000
-            </div>
-          </div>
-
-          {/* Authorized Personnel Signatures */}
-          <div className="print-signature-section">
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '40pt' }}>
-              <div style={{ width: '200pt', textAlign: 'center' }}>
-                <div style={{ height: '30pt' }}></div>
-                <div style={{ borderTop: '1px solid #000', paddingTop: '5pt' }}>
-                  <strong>Nursing Supervisor</strong>
-                </div>
-                <div style={{ fontSize: '10pt' }}>Ward Management</div>
-                <div style={{ fontSize: '10pt' }}>Date: {formatDate(new Date().toISOString())}</div>
+            {/* Maintenance Log */}
+            <div className="print-maintenance-log">
+              <div style={{ fontSize: '11pt', fontWeight: 'bold', marginBottom: '8pt', textTransform: 'uppercase' }}>
+                Maintenance & Cleaning Log
               </div>
-
-              <div style={{ width: '200pt', textAlign: 'center' }}>
-                <div style={{ height: '30pt' }}></div>
-                <div style={{ borderTop: '1px solid #000', paddingTop: '5pt' }}>
-                  <strong>Housekeeping Manager</strong>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10pt', fontSize: '10pt' }}>
+                <div>
+                  <div className="print-label" style={{ fontSize: '9pt' }}>Last Deep Clean</div>
+                  <div style={{ fontSize: '11pt' }}>
+                    {bed.last_cleaned ? formatDate(bed.last_cleaned) : 'Schedule required'}
+                  </div>
                 </div>
-                <div style={{ fontSize: '10pt' }}>Maintenance & Cleaning</div>
-                <div style={{ fontSize: '10pt' }}>Date: {formatDate(new Date().toISOString())}</div>
+                <div>
+                  <div className="print-label" style={{ fontSize: '9pt' }}>Next Scheduled Clean</div>
+                  <div style={{ fontSize: '11pt' }}>Daily after discharge</div>
+                </div>
+                <div>
+                  <div className="print-label" style={{ fontSize: '9pt' }}>Maintenance Due</div>
+                  <div style={{ fontSize: '11pt' }}>Monthly inspection</div>
+                </div>
+                <div>
+                  <div className="print-label" style={{ fontSize: '9pt' }}>Equipment Check</div>
+                  <div style={{ fontSize: '11pt' }}>Weekly verification</div>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Bed Record Footer */}
-          <div style={{ marginTop: '40pt', padding: '10pt', border: '1px solid #ccc', backgroundColor: '#f9f9f9' }}>
-            <div style={{ fontSize: '10pt', textAlign: 'center' }}>
-              <strong>BED MANAGEMENT RECORD</strong><br />
-              Bed: {bed.bed_number} | Room: {bed.room_number} | Status: {getStatusDisplay(bed.status)}<br />
-              Report Generated: {formatDate(new Date().toISOString())} | For internal hospital management use only.
-            </div>
+            {/* Additional Notes */}
+            {bed.notes && (
+              <PrintSection title="Special Instructions & Notes">
+                <div style={{ fontSize: '11pt', lineHeight: '1.5' }}>{bed.notes}</div>
+              </PrintSection>
+            )}
+
+            {/* Nursing Supervisor Signature */}
+            <PrintSignature 
+              doctorName="Nursing Supervisor"
+              qualification="Ward Management"
+              registrationNumber=""
+              date={formatDate(new Date().toISOString())}
+            />
           </div>
         </PrintLayout>
       </DialogContent>

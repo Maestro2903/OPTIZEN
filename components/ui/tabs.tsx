@@ -19,15 +19,27 @@ interface TabsProps {
 export function Tabs({ defaultValue, value, onValueChange, children, className }: TabsProps) {
   const [internalActiveTab, setInternalActiveTab] = React.useState(defaultValue || "")
   const activeTab = value !== undefined ? value : internalActiveTab
-  const setActiveTab = (newValue: string) => {
+  
+  // Use ref to avoid recreating callback when onValueChange changes
+  const onValueChangeRef = React.useRef(onValueChange)
+  React.useEffect(() => {
+    onValueChangeRef.current = onValueChange
+  }, [onValueChange])
+  
+  const setActiveTab = React.useCallback((newValue: string) => {
     if (value === undefined) {
       setInternalActiveTab(newValue)
     }
-    onValueChange?.(newValue)
-  }
+    onValueChangeRef.current?.(newValue)
+  }, [value])
+
+  const contextValue = React.useMemo(() => ({
+    activeTab,
+    setActiveTab
+  }), [activeTab, setActiveTab])
 
   return (
-    <TabsContext.Provider value={{ activeTab, setActiveTab }}>
+    <TabsContext.Provider value={contextValue}>
       <div className={className}>{children}</div>
     </TabsContext.Provider>
   )
@@ -66,6 +78,7 @@ export function TabsTrigger({ value, children, className }: TabsTriggerProps) {
 
   return (
     <button
+      type="button"
       className={cn(
         "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
         activeTab === value

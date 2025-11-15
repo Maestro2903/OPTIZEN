@@ -171,5 +171,112 @@ html {
   height: 1rem;
 }
 
+/* Master Data Page Styles */
+@layer components {
+  /* Sidebar Navigation */
+  .master-data-sidebar {
+    @apply h-full bg-background border-r;
+  }
+
+  /* Data Grid Enhancements */
+  .data-grid-row {
+    @apply hover:bg-muted/30 transition-colors duration-150;
+  }
+
+  .data-grid-row:hover .data-grid-actions {
+    @apply opacity-100;
+  }
+
+  .data-grid-actions {
+    @apply opacity-0 transition-opacity duration-150;
+  }
+
+  /* Sidebar smooth animations */
+  .sidebar-enter {
+    animation: slideInLeft 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .sidebar-exit {
+    animation: slideOutLeft 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  @keyframes slideInLeft {
+    from {
+      transform: translateX(-100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideOutLeft {
+    from {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    to {
+      transform: translateX(-100%);
+      opacity: 0;
+    }
+  }
+
+  /* Fade in animation for data grid items */
+  .data-grid-item {
+    animation: fadeInUp 0.2s ease-out;
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Loading skeleton pulse */
+  .skeleton-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  /* Better hover states for interactive elements */
+  .interactive-hover {
+    @apply transition-all duration-200 ease-in-out;
+  }
+
+  .interactive-hover:hover {
+    @apply scale-[1.02] shadow-sm;
+  }
+
+  /* Category badge animations */
+  .category-badge {
+    @apply transition-all duration-200;
+  }
+
+  .category-badge:hover {
+    @apply scale-105;
+  }
+
+  /* Responsive sidebar */
+  @media (max-width: 1024px) {
+    .master-data-sidebar {
+      @apply fixed inset-y-0 left-0 z-50 w-64 shadow-xl;
+    }
+  }
+}
+
 /* Import print styles */
 @import url('../styles/print.css');

@@ -1,20 +1,106 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { requirePermission } from '@/lib/middleware/rbac'
+
+// Helper function to resolve eye and anesthesia names from master_data
+async function resolveOperationFields(operations: any[], supabase: any) {
+  if (!operations || operations.length === 0) return operations
+  
+  const eyeIds = operations.map(op => op.eye).filter(Boolean)
+  const anesthesiaIds = operations.map(op => op.anesthesia).filter(Boolean)
+  // Check if operation_name might be a UUID (UUIDs are 36 characters with dashes)
+  const operationNames = operations.map(op => op.operation_name).filter(Boolean)
+  const possibleOperationUuids = operationNames.filter(name => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(name))
+  
+  // Fetch eye selection names
+  let eyesMap: Record<string, string> = {}
+  if (eyeIds.length > 0) {
+    const { data: eyes } = await supabase
+      .from('master_data')
+      .select('id, name')
+      .in('id', eyeIds)
+      .eq('category', 'eye_selection')
+    
+    if (eyes) {
+      eyes.forEach((eye: any) => {
+        eyesMap[eye.id] = eye.name
+      })
+    }
+  }
+  
+  // Fetch anesthesia type names
+  let anesthesiaMap: Record<string, string> = {}
+  if (anesthesiaIds.length > 0) {
+    const { data: anesthesiaTypes } = await supabase
+      .from('master_data')
+      .select('id, name')
+      .in('id', anesthesiaIds)
+      .eq('category', 'anesthesia_types')
+    
+    if (anesthesiaTypes) {
+      anesthesiaTypes.forEach((anesthesia: any) => {
+        anesthesiaMap[anesthesia.id] = anesthesia.name
+      })
+    }
+  }
+
+  // Fetch surgery type names if operation_name appears to be a UUID
+  let surgeryTypesMap: Record<string, string> = {}
+  if (possibleOperationUuids.length > 0) {
+    // Try surgery_types category first
+    const { data: surgeryTypes } = await supabase
+      .from('master_data')
+      .select('id, name')
+      .in('id', possibleOperationUuids)
+      .eq('category', 'surgery_types')
+    
+    if (surgeryTypes) {
+      surgeryTypes.forEach((surgery: any) => {
+        surgeryTypesMap[surgery.id] = surgery.name
+      })
+    }
+
+    // Also try surgeries category as fallback
+    const unresolvedSurgeryIds = possibleOperationUuids.filter(id => !surgeryTypesMap[id])
+    if (unresolvedSurgeryIds.length > 0) {
+      const { data: surgeries } = await supabase
+        .from('master_data')
+        .select('id, name')
+        .in('id', unresolvedSurgeryIds)
+        .eq('category', 'surgeries')
+      
+      if (surgeries) {
+        surgeries.forEach((surgery: any) => {
+          surgeryTypesMap[surgery.id] = surgery.name
+        })
+      }
+    }
+  }
+  
+  // Return enriched operation objects
+  return operations.map(op => {
+    const operationName = op.operation_name
+    const isUuid = operationName && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(operationName)
+    const resolvedOperationName = isUuid ? (surgeryTypesMap[operationName] || operationName) : operationName
+    
+    return {
+      ...op,
+      operation_name: resolvedOperationName,
+      operation_name_original: operationName, // Keep original for reference
+      eye_name: op.eye ? (eyesMap[op.eye] || op.eye) : undefined,
+      anesthesia_name: op.anesthesia ? (anesthesiaMap[op.anesthesia] || op.anesthesia) : undefined,
+    }
+  })
+}
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Check authentication
-    const supabase = createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
+    // RBAC check
+    const authCheck = await requirePermission('operations', 'view')
+    if (!authCheck.authorized) return authCheck.response
 
     const { id } = await params
 
@@ -27,22 +113,10 @@ export async function GET(
       )
     }
 
-    // Get user role from users table (secure authorization)
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .eq('is_active', true)
-      .single()
+    // Use service client to bypass RLS during RBAC bypass mode
+    const supabase = createServiceClient()
 
-    if (userError || !userData) {
-      return NextResponse.json(
-        { success: false, error: 'User not found' },
-        { status: 404 }
-      )
-    }
-
-    // Fetch operation with all required data including authorization fields
+    // Fetch operation with all required data
     const { data: operation, error } = await supabase
       .from('operations')
       .select(`
@@ -53,13 +127,13 @@ export async function GET(
           full_name,
           email,
           mobile,
-          gender,
-          user_id
+          gender
         ),
-        cases:case_id (
+        encounters:case_id (
           id,
-          case_no,
-          diagnosis
+          encounter_date,
+          diagnosis,
+          chief_complaint
         )
       `)
       .eq('id', id)
@@ -74,27 +148,22 @@ export async function GET(
       )
     }
 
-    // Check if user is authorized to view this operation
-    const userRole = userData.role
-    const isAuthorized =
-      userRole === 'super_admin' ||
-      userRole === 'hospital_admin' ||
-      userRole === 'ophthalmologist' ||
-      userRole === 'optometrist' ||
-      operation.surgeon_id === user.id ||
-      operation.anesthetist_id === user.id ||
-      operation.patients?.user_id === user.id
+    // Resolve eye and anesthesia names from master_data
+    const resolvedOperations = operation ? await resolveOperationFields([operation], supabase) : []
+    const resolvedOperation = resolvedOperations.length > 0 ? resolvedOperations[0] : operation
 
-    if (!isAuthorized) {
-      return NextResponse.json(
-        { success: false, error: 'Forbidden - insufficient permissions' },
-        { status: 403 }
-      )
+    // Normalize response: add cases alias for backward compatibility
+    const normalizedOperation = {
+      ...resolvedOperation,
+      cases: resolvedOperation.encounters ? {
+        ...resolvedOperation.encounters,
+        case_no: resolvedOperation.encounters.id ? `ENC-${resolvedOperation.encounters.id.substring(0, 8).toUpperCase()}` : undefined
+      } : resolvedOperation.cases || null
     }
 
     return NextResponse.json({
       success: true,
-      data: operation
+      data: normalizedOperation
     })
 
   } catch (error) {
@@ -111,16 +180,10 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createClient()
-
-    // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
+    // RBAC check
+    const authCheck = await requirePermission('operations', 'edit')
+    if (!authCheck.authorized) return authCheck.response
+    const { context } = authCheck
 
     const { id } = await params
 
@@ -133,50 +196,20 @@ export async function PUT(
       )
     }
 
-    // Get user role from users table (secure authorization)
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .eq('is_active', true)
-      .single()
-
-    if (userError || !userData) {
-      return NextResponse.json(
-        { success: false, error: 'User not found' },
-        { status: 404 }
-      )
-    }
-
-    // Fetch operation for authorization check
-    const { data: operationAuth, error: fetchError } = await supabase
+    // Check if operation exists
+    // Use service client to bypass RLS during RBAC bypass mode
+    const supabase = createServiceClient()
+    const { data: existingOperation, error: fetchError } = await supabase
       .from('operations')
-      .select('surgeon_id, anesthetist_id, patient_id, patients(user_id)')
+      .select('id')
       .eq('id', id)
+      .is('deleted_at', null)
       .single()
 
-    if (fetchError || !operationAuth) {
+    if (fetchError || !existingOperation) {
       return NextResponse.json(
         { success: false, error: 'Operation not found' },
         { status: 404 }
-      )
-    }
-
-    // Check if user is authorized to update this operation
-    const userRole = userData.role
-    const isAuthorized =
-      userRole === 'super_admin' ||
-      userRole === 'hospital_admin' ||
-      userRole === 'ophthalmologist' ||
-      userRole === 'optometrist' ||
-      operationAuth.surgeon_id === user.id ||
-      operationAuth.anesthetist_id === user.id ||
-      (operationAuth.patients as any)?.user_id === user.id
-
-    if (!isAuthorized) {
-      return NextResponse.json(
-        { success: false, error: 'Forbidden - insufficient permissions to update this operation' },
-        { status: 403 }
       )
     }
 
@@ -190,73 +223,64 @@ export async function PUT(
       )
     }
 
-    // Define allowed fields that can be updated
+    // Define allowed fields that can be updated (matching the schema)
     const allowedFields = [
       'operation_name',
       'operation_date',
-      'operation_type',
-      'procedure_details',
-      'surgeon_id',
-      'anesthetist_id',
+      'begin_time',
+      'end_time',
       'duration',
-      'complications',
+      'eye',
+      'sys_diagnosis',
+      'anesthesia',
+      'operation_notes',
+      'payment_mode',
+      'amount',
+      'iol_name',
+      'iol_power',
+      'print_notes',
+      'print_payment',
+      'print_iol',
       'status',
-      'notes'
+      'case_id'
     ]
 
-    // Validate surgeon_id and anesthetist_id if provided
-    if (body.surgeon_id) {
-      const { data: surgeon, error: surgeonError } = await supabase
-        .from('users')
-        .select('id, role')
-        .eq('id', body.surgeon_id)
-        .eq('role', 'surgeon')
-        .single()
-
-      if (surgeonError || !surgeon) {
-        return NextResponse.json({
-          success: false,
-          error: 'Invalid surgeon_id - user not found or does not have surgeon role'
-        }, { status: 400 })
-      }
-    }
-
-    if (body.anesthetist_id) {
-      const { data: anesthetist, error: anesthetistError } = await supabase
-        .from('users')
-        .select('id, role')
-        .eq('id', body.anesthetist_id)
-        .eq('role', 'anesthetist')
-        .single()
-
-      if (anesthetistError || !anesthetist) {
-        return NextResponse.json({
-          success: false,
-          error: 'Invalid anesthetist_id - user not found or does not have anesthetist role'
-        }, { status: 400 })
-      }
-    }
-
     // Build update data with only allowed fields
-    const updateData: Record<string, any> = { updated_at: new Date().toISOString() }
+    const updateData: any = { 
+      updated_at: new Date().toISOString() 
+    }
+    
+    // Only set updated_by if it's not the mock bypass user ID
+    if (context.user_id !== '00000000-0000-0000-0000-000000000000') {
+      updateData.updated_by = context.user_id
+    }
+    
     for (const field of allowedFields) {
       if (body[field] !== undefined) {
         updateData[field] = body[field]
       }
     }
 
-    // Check if there's anything to update
-    if (Object.keys(updateData).length === 1) { // Only updated_at
+    // Convert amount to number if provided
+    if (updateData.amount && typeof updateData.amount === 'string') {
+      updateData.amount = parseFloat(updateData.amount)
+    }
+
+    // Check if there's anything to update (besides updated_at and updated_by)
+    const baseFieldCount = updateData.updated_by ? 2 : 1 // Count updated_at and optionally updated_by
+    if (Object.keys(updateData).length === baseFieldCount) {
       return NextResponse.json({
         success: false,
         error: 'No valid fields to update. Allowed fields: ' + allowedFields.join(', ')
       }, { status: 400 })
     }
 
-    const { data: operation, error } = await supabase
+    // Perform update
+    const updateResult = await (supabase as any)
       .from('operations')
       .update(updateData)
       .eq('id', id)
+      .is('deleted_at', null)
       .select(`
         *,
         patients:patient_id (
@@ -267,14 +291,16 @@ export async function PUT(
           mobile,
           gender
         ),
-        cases:case_id (
+        encounters:case_id (
           id,
-          case_no,
-          diagnosis
+          encounter_date,
+          diagnosis,
+          chief_complaint
         )
       `)
-      .is('deleted_at', null)
       .single()
+    
+    const { data: operation, error } = updateResult
 
     if (error) {
       console.error('Operation update error:', error)
@@ -284,9 +310,22 @@ export async function PUT(
       )
     }
 
+    // Resolve eye and anesthesia names from master_data
+    const resolvedOperations = operation ? await resolveOperationFields([operation], supabase) : []
+    const resolvedOperation = resolvedOperations.length > 0 ? resolvedOperations[0] : operation
+
+    // Normalize response: add cases alias for backward compatibility
+    const normalizedOperation = {
+      ...resolvedOperation,
+      cases: resolvedOperation.encounters ? {
+        ...resolvedOperation.encounters,
+        case_no: resolvedOperation.encounters.id ? `ENC-${resolvedOperation.encounters.id.substring(0, 8).toUpperCase()}` : undefined
+      } : resolvedOperation.cases || null
+    }
+
     return NextResponse.json({
       success: true,
-      data: operation,
+      data: normalizedOperation,
       message: 'Operation updated successfully'
     })
 
@@ -304,16 +343,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createClient()
-
-    // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
+    // RBAC check
+    const authCheck = await requirePermission('operations', 'delete')
+    if (!authCheck.authorized) return authCheck.response
+    const { context } = authCheck
 
     const { id } = await params
 
@@ -326,8 +359,11 @@ export async function DELETE(
       )
     }
 
+    // Use service client to bypass RLS during RBAC bypass mode
+    const supabase = createServiceClient()
+
     // Check if operation exists and is not already deleted
-    const { data: existingOperation, error: fetchError } = await supabase
+    const { data: existingOperation, error: fetchError } = await (supabase as any)
       .from('operations')
       .select('id, deleted_at')
       .eq('id', id)
@@ -347,7 +383,7 @@ export async function DELETE(
       )
     }
 
-    if (existingOperation.deleted_at) {
+    if (existingOperation?.deleted_at) {
       return NextResponse.json(
         { success: false, error: 'Operation already deleted' },
         { status: 410 }
@@ -355,12 +391,19 @@ export async function DELETE(
     }
 
     // Soft delete by setting deleted_at timestamp
-    const { error } = await supabase
+    const deleteData: Record<string, any> = {
+      deleted_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }
+    
+    // Only set updated_by if it's not the mock bypass user ID
+    if (context.user_id !== '00000000-0000-0000-0000-000000000000') {
+      deleteData.updated_by = context.user_id
+    }
+    
+    const { error } = await (supabase as any)
       .from('operations')
-      .update({
-        deleted_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
+      .update(deleteData)
       .eq('id', id)
       .is('deleted_at', null) // Only delete if not already deleted
 

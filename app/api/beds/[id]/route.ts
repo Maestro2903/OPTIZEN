@@ -1,19 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { requirePermission } from '@/lib/middleware/rbac'
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    // RBAC check
+    const authCheck = await requirePermission('beds', 'edit')
+    if (!authCheck.authorized) return authCheck.response
+
     const supabase = createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
     const { id } = await params
     const body = await request.json()
 
@@ -26,24 +24,22 @@ export async function PUT(
       .eq('id', id)
       .select(`
         *,
-        bed_assignments (
+        bed_assignments!bed_assignments_bed_id_fkey (
           id,
           patient_id,
           admission_date,
           expected_discharge_date,
           admission_reason,
-          doctor_id,
-          patients:patient_id (
+          surgery_scheduled_time,
+          surgery_type,
+          assigned_doctor_id,
+          status,
+          patients!bed_assignments_patient_id_fkey (
             id,
             patient_id,
             full_name,
             gender,
             date_of_birth
-          ),
-          doctors:doctor_id (
-            id,
-            employee_id,
-            full_name
           )
         )
       `)
@@ -57,6 +53,20 @@ export async function PUT(
       )
     }
 
+    // Get doctor name if there's an active assignment
+    let doctorName = null
+    if (bed.bed_assignments && bed.bed_assignments.length > 0 && bed.bed_assignments[0].assigned_doctor_id) {
+      const { data: doctor } = await supabase
+        .from('users')
+        .select('full_name')
+        .eq('id', bed.bed_assignments[0].assigned_doctor_id)
+        .single()
+      
+      if (doctor) {
+        doctorName = doctor.full_name
+      }
+    }
+
     // Transform data to match frontend format
     const transformedBed = {
       bed,
@@ -67,7 +77,7 @@ export async function PUT(
           ? new Date().getFullYear() - new Date(bed.bed_assignments[0].patients.date_of_birth).getFullYear()
           : null,
         patient_mrn: bed.bed_assignments[0].patients?.patient_id,
-        doctor_name: bed.bed_assignments[0].doctors?.full_name,
+        doctor_name: doctorName,
         days_in_ward: Math.floor(
           (new Date().getTime() - new Date(bed.bed_assignments[0].admission_date).getTime())
           / (1000 * 60 * 60 * 24)
@@ -95,18 +105,12 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    // RBAC check
+    const authCheck = await requirePermission('beds', 'delete')
+    if (!authCheck.authorized) return authCheck.response
+
     const supabase = createClient()
-
-    // Authentication check
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    const { id } = params
+    const { id } = await params
 
     // Check if bed has active assignments
     const { data: assignments, error: checkError } = await supabase

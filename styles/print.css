@@ -1,4 +1,4 @@
-/* Print Styles for Medical Records */
+/* Print Styles for Medical Records - Clean A4 Format */
 
 @media print {
   /* Hide non-printable elements */
@@ -9,30 +9,156 @@
     display: none !important;
   }
 
-  /* Page setup */
+  /* Hide dialog overlays and backdrops */
+  [data-radix-dialog-overlay],
+  [data-radix-portal],
+  .fixed.inset-0[class*="bg-black"],
+  .fixed.inset-0[class*="bg-background"],
+  [class*="backdrop"],
+  [class*="overlay"] {
+    display: none !important;
+  }
+
+  /* Hide all buttons - but not if they're inside print container (shouldn't be any, but just in case) */
+  button:not(.print-container button),
+  [role="button"]:not(.print-container [role="button"]),
+  [type="button"]:not(.print-container [type="button"]) {
+    display: none !important;
+  }
+
+  /* Hide close buttons and icons specifically */
+  [aria-label*="close" i],
+  [aria-label*="Close"],
+  button[aria-label*="close" i],
+  button[aria-label*="Close"] {
+    display: none !important;
+  }
+
+  /* Hide navigation and UI chrome - be specific to avoid hiding content */
+  nav:not(.print-container nav),
+  header:not(.print-header):not(.print-container header),
+  footer:not(.print-footer):not(.print-container footer),
+  aside:not(.print-container aside),
+  [class*="sidebar"]:not(.print-container [class*="sidebar"]),
+  /* Hide app layout elements */
+  [class*="app-sidebar"],
+  [class*="layout"],
+  /* Hide main app content area when printing dialog */
+  main:not(.print-container main),
+  [role="main"]:not(.print-container [role="main"]) {
+    display: none !important;
+  }
+
+  /* Reset dialog content to print-friendly */
+  [data-radix-dialog-content],
+  [role="dialog"] {
+    position: static !important;
+    transform: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+    max-height: none !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: white !important;
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    inset: auto !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    z-index: auto !important;
+  }
+
+  /* Remove dialog wrapper styling - handle Tailwind classes */
+  [data-radix-dialog-content] > *,
+  [data-radix-dialog-content] {
+    max-width: none !important;
+    max-height: none !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+  }
+
+  /* Override any Tailwind utility classes on dialog content */
+  [data-radix-dialog-content][class*="max-w-"],
+  [data-radix-dialog-content][class*="max-h-"],
+  [data-radix-dialog-content][class*="overflow-"] {
+    max-width: none !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* Hide flex containers used for UI buttons */
+  .flex.justify-end:has(button),
+  .flex.justify-between:has(button) {
+    display: none !important;
+  }
+
+  /* Ensure print container is visible and properly styled */
+  .print-container {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  /* Page setup - A4 portrait */
   @page {
-    size: A4;
-    margin: 1in 0.75in;
-    @top-center {
-      content: "Medical Record - " attr(data-document-type);
-    }
-    @bottom-center {
-      content: "Page " counter(page) " of " counter(pages);
-    }
+    size: A4 portrait;
+    margin: 15mm 20mm;
   }
 
   /* Base page styles */
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    box-sizing: border-box;
   }
 
+  html,
   body {
     background: white !important;
     color: black !important;
-    font-family: 'Times New Roman', serif;
-    font-size: 12pt;
-    line-height: 1.4;
+    font-family: 'Arial', 'Helvetica', sans-serif;
+    font-size: 11pt;
+    line-height: 1.3;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Show dialog content - it contains our print content */
+  [data-radix-dialog-content] {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  /* Ensure all children of dialog content are visible */
+  [data-radix-dialog-content] * {
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  /* Ensure print container and all its content is visible */
+  .print-container,
+  .print-container * {
+    display: revert !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  /* Print container itself should be block */
+  .print-container {
+    display: block !important;
   }
 
   /* Print container */
@@ -45,178 +171,227 @@
     border: none !important;
   }
 
-  /* Header styling */
+  /* Header styling - minimal and clean */
   .print-header {
     text-align: center;
     border-bottom: 2px solid #000;
-    padding-bottom: 15pt;
-    margin-bottom: 20pt;
+    padding-bottom: 8pt;
+    margin-bottom: 12pt;
+    page-break-after: avoid;
   }
 
   .print-clinic-name {
-    font-size: 20pt;
+    font-size: 16pt;
     font-weight: bold;
-    margin-bottom: 5pt;
+    margin-bottom: 3pt;
+    color: #000;
   }
 
   .print-clinic-details {
-    font-size: 10pt;
-    margin-bottom: 8pt;
+    font-size: 9pt;
+    margin-bottom: 4pt;
+    color: #333;
   }
 
   .print-document-title {
-    font-size: 16pt;
+    font-size: 13pt;
     font-weight: bold;
     text-transform: uppercase;
-    margin-top: 10pt;
+    margin-top: 6pt;
+    color: #000;
   }
 
-  /* Patient info section */
+  /* Section styling - clean and minimal */
   .print-patient-section {
-    margin-bottom: 20pt;
-    border: 1px solid #ccc;
-    padding: 10pt;
+    margin-bottom: 12pt;
+    page-break-inside: avoid;
   }
 
   .print-section-title {
-    font-size: 14pt;
+    font-size: 11pt;
     font-weight: bold;
     text-transform: uppercase;
     border-bottom: 1px solid #000;
-    padding-bottom: 5pt;
-    margin-bottom: 10pt;
+    padding-bottom: 3pt;
+    margin-bottom: 6pt;
+    page-break-after: avoid;
   }
 
   /* Two-column layout */
   .print-row {
     display: flex;
-    margin-bottom: 8pt;
+    margin-bottom: 6pt;
     page-break-inside: avoid;
   }
 
   .print-col {
     flex: 1;
-    padding-right: 15pt;
+    padding-right: 12pt;
   }
 
   .print-col:last-child {
     padding-right: 0;
   }
 
-  /* Field styling */
+  .print-col.w-full {
+    width: 100%;
+  }
+
+  /* Field styling - clean and simple */
   .print-field {
-    margin-bottom: 8pt;
+    margin-bottom: 5pt;
     page-break-inside: avoid;
   }
 
   .print-label {
     font-weight: bold;
-    font-size: 10pt;
-    color: #444;
-    margin-bottom: 2pt;
-    text-transform: uppercase;
+    font-size: 9pt;
+    color: #000;
+    margin-bottom: 1pt;
   }
 
   .print-value {
-    font-size: 12pt;
+    font-size: 10pt;
     color: #000;
-    padding: 2pt 5pt;
-    border-bottom: 1px solid #ccc;
-    min-height: 16pt;
+    padding: 2pt 0;
+    border-bottom: 1px solid #ddd;
+    min-height: 14pt;
   }
 
-  /* Special field types */
   .print-value.uppercase {
     text-transform: uppercase;
-    font-weight: bold;
+    font-weight: 600;
   }
 
   .print-value.center {
     text-align: center;
   }
 
-  /* Table styling */
+  /* Table styling - professional and clean */
   .print-table {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 15pt;
-    font-size: 10pt;
+    margin: 8pt 0;
+    font-size: 9pt;
+    page-break-inside: auto;
+  }
+
+  .print-table thead {
+    display: table-header-group;
+  }
+
+  .print-table tbody {
+    display: table-row-group;
+  }
+
+  .print-table tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
   }
 
   .print-table th,
   .print-table td {
     border: 1px solid #000;
-    padding: 6pt;
+    padding: 4pt 5pt;
     text-align: left;
   }
 
   .print-table th {
-    background-color: #f5f5f5 !important;
+    background-color: #f0f0f0 !important;
     font-weight: bold;
-    text-transform: uppercase;
+    font-size: 9pt;
   }
 
-  /* Medical sections */
-  .print-medical-section {
-    margin-bottom: 20pt;
-    padding: 10pt;
-    border: 1px solid #000;
+  .print-table td {
+    font-size: 9pt;
+  }
+
+  /* Remove colored boxes and excessive styling */
+  .print-medical-section,
+  .print-emergency,
+  .print-prescription {
+    margin: 10pt 0;
+    padding: 0;
+    border: none;
+    background: transparent !important;
     page-break-inside: avoid;
   }
 
+  .print-prescription {
+    border: 1px solid #000;
+    padding: 8pt;
+  }
+
+  .print-rx-header {
+    font-size: 12pt;
+    font-weight: bold;
+    margin-bottom: 6pt;
+    text-align: left;
+  }
+
+  /* Vision/Eye data boxes */
   .print-vision-box {
     display: inline-block;
     width: 48%;
     margin-right: 2%;
-    border: 1px solid #ccc;
-    padding: 8pt;
+    border: 1px solid #000;
+    padding: 6pt;
     text-align: center;
+    font-size: 10pt;
   }
 
   .print-vision-box:last-child {
     margin-right: 0;
   }
 
-  /* Certificate specific styles */
+  /* Certificate specific - clean border */
   .print-certificate {
-    border: 3px solid #000;
-    padding: 20pt;
-    margin: 20pt 0;
+    border: 2px solid #000;
+    padding: 15pt;
+    margin: 12pt 0;
+    page-break-inside: avoid;
   }
 
   .print-certificate-body {
     text-align: justify;
-    font-size: 12pt;
-    line-height: 1.6;
-    margin: 15pt 0;
+    font-size: 11pt;
+    line-height: 1.4;
+    margin: 10pt 0;
   }
 
-  /* Signature section */
+  /* Signature section - minimal */
   .print-signature-section {
-    margin-top: 40pt;
+    margin-top: 25pt;
     page-break-inside: avoid;
   }
 
   .print-signature-box {
     float: right;
-    width: 200pt;
+    width: 180pt;
     text-align: center;
-    border-top: 1px solid #000;
-    padding-top: 5pt;
-    margin-top: 30pt;
+    margin-top: 20pt;
   }
 
-  /* Footer */
+  .print-signature-box::before {
+    content: "";
+    display: block;
+    width: 100%;
+    border-top: 1px solid #000;
+    margin-bottom: 4pt;
+  }
+
+  /* Footer - minimal */
   .print-footer {
-    margin-top: 30pt;
-    padding-top: 10pt;
+    margin-top: 15pt;
+    padding-top: 6pt;
     border-top: 1px solid #ccc;
-    font-size: 10pt;
+    font-size: 8pt;
     text-align: center;
     page-break-inside: avoid;
+    color: #666;
   }
 
-  /* Page breaks */
+  /* Page break controls */
   .print-page-break {
     page-break-before: always;
   }
@@ -225,63 +400,9 @@
     page-break-inside: avoid;
   }
 
-  /* Emergency styles */
-  .print-emergency {
-    border: 2px solid #ff0000;
-    background-color: #fff5f5 !important;
-    padding: 10pt;
-  }
-
-  /* Prescription styles */
-  .print-prescription {
-    border: 2px solid #000;
-    padding: 15pt;
-    margin: 15pt 0;
-  }
-
-  .print-rx-header {
-    text-align: center;
-    font-size: 16pt;
-    font-weight: bold;
-    margin-bottom: 15pt;
-  }
-
-  .print-medication-list {
-    list-style: decimal;
-    padding-left: 20pt;
-  }
-
-  .print-medication-item {
-    margin-bottom: 8pt;
-    font-size: 12pt;
-  }
-
-  /* Lab results styling */
-  .print-lab-results {
-    border: 1px solid #000;
-    padding: 10pt;
-  }
-
-  .print-lab-table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-
-  .print-lab-table th,
-  .print-lab-table td {
-    border: 1px solid #000;
-    padding: 5pt;
-    font-size: 10pt;
-  }
-
-  /* QR code for digital verification */
-  .print-qr-section {
-    position: absolute;
-    bottom: 20pt;
-    right: 20pt;
-    text-align: center;
-    font-size: 8pt;
-  }
+  .print-spacing-sm { margin-bottom: 6pt; }
+  .print-spacing-md { margin-bottom: 10pt; }
+  .print-spacing-lg { margin-bottom: 15pt; }
 
   /* Watermark for drafts */
   .print-draft-watermark::before {
@@ -290,9 +411,10 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%) rotate(-45deg);
-    font-size: 48pt;
-    color: #ccc;
+    font-size: 72pt;
+    color: #e0e0e0;
     z-index: -1;
+    opacity: 0.3;
   }
 
   /* Hide screen-only elements */
@@ -300,52 +422,486 @@
     display: none !important;
   }
 
-  /* Ensure proper spacing */
-  .print-spacing-sm { margin-bottom: 8pt; }
-  .print-spacing-md { margin-bottom: 12pt; }
-  .print-spacing-lg { margin-bottom: 20pt; }
+  /* ============================================
+     DEPARTMENT-SPECIFIC DOCUMENT STYLES
+     ============================================ */
 
-  /* Checkbox styling for forms */
-  .print-checkbox {
-    display: inline-block;
-    width: 12pt;
-    height: 12pt;
-    border: 1px solid #000;
-    margin-right: 5pt;
-    vertical-align: middle;
+  /* Medical Record Card - Patient Print */
+  .print-medical-card {
+    border: 2px solid #000;
+    padding: 12pt;
+    margin-bottom: 12pt;
+    page-break-inside: avoid;
   }
 
-  .print-checkbox.checked::after {
-    content: "✓";
-    display: block;
+  .print-photo-placeholder {
+    width: 80pt;
+    height: 100pt;
+    border: 1px solid #000;
+    background: #f9f9f9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8pt;
+    color: #666;
+    float: left;
+    margin-right: 12pt;
+    margin-bottom: 8pt;
+  }
+
+  .print-patient-id-large {
+    font-size: 14pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    margin-bottom: 8pt;
+  }
+
+  .print-compact-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4pt;
+    margin-bottom: 8pt;
+  }
+
+  /* Appointment Slip */
+  .print-appointment-slip {
+    max-width: 18cm;
+    margin: 0 auto;
+    padding: 10pt;
+    border: 1px solid #000;
+    page-break-inside: avoid;
+  }
+
+  .print-appointment-number {
+    font-size: 18pt;
+    font-weight: bold;
     text-align: center;
-    line-height: 12pt;
+    margin-bottom: 10pt;
+    border-bottom: 2px solid #000;
+    padding-bottom: 6pt;
+  }
+
+  .print-appointment-datetime {
+    font-size: 16pt;
+    font-weight: bold;
+    text-align: center;
+    margin: 12pt 0;
+    padding: 8pt;
+    background: #f0f0f0 !important;
+  }
+
+  .print-tear-line {
+    border-top: 2px dashed #000;
+    margin-top: 15pt;
+    padding-top: 8pt;
+    text-align: center;
+    font-size: 8pt;
+    color: #666;
+  }
+
+  /* Medical Case Report */
+  .print-case-report {
+    font-family: 'Times New Roman', serif;
+  }
+
+  .print-chief-complaint {
+    font-size: 12pt;
+    font-weight: bold;
+    margin: 10pt 0 6pt 0;
+    padding: 6pt;
+    background: #f9f9f9 !important;
+    border-left: 4px solid #000;
+  }
+
+  .print-history-section {
+    margin: 10pt 0;
+    text-align: justify;
+    line-height: 1.5;
+  }
+
+  .print-diagnosis-box {
+    border: 2px solid #000;
+    padding: 10pt;
+    margin: 10pt 0;
+    background: #fff !important;
     font-weight: bold;
   }
 
-  /* Address formatting */
-  .print-address {
-    line-height: 1.3;
-    margin-bottom: 8pt;
+  .print-treatment-list {
+    margin: 8pt 0;
+    padding-left: 20pt;
+  }
+
+  .print-treatment-list li {
+    margin-bottom: 4pt;
+    line-height: 1.4;
+  }
+
+  /* Surgical Operation Report */
+  .print-surgical-report {
+    font-family: 'Times New Roman', serif;
+  }
+
+  .print-surgical-team-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10pt 0;
+  }
+
+  .print-surgical-team-table th,
+  .print-surgical-team-table td {
+    border: 1px solid #000;
+    padding: 6pt;
+    text-align: left;
+  }
+
+  .print-surgical-team-table th {
+    background: #f0f0f0 !important;
+    font-weight: bold;
+  }
+
+  .print-diagnosis-highlight {
+    border: 2px solid #000;
+    padding: 10pt;
+    margin: 10pt 0;
+    background: #fff !important;
+    font-weight: bold;
+    font-size: 11pt;
+  }
+
+  .print-diagnosis-highlight.pre-op {
+    border-left: 6px solid #0066cc;
+  }
+
+  .print-diagnosis-highlight.post-op {
+    border-left: 6px solid #cc0000;
+  }
+
+  .print-complications-box {
+    border: 2px solid #cc0000;
+    padding: 10pt;
+    margin: 10pt 0;
+    background: #fff5f5 !important;
+  }
+
+  .print-post-op-instructions {
+    margin: 10pt 0;
+    padding-left: 20pt;
+  }
+
+  .print-post-op-instructions li {
+    margin-bottom: 6pt;
+    line-height: 1.5;
+  }
+
+  /* Discharge Summary */
+  .print-discharge-summary {
+    font-family: 'Times New Roman', serif;
+  }
+
+  .print-discharge-header {
+    border-bottom: 2px solid #000;
+    padding-bottom: 8pt;
+    margin-bottom: 12pt;
+  }
+
+  .print-diagnosis-primary {
+    font-size: 13pt;
+    font-weight: bold;
+    margin: 8pt 0;
+    padding: 8pt;
+    background: #f0f0f0 !important;
+    border-left: 4px solid #000;
+  }
+
+  .print-diagnosis-secondary {
+    font-size: 11pt;
+    margin: 6pt 0;
+    padding: 6pt;
+    border-left: 2px solid #666;
+  }
+
+  .print-hospital-course {
+    text-align: justify;
+    line-height: 1.5;
+    margin: 10pt 0;
+    padding: 8pt;
+    background: #f9f9f9 !important;
+  }
+
+  .print-instruction-checklist {
+    margin: 10pt 0;
+  }
+
+  .print-instruction-checklist li {
+    margin-bottom: 6pt;
+    line-height: 1.5;
+    list-style: none;
+    padding-left: 20pt;
+  }
+
+  .print-instruction-checklist li::before {
+    content: "☐ ";
+    font-size: 12pt;
+    margin-right: 6pt;
+  }
+
+  .print-final-condition {
+    border: 2px solid #000;
+    padding: 10pt;
+    margin: 10pt 0;
+    background: #fff !important;
+    font-weight: bold;
+    font-size: 12pt;
+    text-align: center;
+  }
+
+  /* Professional Invoice */
+  .print-invoice {
+    font-family: 'Arial', sans-serif;
+  }
+
+  .print-invoice-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 15pt;
+    padding-bottom: 10pt;
+    border-bottom: 2px solid #000;
+  }
+
+  .print-invoice-number-large {
+    font-size: 16pt;
+    font-weight: bold;
+  }
+
+  .print-bill-to {
+    margin: 10pt 0;
+    padding: 8pt;
+    border: 1px solid #ccc;
+  }
+
+  .print-invoice-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10pt 0;
+  }
+
+  .print-invoice-table th,
+  .print-invoice-table td {
+    border: 1px solid #000;
+    padding: 6pt;
+  }
+
+  .print-invoice-table th {
+    background: #f0f0f0 !important;
+    font-weight: bold;
+  }
+
+  .print-invoice-summary {
+    width: 50%;
+    margin-left: auto;
+    margin-top: 10pt;
+  }
+
+  .print-invoice-total {
+    font-size: 14pt;
+    font-weight: bold;
+    border-top: 2px solid #000;
+    border-bottom: 2px solid #000;
+    padding: 8pt;
+    text-align: right;
+  }
+
+  .print-payment-terms {
+    margin-top: 15pt;
+    padding: 8pt;
+    border: 1px solid #ccc;
+    font-size: 9pt;
+  }
+
+  /* Financial Report */
+  .print-financial-report {
+    font-family: 'Arial', sans-serif;
+  }
+
+  .print-executive-summary {
+    border: 2px solid #000;
+    padding: 12pt;
+    margin: 12pt 0;
+    background: #fff !important;
+  }
+
+  .print-executive-summary table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .print-executive-summary td {
+    padding: 8pt;
+    border-bottom: 1px solid #ccc;
+  }
+
+  .print-executive-summary td:first-child {
+    font-weight: bold;
+    width: 40%;
+  }
+
+  .print-executive-summary td:last-child {
+    text-align: right;
+    font-weight: bold;
+  }
+
+  .print-metric-label {
+    font-size: 10pt;
+    color: #333;
+  }
+
+  .print-metric-value {
+    font-size: 14pt;
+    font-weight: bold;
+    color: #000;
+  }
+
+  .print-percentage-badge {
+    display: inline-block;
+    padding: 2pt 6pt;
+    background: #f0f0f0 !important;
+    border: 1px solid #000;
+    font-weight: bold;
+    font-size: 9pt;
+  }
+
+  /* Prescription */
+  .print-prescription {
+    font-family: 'Times New Roman', serif;
+  }
+
+  .print-rx-symbol {
+    font-size: 48pt;
+    font-weight: bold;
+    line-height: 1;
+    margin-right: 10pt;
+    float: left;
+  }
+
+  .print-prescription-header {
+    border-bottom: 2px solid #000;
+    padding-bottom: 8pt;
+    margin-bottom: 12pt;
+    overflow: hidden;
+  }
+
+  .print-prescription-number {
+    font-size: 14pt;
+    font-weight: bold;
+    margin-top: 8pt;
+  }
+
+  .print-medication-item {
+    margin: 12pt 0;
+    padding: 8pt;
+    border-left: 3px solid #000;
+  }
+
+  .print-medication-name {
+    font-size: 13pt;
+    font-weight: bold;
+    margin-bottom: 4pt;
+  }
+
+  .print-medication-details {
+    font-size: 11pt;
+    line-height: 1.6;
+  }
+
+  .print-sig {
+    font-weight: bold;
+    margin-top: 4pt;
+  }
+
+  .print-pharmacist-stamp {
+    border: 2px dashed #000;
+    padding: 10pt;
+    margin: 15pt 0;
+    text-align: center;
+    min-height: 60pt;
+  }
+
+  /* Bed Management Report */
+  .print-bed-report {
+    font-family: 'Arial', sans-serif;
+  }
+
+  .print-bed-identification {
+    border: 2px solid #000;
+    padding: 10pt;
+    margin-bottom: 12pt;
+    background: #f9f9f9 !important;
+  }
+
+  .print-bed-number-large {
+    font-size: 20pt;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 6pt;
+  }
+
+  .print-status-badge {
+    display: inline-block;
+    padding: 4pt 10pt;
+    border: 2px solid #000;
+    font-weight: bold;
+    font-size: 11pt;
+    text-transform: uppercase;
+    margin: 4pt 0;
+  }
+
+  .print-status-badge.available {
+    background: #e8f5e9 !important;
+  }
+
+  .print-status-badge.occupied {
+    background: #ffebee !important;
+  }
+
+  .print-status-badge.maintenance {
+    background: #fff3e0 !important;
+  }
+
+  .print-occupancy-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10pt 0;
+  }
+
+  .print-occupancy-table th,
+  .print-occupancy-table td {
+    border: 1px solid #000;
+    padding: 6pt;
+  }
+
+  .print-occupancy-table th {
+    background: #f0f0f0 !important;
+    font-weight: bold;
+  }
+
+  .print-maintenance-log {
+    border: 1px solid #ccc;
+    padding: 8pt;
+    margin: 10pt 0;
+    background: #f9f9f9 !important;
   }
 }
 
-/* Screen preview styles (optional) */
+/* Screen preview styles */
 @media screen {
-  .print-preview {
+  .print-container {
     background: white;
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    max-width: 8.5in;
+    box-shadow: 0 0 15px rgba(0,0,0,0.1);
+    max-width: 21cm;
+    min-height: 29.7cm;
     margin: 20px auto;
-    padding: 1in 0.75in;
-    font-family: 'Times New Roman', serif;
-    color: black;
-  }
-
-  .print-preview .print-header {
-    text-align: center;
-    border-bottom: 2px solid #000;
-    padding-bottom: 15px;
-    margin-bottom: 20px;
+    padding: 15mm 20mm;
+    font-family: 'Arial', 'Helvetica', sans-serif;
   }
 }

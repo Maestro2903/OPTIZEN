@@ -10,8 +10,9 @@ import {
   AlertCircle,
   Wrench,
   TrendingUp,
-  Printer,
   Eye,
+  Trash2,
+  Edit,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -35,71 +36,174 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BedCard } from "@/components/bed-card"
 import { BedAssignmentForm } from "@/components/bed-assignment-form"
-import { BedDetailsSheet } from "@/components/bed-details-sheet"
+import { BedDetailsDialog } from "@/components/bed-details-dialog"
 import { BedForm } from "@/components/bed-form"
-import { BedPrint } from "@/components/bed-print"
-
-// Sample data removed for production - should be fetched from API
-interface BedData {
-  bed: {
-    id: string
-    bed_number: string
-    ward_name: string
-    ward_type: string
-    floor_number: number
-    room_number: string
-    status: "available" | "occupied" | "maintenance" | "reserved"
-    daily_rate: number
-  }
-  assignment: {
-    patient_name: string
-    patient_age: number
-    patient_mrn: string
-    admission_date: string
-    days_in_ward: number
-    expected_discharge_date?: string
-    surgery_scheduled_time?: string
-    surgery_type?: string
-    admission_reason: string
-    doctor_name: string
-  } | null
-}
-
-const bedsData: BedData[] = [
-  // This should be populated from the beds API
-  // Example: const bedsData = await fetchBeds()
-]
+import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
+import { bedsApi, masterDataApi, type BedWithAssignment } from "@/lib/services/api"
+import { useToast } from "@/hooks/use-toast"
 
 export default function BedsPage() {
+  const { toast } = useToast()
   const [selectedBed, setSelectedBed] = React.useState<any>(null)
   const [isSheetOpen, setIsSheetOpen] = React.useState(false)
   const [wardFilter, setWardFilter] = React.useState<string>("all")
   const [floorFilter, setFloorFilter] = React.useState<string>("all")
   const [statusFilter, setStatusFilter] = React.useState<string>("all")
-  const [beds, setBeds] = React.useState<BedData[]>(bedsData)
+  const [beds, setBeds] = React.useState<BedWithAssignment[]>([])
   const [draggedBed, setDraggedBed] = React.useState<any>(null)
   const [dragOverColumn, setDragOverColumn] = React.useState<string | null>(null)
   const [searchTerm, setSearchTerm] = React.useState("")
-  const [isLoading, setIsLoading] = React.useState(false)
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [deletingBed, setDeletingBed] = React.useState<{id: string, name: string} | null>(null)
+
+  // Fetch beds data from master_data
+  const fetchBeds = React.useCallback(async () => {
+    try {
+      setIsLoading(true)
+      // Fetch beds from master_data (only active ones)
+      const bedsResponse = await masterDataApi.list({ 
+        category: 'beds',
+        active_only: true 
+      })
+      
+      // Fetch bed assignments
+      const assignmentsResponse = await bedsApi.list({})
+
+      if (bedsResponse.success && bedsResponse.data) {
+        // Transform master_data beds into the format expected by the UI
+        const masterBeds = bedsResponse.data.map((bed: any) => {
+          // Read bed properties from metadata
+          const metadata = bed.metadata || {}
+          
+          return {
+            bed: {
+              id: bed.id,
+              bed_number: bed.bed_number || bed.name,
+              ward_name: bed.name,
+              ward_type: metadata.ward_type || 'general',
+              floor_number: metadata.floor_number || 1,
+              room_number: metadata.room_number || null,
+              status: metadata.status || 'available',
+              daily_rate: metadata.daily_rate || 0,
+              bed_type: metadata.bed_type || 'Standard',
+              facilities: metadata.facilities || [],
+              description: bed.description,
+              created_at: bed.created_at || new Date().toISOString(),
+              updated_at: bed.updated_at || new Date().toISOString(),
+            },
+            assignment: null as any
+          }
+        })
+
+        // Match assignments to beds
+        if (assignmentsResponse.success && assignmentsResponse.data) {
+          assignmentsResponse.data.forEach((assignment: any) => {
+            const bedIndex = masterBeds.findIndex((b: any) => b.bed.id === assignment.bed_id)
+            if (bedIndex !== -1) {
+              masterBeds[bedIndex].assignment = assignment
+              masterBeds[bedIndex].bed.status = 'occupied'
+            }
+          })
+        }
+
+        // Apply filters
+        let filtered = masterBeds
+        
+        if (wardFilter !== "all") {
+          filtered = filtered.filter((b: any) => b.bed.ward_type === wardFilter)
+        }
+        
+        if (statusFilter !== "all") {
+          filtered = filtered.filter((b: any) => b.bed.status === statusFilter)
+        }
+        
+        if (floorFilter !== "all") {
+          filtered = filtered.filter((b: any) => b.bed.floor_number.toString() === floorFilter)
+        }
+        
+        if (searchTerm) {
+          filtered = filtered.filter((b: any) => 
+            b.bed.bed_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            b.bed.ward_name.toLowerCase().includes(searchTerm.toLowerCase())
+          )
+        }
+
+        setBeds(filtered)
+      }
+    } catch (error) {
+      console.error("Error fetching beds:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load beds data",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }, [wardFilter, statusFilter, floorFilter, searchTerm, toast])
+
+  // Load beds on mount and when filters change
+  React.useEffect(() => {
+    fetchBeds()
+  }, [fetchBeds])
 
   // Function to handle bed deletion/discharge
   const handleDischarge = async (bedId: string) => {
     try {
-      setIsLoading(true)
-      // TODO: Replace with actual API call
-      // await fetch(`/api/beds/${bedId}/discharge`, { method: 'POST' })
+      // Fetch current bed data to get existing metadata
+      const currentBedResponse = await masterDataApi.getById(bedId)
+      if (!currentBedResponse.success || !currentBedResponse.data) {
+        throw new Error('Failed to fetch current bed data')
+      }
 
-      // For now, remove assignment from local state
-      setBeds(prev => prev.map(item =>
-        item.bed.id === bedId
-          ? { ...item, assignment: null, bed: { ...item.bed, status: "available" as const } }
-          : item
-      ))
-      console.log("Bed discharged:", bedId)
+      const currentBed = currentBedResponse.data
+      const updatedMetadata = {
+        ...(currentBed.metadata || {}),
+        status: 'available'
+      }
+
+      // Update bed status to available in master_data metadata
+      const response = await masterDataApi.update(bedId, { metadata: updatedMetadata })
+      
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: "Bed discharged successfully",
+        })
+        fetchBeds() // Refresh the list
+      }
     } catch (error) {
       console.error("Error discharging bed:", error)
-    } finally {
-      setIsLoading(false)
+      toast({
+        title: "Error",
+        description: "Failed to discharge bed",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Function to handle bed deletion from master_data
+  const handleDelete = async (bedId: string) => {
+    try {
+      const response = await masterDataApi.delete(bedId)
+      
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: "Bed deleted successfully",
+        })
+        setDeletingBed(null)
+        fetchBeds() // Refresh the list
+      } else {
+        throw new Error(response.error || "Failed to delete bed")
+      }
+    } catch (error) {
+      console.error("Error deleting bed:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete bed",
+        variant: "destructive",
+      })
     }
   }
 
@@ -147,15 +251,18 @@ export default function BedsPage() {
     setDragOverColumn(null)
   }
 
-  const handleDrop = (e: React.DragEvent, newStatus: string) => {
+  const handleDrop = async (e: React.DragEvent, newStatus: string) => {
     e.preventDefault()
     setDragOverColumn(null)
     
     if (!draggedBed) return
 
-    // Update bed status
+    const bedId = draggedBed.bed.id
+    const oldStatus = draggedBed.bed.status
+
+    // Optimistically update UI
     const updatedBeds = beds.map(item => {
-      if (item.bed.id === draggedBed.bed.id) {
+      if (item.bed.id === bedId) {
         return {
           ...item,
           bed: {
@@ -166,12 +273,74 @@ export default function BedsPage() {
       }
       return item
     })
-
     setBeds(updatedBeds)
     setDraggedBed(null)
 
-    // In real app, you would call API here
-    console.log(`Bed ${draggedBed.bed.bed_number} status changed to ${newStatus}`)
+    // Update via API using master_data - update status in metadata
+    try {
+      // Fetch current bed data to get existing metadata
+      const currentBedResponse = await masterDataApi.getById(bedId)
+      if (!currentBedResponse.success || !currentBedResponse.data) {
+        throw new Error('Failed to fetch current bed data')
+      }
+
+      const currentBed = currentBedResponse.data
+      const updatedMetadata = {
+        ...(currentBed.metadata || {}),
+        status: newStatus
+      }
+
+      const response = await masterDataApi.update(bedId, { metadata: updatedMetadata })
+      
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: `Bed ${draggedBed.bed.bed_number} moved to ${newStatus}`,
+        })
+        fetchBeds() // Refresh to get latest data
+      } else {
+        // Revert on failure
+        const revertedBeds = beds.map(item => {
+          if (item.bed.id === bedId) {
+            return {
+              ...item,
+              bed: {
+                ...item.bed,
+                status: oldStatus
+              }
+            }
+          }
+          return item
+        })
+        setBeds(revertedBeds)
+        toast({
+          title: "Error",
+          description: "Failed to update bed status",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error updating bed status:", error)
+      // Revert on error
+      const revertedBeds = beds.map(item => {
+        if (item.bed.id === bedId) {
+          return {
+            ...item,
+            bed: {
+              ...item.bed,
+              status: oldStatus
+            }
+          }
+        }
+        return item
+      })
+      setBeds(revertedBeds)
+      toast({
+        title: "Error",
+        description: "Failed to update bed status",
+        variant: "destructive",
+      })
+    }
   }
 
   // Filter beds
@@ -203,7 +372,7 @@ export default function BedsPage() {
     if (!acc[key]) acc[key] = []
     acc[key].push(item)
     return acc
-  }, {} as Record<string, typeof bedsData>)
+  }, {} as Record<string, BedWithAssignment[]>)
 
   return (
     <div className="flex flex-col gap-6">
@@ -215,19 +384,77 @@ export default function BedsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <BedForm>
+          <BedForm onSuccess={fetchBeds}>
             <Button variant="outline" className="gap-2">
               <Bed className="h-4 w-4" />
               Add New Bed
             </Button>
           </BedForm>
-          <BedAssignmentForm>
+          <BedAssignmentForm onSuccess={fetchBeds}>
             <Button className="gap-2">
               <Plus className="h-4 w-4" />
               Assign Bed
             </Button>
           </BedAssignmentForm>
         </div>
+      </div>
+
+      {/* Statistics Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Total Beds
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalBeds}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Occupied
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{occupiedBeds}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Available
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{availableBeds}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Maintenance
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-600">{maintenanceBeds}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Occupancy Rate
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{occupancyRate}%</div>
+          </CardContent>
+        </Card>
       </div>
 
       <Tabs defaultValue="kanban" className="space-y-4">
@@ -277,6 +504,11 @@ export default function BedsPage() {
 
         {/* Kanban View */}
         <TabsContent value="kanban" className="space-y-4">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-muted-foreground">Loading beds...</div>
+            </div>
+          ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Available Column */}
             <Card 
@@ -446,149 +678,257 @@ export default function BedsPage() {
               </CardContent>
             </Card>
           </div>
+          )}
         </TabsContent>
 
         {/* Table View */}
         <TabsContent value="table">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-muted-foreground">Loading beds...</div>
+            </div>
+          ) : (
           <Card>
             <CardHeader>
-              <CardTitle>All Beds</CardTitle>
-              <CardDescription>
-                Detailed view of all beds and assignments
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>All Beds</CardTitle>
+                  <CardDescription>
+                    Showing {filteredBeds.length} of {beds.length} beds
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue placeholder="All Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="available">Available</SelectItem>
+                      <SelectItem value="occupied">Occupied</SelectItem>
+                      <SelectItem value="maintenance">Maintenance</SelectItem>
+                      <SelectItem value="reserved">Reserved</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </CardHeader>
-            <CardContent>
-              <div className="rounded-md border">
+            <CardContent className="p-0">
+              <div className="border-t">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>BED NO.</TableHead>
-                      <TableHead>WARD</TableHead>
-                      <TableHead>FLOOR</TableHead>
-                      <TableHead>STATUS</TableHead>
-                      <TableHead>PATIENT</TableHead>
-                      <TableHead>ADMISSION DATE</TableHead>
-                      <TableHead>DAYS</TableHead>
-                      <TableHead>SURGERY TIME</TableHead>
-                      <TableHead>DOCTOR</TableHead>
-                      <TableHead>DAILY RATE</TableHead>
-                      <TableHead>ACTIONS</TableHead>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="w-[100px]">Bed</TableHead>
+                      <TableHead className="w-[140px]">Location</TableHead>
+                      <TableHead className="w-[120px]">Status</TableHead>
+                      <TableHead className="w-[120px]">Patient ID</TableHead>
+                      <TableHead>Patient Details</TableHead>
+                      <TableHead className="w-[140px]">Admission</TableHead>
+                      <TableHead className="w-[100px]">Duration</TableHead>
+                      <TableHead className="w-[180px]">Surgery Info</TableHead>
+                      <TableHead className="w-[140px]">Doctor</TableHead>
+                      <TableHead className="w-[100px] text-right">Rate/Day</TableHead>
+                      <TableHead className="w-[120px] text-center">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredBeds.map(({ bed, assignment }) => (
-                      <TableRow 
-                        key={bed.id} 
-                        className="cursor-pointer hover:bg-gray-100"
-                        onClick={() => handleBedClick({ bed, assignment })}
-                      >
-                        <TableCell className="font-mono font-semibold">{bed.bed_number}</TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" className="capitalize">{bed.ward_name}</Badge>
+                    {filteredBeds.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={11} className="h-32 text-center text-muted-foreground">
+                          No beds found matching your criteria.
                         </TableCell>
-                        <TableCell>Floor {bed.floor_number}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={
-                              bed.status === 'available' ? 'bg-green-100 text-green-700 border-green-200' :
-                              bed.status === 'occupied' ? 'bg-red-100 text-red-700 border-red-200' :
-                              bed.status === 'maintenance' ? 'bg-gray-100 text-gray-700 border-gray-200' :
-                              'bg-yellow-100 text-yellow-700 border-yellow-200'
-                            }
-                          >
-                            {bed.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {assignment ? (
-                            <div>
-                              <div className="font-medium">{assignment.patient_name}</div>
-                              <div className="text-xs text-muted-foreground">{assignment.patient_mrn}</div>
+                      </TableRow>
+                    ) : (
+                      filteredBeds.map(({ bed, assignment }) => (
+                        <TableRow 
+                          key={bed.id} 
+                          className="hover:bg-muted/50 transition-colors"
+                        >
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Bed className="h-4 w-4 text-muted-foreground" />
+                              <span className="font-mono font-semibold text-base">
+                                {bed.bed_number}
+                              </span>
                             </div>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {assignment ? new Date(assignment.admission_date).toLocaleDateString('en-GB') : '-'}
-                        </TableCell>
-                        <TableCell>
-                          {assignment ? `${assignment.days_in_ward} ${assignment.days_in_ward === 1 ? 'day' : 'days'}` : '-'}
-                        </TableCell>
-                        <TableCell>
-                          {assignment?.surgery_scheduled_time ? (
-                            <div className="text-sm">
-                              {new Date(assignment.surgery_scheduled_time).toLocaleString('en-GB', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                hour: 'numeric',
-                                minute: '2-digit',
-                                hour12: true
-                              })}
+                          </TableCell>
+                          <TableCell>
+                            <div className="space-y-1">
+                              <div className="font-medium capitalize text-sm">{bed.ward_name}</div>
+                              <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Badge variant="outline" className="text-xs h-5">
+                                  {bed.ward_type}
+                                </Badge>
+                                Floor {bed.floor_number}
+                              </div>
                             </div>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {assignment?.doctor_name || <span className="text-muted-foreground">-</span>}
-                        </TableCell>
-                        <TableCell className="font-semibold">₹{bed.daily_rate.toLocaleString()}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleBedClick({ bed, assignment })
-                              }}
-                              title="View bed details"
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={`font-medium ${
+                                bed.status === 'available' 
+                                  ? 'bg-green-50 text-green-700 border-green-300' 
+                                  : bed.status === 'occupied' 
+                                  ? 'bg-red-50 text-red-700 border-red-300' 
+                                  : bed.status === 'maintenance' 
+                                  ? 'bg-gray-50 text-gray-700 border-gray-300' 
+                                  : 'bg-yellow-50 text-yellow-700 border-yellow-300'
+                              }`}
                             >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <BedPrint
-                              bed={{
-                                id: bed.id,
-                                bed_number: bed.bed_number,
-                                room_number: bed.room_number,
-                                ward: bed.ward_name,
-                                bed_type: bed.ward_type,
-                                status: bed.status,
-                                patient_name: assignment?.patient_name,
-                                patient_id: assignment?.patient_mrn,
-                                admission_date: assignment?.admission_date,
-                                daily_rate: bed.daily_rate,
-                                assigned_nurse: assignment?.doctor_name,
-                                notes: assignment?.admission_reason
-                              }}
-                            >
+                              {bed.status === 'available' && <CheckCircle className="h-3 w-3 mr-1" />}
+                              {bed.status === 'occupied' && <AlertCircle className="h-3 w-3 mr-1" />}
+                              {bed.status === 'maintenance' && <Wrench className="h-3 w-3 mr-1" />}
+                              {bed.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {assignment ? (
+                              <div className="font-mono text-sm font-semibold text-primary">
+                                {(assignment as any).patients?.patient_id || '-'}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {assignment ? (
+                              <div className="space-y-1">
+                                <div className="font-medium text-sm">{assignment.patient_name}</div>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="secondary" className="text-xs h-5">
+                                    {assignment.patient_mrn}
+                                  </Badge>
+                                  {assignment.patient_age && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {assignment.patient_age}y
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">Not assigned</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {assignment ? (
+                              <div className="space-y-1">
+                                <div className="text-sm font-medium">
+                                  {new Date(assignment.admission_date).toLocaleDateString('en-GB', {
+                                    day: '2-digit',
+                                    month: 'short',
+                                    year: 'numeric'
+                                  })}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {new Date(assignment.admission_date).toLocaleTimeString('en-GB', {
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {assignment ? (
+                              <Badge variant="secondary" className="font-mono">
+                                {assignment.days_in_ward} {assignment.days_in_ward === 1 ? 'day' : 'days'}
+                              </Badge>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {assignment?.surgery_scheduled_time ? (
+                              <div className="space-y-1">
+                                <div className="text-sm font-medium text-orange-600">
+                                  {new Date(assignment.surgery_scheduled_time).toLocaleDateString('en-GB', {
+                                    day: '2-digit',
+                                    month: 'short'
+                                  })}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {new Date(assignment.surgery_scheduled_time).toLocaleTimeString('en-GB', {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    hour12: true
+                                  })}
+                                </div>
+                                {assignment.surgery_type && (
+                                  <div className="text-xs text-muted-foreground truncate max-w-[160px]">
+                                    {assignment.surgery_type}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">No surgery</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {assignment?.doctor_name ? (
+                              <div className="text-sm">{assignment.doctor_name}</div>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">Not assigned</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className="font-semibold text-sm">
+                              ₹{bed.daily_rate.toLocaleString()}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center justify-center gap-1">
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8"
-                                onClick={(e) => e.stopPropagation()}
-                                title="Print bed information"
+                                className="h-8 w-8 hover:bg-blue-50 hover:text-blue-600"
+                                onClick={() => handleBedClick({ bed, assignment })}
+                                title="View details"
                               >
-                                <Printer className="h-4 w-4" />
+                                <Eye className="h-4 w-4" />
                               </Button>
-                            </BedPrint>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                              <BedForm
+                                bedData={bed}
+                                mode="edit"
+                                onSuccess={fetchBeds}
+                              >
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 hover:bg-green-50 hover:text-green-600"
+                                  title="Edit bed"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              </BedForm>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 hover:bg-red-50 hover:text-red-600"
+                                onClick={() => setDeletingBed({ id: bed.id, name: bed.bed_number })}
+                                title="Delete bed"
+                                disabled={bed.status === 'occupied'}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </div>
             </CardContent>
           </Card>
+          )}
         </TabsContent>
       </Tabs>
 
-      {/* Bed Details Sheet */}
-      <BedDetailsSheet
+      {/* Bed Details Dialog */}
+      <BedDetailsDialog
         open={isSheetOpen}
         onOpenChange={setIsSheetOpen}
         bedData={selectedBed?.bed || null}
@@ -607,6 +947,16 @@ export default function BedsPage() {
           console.log("Update assignment")
           setIsSheetOpen(false)
         }}
+        onRefresh={fetchBeds}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmDialog
+        open={!!deletingBed}
+        onOpenChange={(open) => !open && setDeletingBed(null)}
+        onConfirm={() => deletingBed && handleDelete(deletingBed.id)}
+        title="Delete Bed"
+        description={`Are you sure you want to delete bed ${deletingBed?.name}? This action cannot be undone.`}
       />
     </div>
   )

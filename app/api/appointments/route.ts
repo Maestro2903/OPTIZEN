@@ -36,8 +36,8 @@ export async function GET(request: NextRequest) {
     // Validate sortBy against allowlist
     const allowedSortColumns = [
       'appointment_date',
-      'appointment_time',
-      'appointment_type',
+      'start_time',
+      'type',
       'status',
       'created_at'
     ]
@@ -58,27 +58,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid date format. Use ISO date format (YYYY-MM-DD)' }, { status: 400 })
     }
 
-    // Check authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     // Calculate offset for pagination
     const offset = (page - 1) * limit
 
-    // Build query with joins to get patient information
+    // Build query with joins to get patient and provider information
+    // Note: PostgREST uses table!foreign_key_column syntax for joins
     let query = supabase
       .from('appointments')
       .select(`
         *,
-        patients:patient_id (
+        patients!appointments_patient_id_fkey (
           id,
           patient_id,
           full_name,
           email,
           mobile,
           gender
+        ),
+        users!appointments_provider_id_fkey (
+          id,
+          full_name,
+          email,
+          role
         )
       `, { count: 'exact' })
 
@@ -86,9 +87,9 @@ export async function GET(request: NextRequest) {
     // Sanitize search input to prevent wildcard injection
     if (search) {
       const sanitizedSearch = search.replace(/[%_]/g, '\\$&').replace(/,/g, '')
-      query = query.ilike('appointment_type', `%${sanitizedSearch}%`)
-      // Note: Patient search moved to client-side filtering due to PostgREST limitations
-      // For production, consider creating a DB view or RPC that denormalizes patient fields
+      query = query.ilike('type', `%${sanitizedSearch}%`)
+      // Note: Patient/doctor search moved to client-side filtering due to PostgREST limitations
+      // For production, consider creating a DB view or RPC that denormalizes fields
     }
 
     // Apply status filter (supports multiple values)
@@ -169,24 +170,20 @@ export async function POST(request: NextRequest) {
     const {
       patient_id,
       appointment_date,
-      appointment_time,
-      appointment_type,
-      doctor_id,
-      reason,
-      duration_minutes,
+      start_time,
+      end_time,
+      type,
+      provider_id,
+      room,
       notes
     } = body
 
-    if (!patient_id || !appointment_date || !appointment_time || !appointment_type) {
+    if (!patient_id || !provider_id || !appointment_date || !start_time || !end_time || !type) {
       return NextResponse.json(
-        { error: 'Missing required fields: patient_id, appointment_date, appointment_time, appointment_type' },
+        { error: 'Missing required fields: patient_id, provider_id, appointment_date, start_time, end_time, type' },
         { status: 400 }
       )
     }
-
-    // Set defaults for optional fields
-    const finalDuration = duration_minutes || 30
-    const finalStatus = 'scheduled'
 
     // Verify patient exists
     const { data: patient, error: patientError } = await supabase
@@ -199,58 +196,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
     }
 
-    // Validate appointment_time format
-    const timeRegex = /^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$/
-    if (!timeRegex.test(appointment_time)) {
+    // Validate time format
+    const timeRegex = /^([0-1]?[0-9]|2[0-3]):([0-5][0-9])(:[0-5][0-9])?$/
+    if (!timeRegex.test(start_time)) {
       return NextResponse.json({ 
-        error: 'Invalid appointment_time format. Expected HH:MM (24-hour format, e.g., "09:30" or "14:00")' 
+        error: 'Invalid start_time format. Expected HH:MM (24-hour format, e.g., "09:30" or "14:00")' 
+      }, { status: 400 })
+    }
+    if (!timeRegex.test(end_time)) {
+      return NextResponse.json({ 
+        error: 'Invalid end_time format. Expected HH:MM (24-hour format, e.g., "09:30" or "14:00")' 
       }, { status: 400 })
     }
 
-    // Check for appointment conflicts with interval overlap logic
-    // Calculate time range for new appointment
-    const appointmentDuration = duration_minutes || 30
-    const newStartTime = appointment_time
-    
-    // Parse time and calculate end time with validation
-    const [hoursStr, minutesStr] = newStartTime.split(':')
-    const hours = parseInt(hoursStr, 10)
-    const minutes = parseInt(minutesStr, 10)
-    
-    // Validate parsed values (additional safety check)
-    if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
-      return NextResponse.json({ 
-        error: 'Invalid time values. Hours must be 0-23 and minutes must be 0-59' 
-      }, { status: 400 })
-    }
-
-    const startMinutes = hours * 60 + minutes
-    const endMinutes = startMinutes + appointmentDuration
-    const endHours = Math.floor(endMinutes / 60)
-    const endMins = endMinutes % 60
-
-    // Check if appointment would cross midnight (end time >= 24:00)
-    if (endHours >= 24) {
-      return NextResponse.json({ 
-        error: `Appointment would extend past midnight (end time would be ${endHours}:${String(endMins).padStart(2, '0')}). Please schedule appointments within a single day or split across multiple days.`,
-        startTime: appointment_time,
-        duration: appointmentDuration,
-        calculatedEndTime: `${endHours}:${String(endMins).padStart(2, '0')}`
-      }, { status: 400 })
-    }
-
-    const newEndTime = `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}`
-
-    // CRITICAL: This application-level check has TOCTOU vulnerability
-    // Concurrent requests can still create conflicting appointments
-    // TODO: Implement database-level exclusion constraint (see CRITICAL_PRODUCTION_BLOCKERS.md #1)
-    // Required before production: ALTER TABLE appointments ADD CONSTRAINT no_overlapping_appointments ...
-    
-    if (doctor_id) {
+    // Check for appointment conflicts (basic overlap detection)
+    // TODO: Implement database-level exclusion constraint for true concurrent safety
+    if (provider_id) {
       const { data: conflictingAppointments, error: conflictError } = await supabase
         .from('appointments')
-        .select('id, appointment_time, duration_minutes')
-        .eq('doctor_id', doctor_id)
+        .select('id, start_time, end_time')
+        .eq('provider_id', provider_id)
         .eq('appointment_date', appointment_date)
         .neq('status', 'cancelled')
 
@@ -259,22 +224,28 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to check appointment conflicts' }, { status: 500 })
       }
 
-      // Check for interval overlaps: (newStart < existingEnd && newEnd > existingStart)
+      // Check for time overlaps
       if (conflictingAppointments && conflictingAppointments.length > 0) {
         for (const existing of conflictingAppointments) {
-          const existingDuration = existing.duration_minutes || 30
-          const [exHours, exMinutes] = existing.appointment_time.split(':').map(Number)
-          const existingStartMinutes = exHours * 60 + exMinutes
-          const existingEndMinutes = existingStartMinutes + existingDuration
+          // Convert times to minutes for comparison
+          const [newStartH, newStartM] = start_time.split(':').map(Number)
+          const [newEndH, newEndM] = end_time.split(':').map(Number)
+          const [exStartH, exStartM] = existing.start_time.split(':').map(Number)
+          const [exEndH, exEndM] = existing.end_time.split(':').map(Number)
+          
+          const newStartMinutes = newStartH * 60 + newStartM
+          const newEndMinutes = newEndH * 60 + newEndM
+          const exStartMinutes = exStartH * 60 + exStartM
+          const exEndMinutes = exEndH * 60 + exEndM
 
-          // Overlap detection: new appointment overlaps if it starts before existing ends AND ends after existing starts
-          if (startMinutes < existingEndMinutes && endMinutes > existingStartMinutes) {
+          // Check for overlap: (start1 < end2 AND start2 < end1)
+          if (newStartMinutes < exEndMinutes && exStartMinutes < newEndMinutes) {
             return NextResponse.json({
-              error: `Doctor has a conflicting appointment from ${existing.appointment_time} (conflicts with requested ${newStartTime}-${newEndTime})`,
+              error: `Provider has a conflicting appointment from ${existing.start_time} to ${existing.end_time}`,
               conflict: true,
               existingAppointment: {
-                time: existing.appointment_time,
-                duration: existingDuration
+                start_time: existing.start_time,
+                end_time: existing.end_time
               }
             }, { status: 409 })
           }
@@ -282,39 +253,52 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Get current user session for created_by
+    const { data: { session } } = await supabase.auth.getSession()
+
     // Insert new appointment - explicitly set allowed fields only
     const { data: appointment, error } = await supabase
       .from('appointments')
       .insert([
         {
           patient_id,
+          provider_id,
           appointment_date,
-          appointment_time,
-          appointment_type,
-          doctor_id,
-          reason,
-          duration_minutes: finalDuration,
-          status: finalStatus,
+          start_time,
+          end_time,
+          type,
+          status: 'scheduled',
+          room,
           notes,
-          created_by: session.user.id
+          updated_by: session?.user?.id
         }
       ])
       .select(`
         *,
-        patients:patient_id (
+        patients!appointments_patient_id_fkey (
           id,
           patient_id,
           full_name,
           email,
           mobile,
           gender
+        ),
+        users!appointments_provider_id_fkey (
+          id,
+          full_name,
+          email,
+          role
         )
       `)
       .single()
 
     if (error) {
-      console.error('Database error:', error)
-      return NextResponse.json({ error: 'Failed to create appointment' }, { status: 500 })
+      console.error('Database error creating appointment:', error)
+      return NextResponse.json({ 
+        error: 'Failed to create appointment', 
+        details: error.message,
+        code: error.code 
+      }, { status: 500 })
     }
 
     return NextResponse.json({
@@ -325,6 +309,9 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
   }
 }

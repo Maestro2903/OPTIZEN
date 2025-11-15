@@ -14,7 +14,9 @@ import {
 } from "@/components/ui/alert-dialog"
 
 interface DeleteConfirmDialogProps {
-  children: React.ReactNode
+  children?: React.ReactNode
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
   title: string
   description: string
   onConfirm: () => void
@@ -22,13 +24,26 @@ interface DeleteConfirmDialogProps {
 
 export function DeleteConfirmDialog({
   children,
+  open: controlledOpen,
+  onOpenChange,
   title,
   description,
   onConfirm,
 }: DeleteConfirmDialogProps) {
+  const [internalOpen, setInternalOpen] = React.useState(false)
+  
+  // Use controlled or internal state
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen
+  const setOpen = onOpenChange || setInternalOpen
+  
+  const handleConfirm = () => {
+    onConfirm()
+    setOpen(false)
+  }
+  
   return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>{children}</AlertDialogTrigger>
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      {children && <AlertDialogTrigger asChild>{children}</AlertDialogTrigger>}
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
@@ -36,7 +51,10 @@ export function DeleteConfirmDialog({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+          <AlertDialogAction 
+            onClick={handleConfirm}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
             Delete
           </AlertDialogAction>
         </AlertDialogFooter>

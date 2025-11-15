@@ -114,25 +114,55 @@ export default function EmployeesPage() {
 
   const handleAddEmployee = async (employeeData: any) => {
     try {
-      // Backend will generate employee_id
       const result = await createEmployee(
-        () => employeesApi.create({
-          full_name: employeeData.full_name,
-          email: employeeData.email,
-          phone: employeeData.phone,
-          role: employeeData.role,
-          department: employeeData.department,
-          hire_date: employeeData.hire_date,
-          salary: employeeData.salary,
-          address: employeeData.address,
-          emergency_contact: employeeData.emergency_contact,
-          emergency_phone: employeeData.emergency_phone,
-          qualifications: employeeData.qualifications,
-          license_number: employeeData.license_number,
-          status: 'active'
-        }),
+        async () => {
+          const { createClient } = await import('@/lib/supabase/client')
+          const supabase = createClient()
+          const { data: { session } } = await supabase.auth.getSession()
+
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+          }
+
+          if (session?.access_token) {
+            headers['Authorization'] = `Bearer ${session.access_token}`
+          }
+
+          const response = await fetch('/api/employees', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              employee_id: employeeData.employee_id,
+              full_name: employeeData.full_name,
+              email: employeeData.email,
+              password: employeeData.password,
+              phone: employeeData.phone,
+              role: employeeData.role,
+              department: employeeData.department,
+              position: employeeData.position,
+              hire_date: employeeData.hire_date,
+              salary: employeeData.salary ? parseFloat(employeeData.salary) : undefined,
+              address: employeeData.address,
+              emergency_contact: employeeData.emergency_contact,
+              emergency_phone: employeeData.emergency_phone,
+              qualifications: employeeData.qualifications,
+              license_number: employeeData.license_number,
+              date_of_birth: employeeData.date_of_birth,
+              gender: employeeData.gender,
+              blood_group: employeeData.blood_group,
+              marital_status: employeeData.marital_status,
+              is_active: true
+            })
+          })
+
+          const data = await response.json()
+          if (!response.ok) {
+            throw new Error(data.error || `HTTP ${response.status}`)
+          }
+          return data
+        },
         {
-          successMessage: `Employee ${employeeData.full_name} has been added successfully.`,
+          successMessage: `Employee ${employeeData.full_name} has been added successfully with login credentials.`,
           onSuccess: (newEmployee) => {
             addItem(newEmployee)
           }
@@ -310,9 +340,12 @@ export default function EmployeesPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  employees.map((employee) => (
+                  employees.map((employee) => {
+                    // Convert is_active to status for display
+                    const displayStatus = employee.is_active ? 'active' : 'inactive'
+                    return (
                     <TableRow key={employee.id}>
-                      <TableCell className="font-medium">{employee.employee_id}</TableCell>
+                      <TableCell className="font-medium">{employee.employee_id || '-'}</TableCell>
                       <TableCell className="font-medium uppercase">{employee.full_name}</TableCell>
                       <TableCell>
                         <Badge variant="secondary" className={`capitalize ${roleColors[employee.role as keyof typeof roleColors] || ''}`}>
@@ -323,8 +356,8 @@ export default function EmployeesPage() {
                       <TableCell className="text-muted-foreground">{employee.email}</TableCell>
                       <TableCell>{employee.phone}</TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className={`capitalize ${statusColors[employee.status as keyof typeof statusColors] || ''}`}>
-                          {employee.status}
+                        <Badge variant="secondary" className={`capitalize ${statusColors[displayStatus as keyof typeof statusColors] || ''}`}>
+                          {displayStatus}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -354,7 +387,7 @@ export default function EmployeesPage() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))
+                  )})
                 )}
               </TableBody>
             </Table>

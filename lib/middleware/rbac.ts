@@ -84,9 +84,9 @@ export async function requirePermission(
   if (!context && process.env.NODE_ENV !== 'production') {
     console.warn('⚠️  RBAC BYPASS ACTIVE: Using mock super_admin for development testing')
     const mockContext: RBACContext = {
-      user_id: '00000000-0000-0000-0000-000000000000', // Mock UUID
+      user_id: 'ad420082-0897-438a-bdf8-93731c09b93f', // Use existing superadmin user for dev
       role: 'super_admin',
-      email: 'dev@localhost'
+      email: 'superadmin@eyecare.local'
     }
     return { authorized: true, context: mockContext }
   }

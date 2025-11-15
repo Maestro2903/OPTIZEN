@@ -78,6 +78,21 @@ export async function PUT(
       )
     }
 
+    // Get existing employee data to check for email changes
+    const { data: existingEmployee, error: fetchError } = await supabase
+      .from('users')
+      .select('email, role')
+      .eq('id', id)
+      .single()
+
+    if (fetchError) {
+      if (fetchError.code === 'PGRST116') {
+        return NextResponse.json({ error: 'Employee not found' }, { status: 404 })
+      }
+      console.error('Error fetching employee:', fetchError)
+      return NextResponse.json({ error: 'Failed to fetch employee' }, { status: 500 })
+    }
+
     // Validate required fields if provided
     if (body.email && typeof body.email !== 'string') {
       return NextResponse.json(
@@ -100,14 +115,52 @@ export async function PUT(
       )
     }
 
+    // Validate role if provided
+    if (body.role) {
+      const validRoles = [
+        'super_admin', 'hospital_admin', 'receptionist', 'optometrist', 
+        'ophthalmologist', 'technician', 'billing_staff', 'admin', 
+        'doctor', 'nurse', 'finance', 'pharmacy_staff', 'pharmacy', 
+        'lab_technician', 'manager', 'read_only'
+      ]
+      if (!validRoles.includes(body.role.toLowerCase())) {
+        return NextResponse.json(
+          { error: `Invalid role. Must be one of: ${validRoles.join(', ')}` },
+          { status: 400 }
+        )
+      }
+    }
+
+    // If email is being changed, update it in auth.users too
+    if (body.email && body.email !== existingEmployee.email) {
+      const { error: authUpdateError } = await supabase.auth.admin.updateUserById(
+        id,
+        { email: body.email }
+      )
+      if (authUpdateError) {
+        console.error('Auth email update error:', authUpdateError)
+        return NextResponse.json(
+          { error: `Failed to update email: ${authUpdateError.message}` },
+          { status: 500 }
+        )
+      }
+    }
+
     // Remove fields that shouldn't be updated
     const {
       id: _id,
       created_at,
       created_by,
       employee_id, // Don't allow changing employee ID
+      password, // Don't accept password in update
+      confirmPassword, // Don't accept confirmPassword
       ...updateData
     } = body
+
+    // Normalize role to lowercase if provided
+    if (updateData.role) {
+      updateData.role = updateData.role.toLowerCase()
+    }
 
     // Add audit fields
     updateData.updated_at = new Date().toISOString()
@@ -169,11 +222,11 @@ export async function DELETE(
     const supabase = createClient()
     const { id } = await params
 
-    // Soft delete by updating status to inactive
+    // Soft delete by updating is_active to false
     const { data: employee, error } = await supabase
       .from('users')
       .update({
-        status: 'inactive',
+        is_active: false,
         updated_at: new Date().toISOString(),
         updated_by: context.user_id
       })

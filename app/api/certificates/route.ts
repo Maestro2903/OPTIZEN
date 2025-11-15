@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate certificate type
-    const allowedTypes = ['Medical Certificate', 'Fitness Certificate', 'Eye Test Certificate', 'Custom']
+    const allowedTypes = ['Medical Certificate', 'Fitness Certificate', 'Eye Test Certificate', 'Sick Leave', 'Custom']
     if (!allowedTypes.includes(body.type)) {
       return NextResponse.json(
         { success: false, error: `Invalid certificate type. Allowed types: ${allowedTypes.join(', ')}` },
@@ -209,6 +209,14 @@ export async function POST(request: NextRequest) {
           title: body.title,
           content: body.content,
           issued_by: body.issued_by,
+          // Hospital and doctor details
+          hospital_name: body.hospital_name,
+          hospital_address: body.hospital_address,
+          doctor_name: body.doctor_name,
+          doctor_qualification: body.doctor_qualification,
+          doctor_registration_number: body.doctor_registration_number,
+          hospital_logo_url: body.hospital_logo_url,
+          doctor_signature_url: body.doctor_signature_url,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }

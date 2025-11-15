@@ -10,15 +10,43 @@ import { Database } from './database.types'
  * PRODUCTION: Uses auth-helpers with cookies for proper authentication
  */
 export const createClient = () => {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  
   // Development mode: Use service role key to bypass RLS
-  if (process.env.NODE_ENV !== 'production' && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (process.env.NODE_ENV !== 'production' && serviceRoleKey) {
+    if (!supabaseUrl) {
+      throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable')
+    }
+    
     return createSupabaseClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      supabaseUrl,
+      serviceRoleKey,
       {
         auth: {
           persistSession: false,
           autoRefreshToken: false,
+        },
+        global: {
+          // Use a custom fetch that works better with Next.js
+          fetch: async (url, options = {}) => {
+            try {
+              // Add keepalive and set a reasonable timeout
+              const response = await fetch(url, {
+                ...options,
+                keepalive: false,
+                signal: AbortSignal.timeout(30000), // 30 second timeout
+              })
+              return response
+            } catch (error) {
+              console.error('Fetch error:', {
+                url,
+                error: error instanceof Error ? error.message : String(error),
+                stack: error instanceof Error ? error.stack : undefined
+              })
+              throw error
+            }
+          }
         }
       }
     )

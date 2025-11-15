@@ -6,9 +6,17 @@ export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
   const supabase = createMiddlewareClient({ req, res })
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  // Safely attempt to get session; network issues (e.g., bad Supabase URL) should not crash middleware
+  let session: any = null
+  try {
+    const {
+      data: { session: s },
+    } = await supabase.auth.getSession()
+    session = s
+  } catch (err) {
+    console.error('Middleware: failed to get Supabase session:', err)
+    session = null
+  }
 
   // Protect dashboard routes
   if (req.nextUrl.pathname.startsWith('/dashboard')) {
@@ -26,23 +34,31 @@ export async function middleware(req: NextRequest) {
       
       // If role not in session, fall back to DB lookup
       if (!userRole) {
-        const { data: user, error } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', session.user.id)
-          .single()
+        try {
+          const { data: user, error } = await supabase
+            .from('users')
+            .select('role')
+            .eq('id', session.user.id)
+            .single()
 
-        if (error) {
-          console.error('Error fetching user role in middleware:', error)
+          if (error) {
+            console.error('Error fetching user role in middleware:', error)
+            const redirectUrl = req.nextUrl.clone()
+            redirectUrl.pathname = '/dashboard/cases'
+            redirectUrl.searchParams.set('error', 'db_error')
+            return NextResponse.redirect(redirectUrl)
+          }
+
+          if (!user || user.role !== 'super_admin') {
+            const redirectUrl = req.nextUrl.clone()
+            redirectUrl.pathname = '/dashboard/cases'
+            return NextResponse.redirect(redirectUrl)
+          }
+        } catch (err) {
+          console.error('Middleware: role lookup failed:', err)
           const redirectUrl = req.nextUrl.clone()
           redirectUrl.pathname = '/dashboard/cases'
           redirectUrl.searchParams.set('error', 'db_error')
-          return NextResponse.redirect(redirectUrl)
-        }
-
-        if (!user || user.role !== 'super_admin') {
-          const redirectUrl = req.nextUrl.clone()
-          redirectUrl.pathname = '/dashboard/cases'
           return NextResponse.redirect(redirectUrl)
         }
       } else if (userRole !== 'super_admin') {

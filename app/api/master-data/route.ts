@@ -2,9 +2,165 @@ import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { requirePermission } from '@/lib/middleware/rbac'
 
+// Helper function to get hierarchical complaints structure
+async function getHierarchicalComplaints(
+  supabase: any,
+  search: string,
+  active_only: boolean,
+  page: number,
+  limit: number
+) {
+  try {
+    // Fetch complaint categories
+    let categoriesQuery = supabase
+      .from('master_data')
+      .select('*')
+      .eq('category', 'complaint_categories')
+      .order('sort_order', { ascending: true })
+
+    if (active_only) {
+      categoriesQuery = categoriesQuery.eq('is_active', true)
+    }
+
+    const { data: categories, error: categoriesError } = await categoriesQuery
+
+    if (categoriesError) {
+      console.error('Error fetching complaint categories:', categoriesError)
+      return NextResponse.json({ error: 'Failed to fetch complaint categories' }, { status: 500 })
+    }
+
+    // Fetch all complaints
+    let complaintsQuery = supabase
+      .from('master_data')
+      .select('*')
+      .eq('category', 'complaints')
+      .order('sort_order', { ascending: true })
+
+    if (active_only) {
+      complaintsQuery = complaintsQuery.eq('is_active', true)
+    }
+
+    const { data: allComplaints, error: complaintsError } = await complaintsQuery
+
+    if (complaintsError) {
+      console.error('Error fetching complaints:', complaintsError)
+      return NextResponse.json({ error: 'Failed to fetch complaints' }, { status: 500 })
+    }
+
+    // Initialize arrays
+    const hierarchicalData: any[] = []
+    const allComplaintsList = allComplaints || []
+
+    // Process each category
+    if (categories && categories.length > 0) {
+      for (const category of categories) {
+        const categoryComplaints = allComplaintsList.filter((complaint: any) => {
+          const parentCategoryId = complaint.metadata?.parent_category_id
+          return parentCategoryId === category.id
+        })
+
+        // Apply search filter if provided
+        let filteredComplaints = categoryComplaints
+        if (search) {
+          const sanitizedSearch = search.toLowerCase()
+          filteredComplaints = categoryComplaints.filter((complaint: any) =>
+            complaint.name.toLowerCase().includes(sanitizedSearch) ||
+            complaint.description?.toLowerCase().includes(sanitizedSearch) ||
+            category.name.toLowerCase().includes(sanitizedSearch)
+          )
+        }
+
+        // Only include category if it has complaints or search matches category name
+        if (filteredComplaints.length > 0 || (search && category.name.toLowerCase().includes(search.toLowerCase()))) {
+          hierarchicalData.push({
+            id: category.id,
+            name: category.name,
+            description: category.description || null,
+            children: filteredComplaints.map((complaint: any) => ({
+              id: complaint.id,
+              name: complaint.name,
+              description: complaint.description || null,
+              is_active: complaint.is_active,  // ✅ Include is_active field
+              sort_order: complaint.sort_order,
+              created_at: complaint.created_at,
+              updated_at: complaint.updated_at,
+              metadata: complaint.metadata
+            }))
+          })
+        }
+      }
+    }
+
+    // Add complaints without a category (for backward compatibility)
+    const complaintsWithCategoryIds = new Set(
+      allComplaintsList
+        .filter((c: any) => c.metadata?.parent_category_id)
+        .map((c: any) => c.id)
+    )
+
+    const uncategorizedComplaints = allComplaintsList.filter((complaint: any) => {
+      if (complaintsWithCategoryIds.has(complaint.id)) return false
+      
+      if (search) {
+        const sanitizedSearch = search.toLowerCase()
+        return complaint.name.toLowerCase().includes(sanitizedSearch) ||
+               complaint.description?.toLowerCase().includes(sanitizedSearch)
+      }
+      return true
+    })
+
+    // If there are complaints without category, add them as a special group
+    if (uncategorizedComplaints.length > 0) {
+      hierarchicalData.push({
+        id: null,
+        name: 'Other Complaints',
+        description: 'Complaints without a specific category',
+        children: uncategorizedComplaints.map((complaint: any) => ({
+          id: complaint.id,
+          name: complaint.name,
+          description: complaint.description || null,
+          is_active: complaint.is_active,  // ✅ Include is_active field
+          sort_order: complaint.sort_order,
+          created_at: complaint.created_at,
+          updated_at: complaint.updated_at,
+          metadata: complaint.metadata
+        }))
+      })
+    }
+
+    // Calculate total count for pagination
+    const totalCount = hierarchicalData.reduce((sum, cat) => sum + cat.children.length, 0)
+    const totalPages = Math.ceil(totalCount / limit)
+    const hasNextPage = page < totalPages
+    const hasPrevPage = page > 1
+
+    return NextResponse.json({
+      success: true,
+      data: hierarchicalData,
+      category: 'complaints',
+      hierarchical: true,
+      pagination: {
+        page,
+        limit,
+        total: totalCount,
+        totalPages,
+        hasNextPage,
+        hasPrevPage
+      }
+    })
+  } catch (error) {
+    console.error('Error in getHierarchicalComplaints:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
 // Allowed master data categories
 const ALLOWED_CATEGORIES = [
+  // Complaints and Categories
   'complaints',
+  'complaint_categories',
+  
+  // Medical Data
   'treatments',
   'medicines',
   'surgeries',
@@ -16,40 +172,39 @@ const ALLOWED_CATEGORIES = [
   'diagnosis',
   'dosages',
   'routes',
-  'eye_selection',
-  'visit_types',
-  'sac_status',
-  'iop_ranges',
-  'iop_methods',
+  'anesthesia_types',
+  
+  // Eye Examination Findings
   'fundus_findings',
   'cornea_findings',
   'conjunctiva_findings',
   'iris_findings',
   'anterior_segment_findings',
   'lens_options',
-  'payment_methods',
-  'insurance_providers',
-  'roles',
+  
+  // Visit and IOP
+  'eye_selection',
+  'visit_types',
+  'sac_status',
+  'iop_ranges',
+  'iop_methods',
+  
+  // Facility Management
+  'beds',
   'room_types',
+  'roles',
+  
+  // Financial
+  'payment_methods',
+  'payment_statuses',
+  'revenue_types',
   'expense_categories',
-  'anesthesia_types',
-  'conditions',
-  'tests',
-  'eye_options',
-  'conjuctiva_findings',
+  'insurance_providers',
+  
   // Form-specific categories
   'pharmacy_categories',
   'color_vision_types',
-  'driving_fitness_types',
-  // Legacy categories (keeping for backward compatibility)
-  'departments',
-  'specializations',
-  'insurance_types',
-  'appointment_types',
-  'document_types',
-  'medication_types',
-  'operation_types',
-  'discharge_types'
+  'driving_fitness_types'
 ]
 
 // GET /api/master-data - List master data items by category with pagination
@@ -105,17 +260,41 @@ export async function GET(request: NextRequest) {
 
     // If no category specified, return all categories with counts
     if (!category) {
-      // Use database aggregation instead of fetching all rows
-      const { data: categoryCounts, error } = await supabase
+      // Try using database RPC function first for better performance
+      const { data: categoryCounts, error: rpcError } = await supabase
         .rpc('get_category_counts')
 
-      if (error) {
-        // Fail hard when RPC is missing - requires database function setup
-        console.error('RPC get_category_counts not available - database function setup required:', error)
+      if (rpcError) {
+        // RPC not available - fall back to client-side aggregation
+        console.warn('RPC get_category_counts not available, using fallback query:', rpcError.message)
+        console.warn('💡 Hint: Run database migrations to enable optimized queries: npx supabase db push')
+        
+        // Fallback: Fetch all master data and aggregate on client side
+        const { data: allMasterData, error: fallbackError } = await supabase
+          .from('master_data')
+          .select('category')
+        
+        if (fallbackError) {
+          console.error('Fallback query also failed:', fallbackError)
+          return NextResponse.json({
+            error: 'Failed to fetch master data categories',
+            details: fallbackError.message
+          }, { status: 500 })
+        }
+
+        // Aggregate counts on client side
+        const counts: Record<string, number> = {}
+        allMasterData?.forEach((item: any) => {
+          counts[item.category] = (counts[item.category] || 0) + 1
+        })
+
         return NextResponse.json({
-          error: 'Database function get_category_counts is not available. Please ensure database setup is complete.',
-          details: 'Required stored procedure missing'
-        }, { status: 500 })
+          success: true,
+          data: counts,
+          categories: Object.keys(counts).sort(),
+          fallback: true,
+          hint: 'Using fallback query. Run migrations for better performance.'
+        })
       }
 
       // Transform RPC result to expected format
@@ -129,6 +308,11 @@ export async function GET(request: NextRequest) {
         data: counts,
         categories: Object.keys(counts).sort()
       })
+    }
+
+    // Special handling for complaints category - return hierarchical structure
+    if (category === 'complaints') {
+      return await getHierarchicalComplaints(supabase, search, active_only, page, limit)
     }
 
     // Calculate offset for pagination
@@ -285,7 +469,7 @@ export async function POST(request: NextRequest) {
           is_active,
           sort_order: finalSortOrder,
           metadata,
-          created_by: context.user.id
+          created_by: context.user_id
         }
       ])
       .select()

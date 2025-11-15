@@ -31,6 +31,17 @@ import { AppointmentForm } from "@/components/appointment-form"
 import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
 import { ViewEditDialog } from "@/components/view-edit-dialog"
 import { AppointmentPrint } from "@/components/appointment-print"
+import { AppointmentViewDialog } from "@/components/appointment-view-dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useApiList, useApiForm, useApiDelete } from "@/lib/hooks/useApi"
@@ -63,6 +74,12 @@ export default function AppointmentsPage() {
   const [appliedFilters, setAppliedFilters] = React.useState<string[]>([])
   const [currentSort, setCurrentSort] = React.useState("appointment_date")
   const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('asc')
+  
+  // View/Edit/Delete state
+  const [viewDialogOpen, setViewDialogOpen] = React.useState(false)
+  const [editDialogOpen, setEditDialogOpen] = React.useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
+  const [selectedAppointment, setSelectedAppointment] = React.useState<Appointment | null>(null)
 
   // API hooks
   const {
@@ -117,19 +134,20 @@ export default function AppointmentsPage() {
       const result = await createAppointment(
         () => appointmentsApi.create({
           patient_id: appointmentData.patient_id,
+          provider_id: appointmentData.provider_id,
           appointment_date: appointmentData.appointment_date,
-          appointment_time: appointmentData.appointment_time,
-          appointment_type: appointmentData.appointment_type,
-          doctor_id: appointmentData.doctor_id,
-          reason: appointmentData.reason,
-          duration_minutes: appointmentData.duration_minutes || 30,
-          status: 'scheduled',
-          notes: appointmentData.notes
+          start_time: appointmentData.start_time,
+          end_time: appointmentData.end_time,
+          type: appointmentData.type,
+          room: appointmentData.room,
+          notes: appointmentData.notes,
+          status: appointmentData.status || 'scheduled'
         }),
         {
           successMessage: `Appointment scheduled successfully.`,
           onSuccess: (newAppointment) => {
             addItem(newAppointment)
+            refresh() // Refresh the list to show the new appointment
           }
         }
       )
@@ -154,19 +172,39 @@ export default function AppointmentsPage() {
     }
   }
 
-  const handleDeleteAppointment = async (appointmentId: string) => {
-    const appointment = appointments.find(a => a.id === appointmentId)
-    if (!appointment) return
+  const handleDeleteAppointment = async () => {
+    if (!selectedAppointment) return
 
-    const success = await deleteItem(
-      () => appointmentsApi.delete(appointmentId),
-      {
-        successMessage: `Appointment has been cancelled successfully.`,
-        onSuccess: () => {
-          removeItem(appointmentId)
+    try {
+      const success = await deleteItem(
+        () => appointmentsApi.delete(selectedAppointment.id),
+        {
+          successMessage: `Appointment has been cancelled successfully.`,
+          onSuccess: () => {
+            removeItem(selectedAppointment.id)
+            setDeleteDialogOpen(false)
+            setSelectedAppointment(null)
+          }
         }
-      }
-    )
+      )
+    } catch (error) {
+      console.error('Error deleting appointment:', error)
+    }
+  }
+
+  const handleViewAppointment = (appointment: Appointment) => {
+    setSelectedAppointment(appointment)
+    setViewDialogOpen(true)
+  }
+
+  const handleEditAppointment = (appointment: Appointment) => {
+    setSelectedAppointment(appointment)
+    setEditDialogOpen(true)
+  }
+
+  const handleDeleteClick = (appointment: Appointment) => {
+    setSelectedAppointment(appointment)
+    setDeleteDialogOpen(true)
   }
 
   const handleFilterChange = (filters: string[]) => {
@@ -220,7 +258,7 @@ export default function AppointmentsPage() {
             Manage patient appointments and scheduling
           </p>
         </div>
-        <AppointmentForm>
+        <AppointmentForm onSubmit={handleAddAppointment}>
           <Button className="gap-2">
             <Plus className="h-4 w-4" />
             Schedule Appointment
@@ -280,6 +318,7 @@ export default function AppointmentsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>SR. NO.</TableHead>
+                  <TableHead>PATIENT ID</TableHead>
                   <TableHead>PATIENT</TableHead>
                   <TableHead>DATE</TableHead>
                   <TableHead>TIME</TableHead>
@@ -292,13 +331,13 @@ export default function AppointmentsPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       Loading appointments...
                     </TableCell>
                   </TableRow>
                 ) : appointments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       No appointments found
                     </TableCell>
                   </TableRow>
@@ -306,15 +345,16 @@ export default function AppointmentsPage() {
                   appointments.map((appointment, index) => (
                     <TableRow key={appointment.id}>
                       <TableCell>{((pagination?.page || 1) - 1) * (pagination?.limit || 10) + index + 1}</TableCell>
+                      <TableCell className="font-mono text-sm font-semibold text-primary">{appointment.patients?.patient_id || '-'}</TableCell>
                       <TableCell className="font-medium uppercase">{appointment.patients?.full_name || '-'}</TableCell>
                       <TableCell>{new Date(appointment.appointment_date).toLocaleDateString('en-GB')}</TableCell>
-                      <TableCell>{appointment.appointment_time}</TableCell>
+                      <TableCell>{appointment.start_time} - {appointment.end_time}</TableCell>
                       <TableCell>
                         <Badge variant="secondary" className="capitalize">
-                          {appointment.appointment_type}
+                          {appointment.type}
                         </Badge>
                       </TableCell>
-                      <TableCell>{appointment.doctors?.full_name || '-'}</TableCell>
+                      <TableCell>{appointment.users?.full_name || '-'}</TableCell>
                       <TableCell>
                         <Badge variant="secondary" className={`capitalize ${statusColors[appointment.status as keyof typeof statusColors] || ''}`}>
                           {appointment.status}
@@ -322,15 +362,12 @@ export default function AppointmentsPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          {/* TODO: Implement view appointment dialog/modal
-                              Add onClick handler to show appointment details in a modal */}
                           <Button 
                             variant="ghost" 
                             size="icon" 
                             className="h-8 w-8"
-                            onClick={() => alert(`View appointment:\n\nPatient: ${appointment.patients?.full_name || appointment.patient_id}\nDate: ${appointment.appointment_date}\nTime: ${appointment.appointment_time}\nStatus: ${appointment.status}`)}
+                            onClick={() => handleViewAppointment(appointment)}
                             title="View appointment details"
-                            aria-label="View appointment details"
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -338,24 +375,20 @@ export default function AppointmentsPage() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8"
-                            onClick={() => {
-                              if (window.confirm('Are you sure you want to mark this appointment as completed?')) {
-                                handleUpdateAppointment(appointment.id, { status: 'completed' })
-                              }
-                            }}
-                            title="Mark as completed"
+                            onClick={() => handleEditAppointment(appointment)}
+                            title="Edit appointment"
                           >
-                            <CheckCircle className="h-4 w-4" />
+                            <Edit className="h-4 w-4" />
                           </Button>
                           <AppointmentPrint appointment={{
                             id: appointment.id,
                             patient_name: appointment.patients?.full_name || '-',
                             patient_id: appointment.patient_id,
                             date: appointment.appointment_date,
-                            time: appointment.appointment_time,
-                            type: appointment.appointment_type,
+                            time: `${appointment.start_time} - ${appointment.end_time}`,
+                            type: appointment.type,
                             status: appointment.status,
-                            doctor: appointment.doctors?.full_name,
+                            doctor: appointment.users?.full_name,
                             notes: appointment.notes,
                             created_at: appointment.created_at
                           }}>
@@ -372,12 +405,8 @@ export default function AppointmentsPage() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-destructive"
-                            onClick={() => {
-                              if (window.confirm('Are you sure you want to cancel this appointment? This action cannot be undone.')) {
-                                handleDeleteAppointment(appointment.id)
-                              }
-                            }}
-                            title="Cancel appointment"
+                            onClick={() => handleDeleteClick(appointment)}
+                            title="Delete appointment"
                           >
                             <XCircle className="h-4 w-4" />
                           </Button>
@@ -402,6 +431,81 @@ export default function AppointmentsPage() {
           />
         </CardContent>
       </Card>
+
+      {/* View Appointment Dialog */}
+      {selectedAppointment && (
+        <AppointmentViewDialog
+          appointment={{
+            id: selectedAppointment.id,
+            patient_name: selectedAppointment.patients?.full_name,
+            patient_id: selectedAppointment.patients?.patient_id || selectedAppointment.patient_id,
+            provider_name: selectedAppointment.users?.full_name,
+            appointment_date: selectedAppointment.appointment_date,
+            start_time: selectedAppointment.start_time,
+            end_time: selectedAppointment.end_time,
+            type: selectedAppointment.type,
+            status: selectedAppointment.status,
+            room: selectedAppointment.room,
+            notes: selectedAppointment.notes,
+            created_at: selectedAppointment.created_at,
+          }}
+          open={viewDialogOpen}
+          onOpenChange={setViewDialogOpen}
+        />
+      )}
+
+      {/* Edit Appointment Dialog */}
+      {selectedAppointment && (
+        <AppointmentForm
+          appointmentData={{
+            patient_id: selectedAppointment.patient_id,
+            provider_id: selectedAppointment.provider_id,
+            appointment_date: selectedAppointment.appointment_date,
+            start_time: selectedAppointment.start_time,
+            end_time: selectedAppointment.end_time,
+            type: selectedAppointment.type,
+            room: selectedAppointment.room,
+            notes: selectedAppointment.notes,
+          }}
+          mode="edit"
+          open={editDialogOpen}
+          onOpenChange={(open) => {
+            setEditDialogOpen(open)
+            if (!open) setSelectedAppointment(null)
+          }}
+          onSubmit={async (data) => {
+            await handleUpdateAppointment(selectedAppointment.id, data)
+            setEditDialogOpen(false)
+            setSelectedAppointment(null)
+          }}
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this appointment for{' '}
+              <strong>{selectedAppointment?.patients?.full_name || 'this patient'}</strong> scheduled for{' '}
+              <strong>{selectedAppointment?.appointment_date}</strong> at{' '}
+              <strong>{selectedAppointment?.start_time}</strong>.
+              <br /><br />
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAppointment}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete Appointment
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

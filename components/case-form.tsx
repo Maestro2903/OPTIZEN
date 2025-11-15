@@ -5,11 +5,14 @@ import { useForm, useFieldArray } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Button } from "@/components/ui/button"
-import { useMasterData } from "@/contexts/master-data-context"
-import { useMasterData as useMasterDataAPI } from "@/hooks/use-master-data"
+import { useMasterData } from "@/hooks/use-master-data"
 import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
-import { patientsApi } from "@/lib/services/api"
+import { GroupedSearchableSelect, type GroupedOption } from "@/components/ui/grouped-searchable-select"
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/multi-select"
+import { patientsApi, type Patient } from "@/lib/services/api"
 import { useToast } from "@/hooks/use-toast"
+import { PatientSelectorWithHistory } from "@/components/patient-selector-with-history"
+import { determineVisitType } from "@/lib/utils/visit-type"
 import {
   Dialog,
   DialogContent,
@@ -85,11 +88,7 @@ const DIAGNOSIS_OPTIONS = [
   "CRAO","BRVO",
 ]
 
-const VISUAL_ACUITY_OPTIONS = [
-  "6/4P","6/5P","6/6P","6/9P","6/6","6/9","6/12","6/18","6/36","6/60","FC 1M","FC 1/2M",
-  "FC CLOSE TO FACE","FC 3M","HAND MOVEMENTS","PL+ PR INACURATE","PL+ PR ACURATE","6/12P","6/18P","6/24P",
-  "6/36P","6/60P","FIXING","NO PL","N/6","N/8","N/10","N/12","N/18","N/24"
-]
+// Visual acuity options now loaded from master data (visual_acuity category)
 
 const BLOOD_TEST_OPTIONS = [
   "CBC","BT","CT","PT-INR","RBS","FBS","PP2BS","HIV","HBSAG","HCV","ANA-PROFILE","P-ANCA","C-ANCA",
@@ -302,30 +301,33 @@ const caseFormSchema = z.object({
   case_no: z.string().min(1, "Case number is required"),
   case_date: z.string().min(1, "Date is required"),
   patient_id: z.string().min(1, "Patient is required"),
-  visit_type: z.enum(["First", "Follow-up-1", "Follow-up-2", "Follow-up-3"]),
+  visit_type: z.string().min(1, "Visit type is required"),
   
   // 2. Case History
   chief_complaint: z.string().optional(),
   history_present_illness: z.string().optional(),
   
-  // 3. Patient History
+  // 3. Treatments & Medications (Past History)
   past_history_treatments: z.array(z.object({
     treatment: z.string(),
     years: z.string(),
   })).optional(),
   past_history_medicines: z.array(z.object({
+    medicine_id: z.string().optional(),
     medicine_name: z.string(),
-    type: z.string(),
-    advice: z.string(),
-    duration: z.string(),
-    eye: z.enum(["R", "L", "B"]),
+    type: z.string().optional(),
+    advice: z.string().optional(),
+    duration: z.string().optional(),
+    eye: z.string().optional(),
   })).optional(),
   
   // 4. Complaints
   complaints: z.array(z.object({
-    complaint: z.string(),
-    eye: z.string(),
-    duration: z.string(),
+    categoryId: z.string().nullable().optional(),
+    complaintId: z.string().min(1, "Complaint is required"),
+    eye: z.string().optional(),
+    duration: z.string().optional(),
+    notes: z.string().optional(),
   })).optional(),
   
   // 5. Vision & Refraction - Vision
@@ -406,6 +408,13 @@ const caseFormSchema = z.object({
   iop_right: z.string().optional(),
   iop_left: z.string().optional(),
   sac_test: z.string().optional(),
+  diagnostic_tests: z.array(z.object({
+    test_id: z.string().min(1, "Test is required"),
+    eye: z.string().optional(),
+    type: z.string().optional(),
+    problem: z.string().optional(),
+    notes: z.string().optional(),
+  })).optional(),
   
   // 10. Advice
   medicines: z.array(z.object({
@@ -427,6 +436,8 @@ const caseFormSchema = z.object({
   // 11. Diagram
   right_eye_diagram: z.string().optional(),
   left_eye_diagram: z.string().optional(),
+  // 12. Advice
+  advice_remarks: z.string().optional(),
 })
 
 interface CaseFormProps {
@@ -441,12 +452,17 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
   const [currentStep, setCurrentStep] = React.useState("register")
   const [patients, setPatients] = React.useState<SearchableSelectOption[]>([])
   const [loadingPatients, setLoadingPatients] = React.useState(false)
+  const [selectedPatient, setSelectedPatient] = React.useState<Patient | null>(null)
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
   const { toast } = useToast()
 
   // State for complaint form inputs
-  const [newComplaint, setNewComplaint] = React.useState("")
+  const [newComplaintId, setNewComplaintId] = React.useState("")
+  const [newComplaintCategoryId, setNewComplaintCategoryId] = React.useState<string | null>(null)
   const [newComplaintEye, setNewComplaintEye] = React.useState("")
   const [newComplaintDuration, setNewComplaintDuration] = React.useState("")
+  const [newComplaintNotes, setNewComplaintNotes] = React.useState("")
+  const [complaintGroups, setComplaintGroups] = React.useState<GroupedOption[]>([])
 
   // State for medicine form inputs
   const [newMedicineDrug, setNewMedicineDrug] = React.useState("")
@@ -455,22 +471,151 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
   const [newMedicineRoute, setNewMedicineRoute] = React.useState("")
   const [newMedicineDuration, setNewMedicineDuration] = React.useState("")
   const [newMedicineQuantity, setNewMedicineQuantity] = React.useState("")
+  const [showAddMedicineDialog, setShowAddMedicineDialog] = React.useState(false)
+  const [newMedicineName, setNewMedicineName] = React.useState("")
+  const [newMedicineDescription, setNewMedicineDescription] = React.useState("")
 
   // State for surgery form inputs
   const [newSurgeryEye, setNewSurgeryEye] = React.useState("")
   const [newSurgeryName, setNewSurgeryName] = React.useState("")
   const [newSurgeryAnesthesia, setNewSurgeryAnesthesia] = React.useState("")
-  const { masterData } = useMasterData()
-  const masterDataAPI = useMasterDataAPI()
+  
+  // State for diagnostic test form inputs
+  const [newTestId, setNewTestId] = React.useState("")
+  const [newTestEye, setNewTestEye] = React.useState("")
+  const [newTestType, setNewTestType] = React.useState("")
+  const [newTestProblem, setNewTestProblem] = React.useState("")
+  const [newTestNotes, setNewTestNotes] = React.useState("")
+  
+  const masterData = useMasterData()
+
+  // Initialize form BEFORE any code that references it
+  const form = useForm<z.infer<typeof caseFormSchema>>({
+    resolver: zodResolver(caseFormSchema),
+    defaultValues: caseData || {
+        case_no: `OPT${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+        case_date: new Date().toISOString().split("T")[0],
+        patient_id: "",
+      visit_type: "First",
+        complaints: [],
+        diagnosis: [],
+        blood_tests: [],
+        treatments: [],
+        right_eye_diagram: "",
+        left_eye_diagram: "",
+    },
+  })
+
+  // Field arrays for patient history sections
+  const { fields: treatmentFields, append: appendTreatment, remove: removeTreatment } = useFieldArray({
+    control: form.control,
+    name: "past_history_treatments",
+  })
+
+  const { fields: medicineFields, append: appendPastMedicine, remove: removePastMedicine } = useFieldArray({
+    control: form.control,
+    name: "past_history_medicines",
+  })
+
+  const { fields: complaintFields, append: appendComplaint, remove: removeComplaint } = useFieldArray({
+    control: form.control,
+    name: "complaints",
+  })
+
+  const { fields: medicineAdviceFields, append: appendMedicine, remove: removeMedicine } = useFieldArray({
+    control: form.control,
+    name: "medicines",
+  })
+
+  const { fields: surgeryFields, append: appendSurgery, remove: removeSurgery } = useFieldArray({
+    control: form.control,
+    name: "surgeries",
+  })
+
+  const { fields: diagnosticTestFields, append: appendDiagnosticTest, remove: removeDiagnosticTest } = useFieldArray({
+    control: form.control,
+    name: "diagnostic_tests",
+  })
+
+  // Compute visit type options for the dropdown
+  const visitTypeOptions = React.useMemo(() => {
+    if (!masterData.data.visitTypes || masterData.data.visitTypes.length === 0) {
+      return []
+    }
+    return masterData.data.visitTypes.map(option => ({
+      value: option.label, // Use the actual name as value
+      label: option.label  // Display the same name
+    }))
+  }, [masterData.data.visitTypes])
+
+  // Reset form and clear patient when dialog opens (for add mode)
+  React.useEffect(() => {
+    if (open && mode === "add") {
+      // Reset form with fresh default values
+      form.reset({
+        case_no: `OPT${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+        case_date: new Date().toISOString().split("T")[0],
+        patient_id: "",
+        visit_type: "First",
+        complaints: [],
+        diagnosis: [],
+        blood_tests: [],
+        treatments: [],
+        right_eye_diagram: "",
+        left_eye_diagram: "",
+      })
+      // Clear selected patient
+      setSelectedPatient(null)
+      // Reset to first step
+      setCurrentStep("register")
+    }
+  }, [open, mode, form])
 
   // Load master data when dialog opens
   React.useEffect(() => {
     if (open) {
-      // Fetch treatments, medicines, dosages, and visit types for dropdowns
-      masterDataAPI.fetchMultiple(['treatments', 'medicines', 'dosages', 'visitTypes'])
+      // Fetch all required master data categories for dropdowns
+      masterData.fetchMultiple([
+        'treatments', 
+        'medicines', 
+        'dosages', 
+        'routes', 
+        'eyeSelection',
+        'visitTypes', 
+        'surgeries', 
+        'diagnosis', 
+        'sacStatus', 
+        'iopRanges',
+        'iopMethods',
+        'visualAcuity',
+        'bloodTests',
+        'diagnosticTests',
+        'anesthesiaTypes'
+      ])
+      
+      // Fetch hierarchical complaints separately
+      fetchComplaintGroups()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
+
+  // Fetch hierarchical complaint groups
+  const fetchComplaintGroups = async () => {
+    try {
+      const response = await fetch('/api/master-data?category=complaints&active_only=true')
+      const result = await response.json()
+      if (result.success && result.hierarchical && result.data) {
+        setComplaintGroups(result.data)
+      }
+    } catch (error) {
+      console.error('Error fetching complaint groups:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to load complaint categories',
+        variant: 'destructive'
+      })
+    }
+  }
 
   // Load patients when dialog opens
   React.useEffect(() => {
@@ -501,6 +646,29 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
     loadPatients()
   }, [open, toast])
 
+  // Auto-detect visit type when patient is selected
+  React.useEffect(() => {
+    if (selectedPatient) {
+      determineVisitType(selectedPatient.id).then(visitType => {
+        form.setValue('visit_type', visitType)
+        toast({
+          title: "Visit Type Detected",
+          description: `This is a ${visitType} visit for ${selectedPatient.full_name}`,
+        })
+      })
+    }
+  }, [selectedPatient, form, toast])
+
+  // Update form when patient is selected
+  const handlePatientSelect = (patient: Patient | null) => {
+    setSelectedPatient(patient)
+    if (patient) {
+      form.setValue('patient_id', patient.id)
+    } else {
+      form.setValue('patient_id', '')
+    }
+  }
+
   function SimpleCombobox({
     options,
     value,
@@ -508,21 +676,25 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
     placeholder,
     className,
   }: {
-    options: string[]
+    options: SearchableSelectOption[]
     value?: string
     onChange: (v: string) => void
     placeholder?: string
     className?: string
   }) {
     const [open, setOpen] = React.useState(false)
-    const [inputValue, setInputValue] = React.useState(value || "")
+    const [inputValue, setInputValue] = React.useState("")
     const [isTyping, setIsTyping] = React.useState(false)
+    
+    // Find selected option by value (UUID)
+    const selectedOption = options.find(opt => opt.value === value)
+    const displayValue = selectedOption?.label || ""
     
     React.useEffect(() => {
       if (!isTyping) {
-        setInputValue(value || "")
+        setInputValue(displayValue)
       }
-    }, [value, isTyping])
+    }, [displayValue, isTyping])
 
     // debounce
     const [debounced, setDebounced] = React.useState(inputValue)
@@ -532,11 +704,13 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
     }, [inputValue])
 
     const filtered = React.useMemo(() => {
+      // Guard against undefined options
+      if (!options || !Array.isArray(options)) return []
       // If user just opened and hasn't typed, show all
       if (!isTyping && open) return options
       const q = (debounced || "").trim().toLowerCase()
       if (!q) return options
-      return options.filter((o) => o.toLowerCase().includes(q))
+      return options.filter((o) => o.label.toLowerCase().includes(q))
     }, [options, debounced, isTyping, open])
 
     const [active, setActive] = React.useState(0)
@@ -544,9 +718,9 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
       setActive(0)
     }, [debounced, open])
 
-    const handleSelect = (opt: string) => {
-      onChange(opt)
-      setInputValue(opt)
+    const handleSelect = (opt: SearchableSelectOption) => {
+      onChange(opt.value)
+      setInputValue(opt.label)
       setIsTyping(false)
       setOpen(false)
     }
@@ -567,7 +741,7 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
             role="combobox"
             className={`w-full justify-between border-gray-300 text-left font-normal ${!value && 'text-muted-foreground'} ${className || ''}`}
           >
-            <span className="truncate">{value || placeholder || "Select option"}</span>
+            <span className="truncate">{displayValue || placeholder || "Select option"}</span>
             <span className="ml-2">▼</span>
           </Button>
         </PopoverTrigger>
@@ -618,15 +792,15 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
               filtered.map((opt, idx) => (
                 <button
                   type="button"
-                  key={opt}
+                  key={opt.value}
                   className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${
-                    opt === value || idx === active ? 'bg-gray-100' : ''
+                    opt.value === value || idx === active ? 'bg-gray-100' : ''
                   }`}
                   onMouseDown={(e) => e.preventDefault()}
                   onMouseEnter={() => setActive(idx)}
                   onClick={() => handleSelect(opt)}
                 >
-                  {opt}
+                  {opt.label}
                 </button>
               ))
             )}
@@ -642,7 +816,7 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
     onChange,
     placeholder,
   }: {
-    options: string[]
+    options: SearchableSelectOption[]
     values?: string[]
     onChange: (v: string[]) => void
     placeholder?: string
@@ -655,27 +829,34 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
       return () => clearTimeout(t)
     }, [query])
     const filtered = React.useMemo(() => {
+      // Guard against undefined options
+      if (!options || !Array.isArray(options)) return []
       const q = debounced.trim().toLowerCase()
       if (!q) return options
-      return options.filter((o) => o.toLowerCase().includes(q))
+      return options.filter((o) => o.label.toLowerCase().includes(q))
     }, [options, debounced])
     const [active, setActive] = React.useState(0)
     React.useEffect(() => setActive(0), [debounced])
+    
+    // Get labels for display
+    const selectedOptions = (values || []).map(val => 
+      options.find(opt => opt.value === val)
+    ).filter(Boolean) as SearchableSelectOption[]
 
-    const remove = (item: string) => {
-      onChange((values || []).filter((v) => v !== item))
+    const remove = (itemValue: string) => {
+      onChange((values || []).filter((v) => v !== itemValue))
     }
 
     return (
       <div className="space-y-2 relative">
         <div className="flex flex-wrap gap-2">
-          {(values || []).length === 0 ? (
+          {selectedOptions.length === 0 ? (
             <p className="text-sm text-muted-foreground">No items selected</p>
           ) : null}
-          {(values || []).map((v) => (
-            <span key={v} className="inline-flex items-center gap-1 px-2 py-1 rounded border text-xs">
-              {v}
-              <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => remove(v)}>×</button>
+          {selectedOptions.map((opt) => (
+            <span key={opt.value} className="inline-flex items-center gap-1 px-2 py-1 rounded border text-xs">
+              {opt.label}
+              <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => remove(opt.value)}>×</button>
             </span>
           ))}
         </div>
@@ -702,8 +883,8 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                   else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((p) => Math.max(p - 1, 0)) }
                   else if (e.key === 'Enter') {
                     e.preventDefault(); const opt = filtered[active]; if (!opt) return;
-                    const selected = (values || []).includes(opt)
-                    const next = selected ? (values || []).filter((v) => v !== opt) : [...(values || []), opt]
+                    const selected = (values || []).includes(opt.value)
+                    const next = selected ? (values || []).filter((v) => v !== opt.value) : [...(values || []), opt.value]
                     onChange(next)
                   } else if (e.key === 'Escape') { setOpen(false) }
                 }}
@@ -717,21 +898,21 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                 <div className="p-2 text-sm text-muted-foreground">No results</div>
               ) : (
                 filtered.map((opt, idx) => {
-                  const selected = (values || []).includes(opt)
+                  const selected = (values || []).includes(opt.value)
                   return (
                     <button
                       type="button"
-                      key={opt}
+                      key={opt.value}
                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${selected || idx === active ? 'bg-gray-100' : ''}`}
                       onClick={() => {
                         const next = selected
-                          ? (values || []).filter((v) => v !== opt)
-                          : [...(values || []), opt]
+                          ? (values || []).filter((v) => v !== opt.value)
+                          : [...(values || []), opt.value]
                         onChange(next)
                       }}
                       onMouseEnter={() => setActive(idx)}
                     >
-                      {opt}
+                      {opt.label}
                     </button>
                   )
                 })
@@ -743,65 +924,45 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
     )
   }
 
-  const form = useForm<z.infer<typeof caseFormSchema>>({
-    resolver: zodResolver(caseFormSchema),
-    defaultValues: caseData || {
-      case_no: "OPT" + new Date().getFullYear() + "001",
-      case_date: new Date().toISOString().split("T")[0],
-      patient_id: "",
-      visit_type: "First",
-      complaints: [],
-      diagnosis: [],
-      blood_tests: [],
-      treatments: [],
-      right_eye_diagram: "",
-      left_eye_diagram: "",
-    },
-  })
-
-  // Field arrays for patient history sections
-  const { fields: treatmentFields, append: appendTreatment, remove: removeTreatment } = useFieldArray({
-    control: form.control,
-    name: "past_history_treatments",
-  })
-
-  const { fields: medicineFields, append: appendPastMedicine, remove: removePastMedicine } = useFieldArray({
-    control: form.control,
-    name: "past_history_medicines",
-  })
-
-  const { fields: complaintFields, append: appendComplaint, remove: removeComplaint } = useFieldArray({
-    control: form.control,
-    name: "complaints",
-  })
-
-  const { fields: medicineAdviceFields, append: appendMedicine, remove: removeMedicine } = useFieldArray({
-    control: form.control,
-    name: "medicines",
-  })
-
-  const { fields: surgeryFields, append: appendSurgery, remove: removeSurgery } = useFieldArray({
-    control: form.control,
-    name: "surgeries",
-  })
+  // Transform caseData treatments to medicines format for edit mode
+  React.useEffect(() => {
+    if (mode === "edit" && caseData && caseData.treatments && Array.isArray(caseData.treatments)) {
+      // Transform treatments array to medicines format
+      const transformedMedicines = caseData.treatments.map((treatment: any) => ({
+        drug_name: treatment.drug_id,  // Map drug_id to drug_name (both are UUIDs)
+        eye: treatment.eye,
+        dosage: treatment.dosage_id,   // Map dosage_id to dosage (both are UUIDs)
+        route: treatment.route_id,     // Map route_id to route (both are UUIDs)
+        duration: treatment.duration,
+        quantity: treatment.quantity
+      }))
+      // Set medicines field with transformed data
+      form.setValue('medicines', transformedMedicines)
+    }
+  }, [mode, caseData, form])
 
   // Function to add new complaint
   const handleAddComplaint = () => {
-    if (newComplaint && newComplaintEye && newComplaintDuration) {
+    if (newComplaintId) {
       appendComplaint({
-        complaint: newComplaint,
-        eye: newComplaintEye,
-        duration: newComplaintDuration,
+        categoryId: newComplaintCategoryId || null,
+        complaintId: newComplaintId,
+        eye: newComplaintEye || undefined,
+        duration: newComplaintDuration || undefined,
+        notes: newComplaintNotes || undefined,
       })
-      setNewComplaint("")
+      setNewComplaintId("")
+      setNewComplaintCategoryId(null)
       setNewComplaintEye("")
       setNewComplaintDuration("")
+      setNewComplaintNotes("")
     }
   }
 
   // Function to add new medicine
   const handleAddMedicine = () => {
-    if (newMedicineDrug && newMedicineEye && newMedicineDosage && newMedicineRoute && newMedicineDuration && newMedicineQuantity) {
+    // Require only essential fields: drug, eye, and dosage
+    if (newMedicineDrug && newMedicineEye && newMedicineDosage) {
       appendMedicine({
         drug_name: newMedicineDrug,
         eye: newMedicineEye,
@@ -816,12 +977,19 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
       setNewMedicineRoute("")
       setNewMedicineDuration("")
       setNewMedicineQuantity("")
+    } else {
+      toast({
+        title: "Missing Required Fields",
+        description: "Please fill in Drug Name, Eye, and Dosage to add a medicine.",
+        variant: "destructive",
+      })
     }
   }
 
   // Function to add new surgery
   const handleAddSurgery = () => {
-    if (newSurgeryEye && newSurgeryName && newSurgeryAnesthesia) {
+    // Require only essential fields: eye and surgery name
+    if (newSurgeryEye && newSurgeryName) {
       appendSurgery({
         eye: newSurgeryEye,
         surgery_name: newSurgeryName,
@@ -830,33 +998,299 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
       setNewSurgeryEye("")
       setNewSurgeryName("")
       setNewSurgeryAnesthesia("")
+    } else {
+      toast({
+        title: "Missing Required Fields",
+        description: "Please fill in Eye and Surgery Name to add surgery details.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Function to add new diagnostic test
+  const handleAddDiagnosticTest = () => {
+    if (newTestId) {
+      appendDiagnosticTest({
+        test_id: newTestId,
+        eye: newTestEye || undefined,
+        type: newTestType || undefined,
+        problem: newTestProblem || undefined,
+        notes: newTestNotes || undefined,
+      })
+      setNewTestId("")
+      setNewTestEye("")
+      setNewTestType("")
+      setNewTestProblem("")
+      setNewTestNotes("")
     }
   }
 
   // Dynamic patient options derived from master data
   // Removed patientOptions - now using patients state loaded from API
 
-  function onSubmit(values: z.infer<typeof caseFormSchema>) {
-    if (onSubmitCallback) {
-      onSubmitCallback(values)
+  async function onSubmit(values: z.infer<typeof caseFormSchema>) {
+    setIsSubmitting(true)
+    try {
+      console.log('Form submission started with values:', values)
+      
+      if (!onSubmitCallback) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "No submission handler provided.",
+        })
+        return
+      }
+      
+      // Validate required fields
+      if (!values.patient_id) {
+        toast({
+          variant: "destructive",
+          title: "Missing Required Field",
+          description: "Please select a patient before saving the case.",
+        })
+        setCurrentStep("register")
+        return
+      }
+      
+      if (!values.visit_type) {
+        toast({
+          variant: "destructive",
+          title: "Missing Required Field",
+          description: "Please select a visit type before saving the case.",
+        })
+        setCurrentStep("register")
+        return
+      }
+
+      // Transform form data to match API expectations
+      // Note: With our fixed SimpleCombobox components, form values are already UUIDs
+      const transformedData = {
+        patient_id: values.patient_id,
+        case_no: values.case_no,
+        encounter_date: values.case_date,
+        visit_type: values.visit_type,
+        chief_complaint: values.chief_complaint,
+        history_of_present_illness: values.history_present_illness,
+        past_medical_history: values.past_history_treatments?.map(t => 
+          `${t.treatment} (${t.years} years)`
+        ).join('; ') || undefined,
+        
+        // Transform past medications to structured JSONB
+        past_medications: values.past_history_medicines?.map((m: any) => ({
+          medicine_id: m.medicine_id || undefined,
+          medicine_name: m.medicine_name,
+          type: m.type || undefined,
+          advice: m.advice || undefined,
+          duration: m.duration || undefined,
+          eye: m.eye || undefined
+        })) || [],
+        
+        // Transform complaints array - using new hierarchical structure
+        complaints: values.complaints?.map((c: any) => ({
+          complaintId: c.complaintId, // UUID from grouped dropdown
+          categoryId: c.categoryId || null, // Category UUID from grouped dropdown
+          eye: c.eye || undefined, // UUID from eye dropdown
+          duration: c.duration || undefined,
+          notes: c.notes || undefined
+        })) || [],
+        
+        // Transform medicines (advice) array - values are already UUIDs
+        treatments: values.medicines?.map((m: any) => ({
+          drug_id: m.drug_name, // Already a UUID from dropdown
+          dosage_id: m.dosage || undefined, // Already a UUID from dropdown
+          route_id: m.route || undefined, // Already a UUID from dropdown
+          eye: m.eye || undefined, // Already a UUID from dropdown
+          duration: m.duration || undefined,
+          quantity: m.quantity || undefined
+        })) || [],
+        
+        // Transform vision data
+        vision_data: {
+          unaided: {
+            right: values.visual_acuity_unaided_right || undefined,
+            left: values.visual_acuity_unaided_left || undefined
+          },
+          pinhole: {
+            right: values.pinhole_right || undefined,
+            left: values.pinhole_left || undefined
+          },
+          aided: {
+            right: values.visual_acuity_aided_right || undefined,
+            left: values.visual_acuity_aided_left || undefined
+          },
+          near: {
+            right: values.near_visual_right || undefined,
+            left: values.near_visual_left || undefined
+          }
+        },
+        
+        // Transform examination_data to include all examination fields and surgeries
+        examination_data: {
+          anterior_segment: {
+            eyelids: { 
+              right: values.eyelids_right || undefined, 
+              left: values.eyelids_left || undefined 
+            },
+            conjunctiva: { 
+              right: values.conjunctiva_right || undefined, 
+              left: values.conjunctiva_left || undefined 
+            },
+            cornea: { 
+              right: values.cornea_right || undefined, 
+              left: values.cornea_left || undefined 
+            },
+            anterior_chamber: { 
+              right: values.anterior_chamber_right || undefined, 
+              left: values.anterior_chamber_left || undefined 
+            },
+            iris: { 
+              right: values.iris_right || undefined, 
+              left: values.iris_left || undefined 
+            },
+            lens: { 
+              right: values.lens_right || undefined, 
+              left: values.lens_left || undefined 
+            },
+            remarks: values.anterior_remarks || undefined
+          },
+          posterior_segment: {
+            vitreous: { 
+              right: values.vitreous_right || undefined, 
+              left: values.vitreous_left || undefined 
+            },
+            disc: { 
+              right: values.disc_right || undefined, 
+              left: values.disc_left || undefined 
+            },
+            retina: { 
+              right: values.retina_right || undefined, 
+              left: values.retina_left || undefined 
+            },
+            remarks: values.posterior_remarks || undefined
+          },
+          refraction: {
+            distant: {
+              right: {
+                sph: values.refraction_distant_sph_right || undefined,
+                cyl: values.refraction_distant_cyl_right || undefined,
+                axis: values.refraction_distant_axis_right || undefined,
+                va: values.refraction_distant_va_right || undefined
+              },
+              left: {
+                sph: values.refraction_distant_sph_left || undefined,
+                cyl: values.refraction_distant_cyl_left || undefined,
+                axis: values.refraction_distant_axis_left || undefined,
+                va: values.refraction_distant_va_left || undefined
+              }
+            },
+            near: {
+              right: {
+                sph: values.refraction_near_sph_right || undefined,
+                cyl: values.refraction_near_cyl_right || undefined,
+                axis: values.refraction_near_axis_right || undefined,
+                va: values.refraction_near_va_right || undefined
+              },
+              left: {
+                sph: values.refraction_near_sph_left || undefined,
+                cyl: values.refraction_near_cyl_left || undefined,
+                axis: values.refraction_near_axis_left || undefined,
+                va: values.refraction_near_va_left || undefined
+              }
+            },
+            pg: {
+              right: {
+                sph: values.refraction_pg_sph_right || undefined,
+                cyl: values.refraction_pg_cyl_right || undefined,
+                axis: values.refraction_pg_axis_right || undefined,
+                va: values.refraction_pg_va_right || undefined
+              },
+              left: {
+                sph: values.refraction_pg_sph_left || undefined,
+                cyl: values.refraction_pg_cyl_left || undefined,
+                axis: values.refraction_pg_axis_left || undefined,
+                va: values.refraction_pg_va_left || undefined
+              }
+            },
+            purpose: values.refraction_purpose || undefined,
+            quality: values.refraction_quality || undefined,
+            remark: values.refraction_remark || undefined
+          },
+          blood_investigation: {
+            blood_pressure: values.blood_pressure || undefined,
+            blood_sugar: values.blood_sugar || undefined,
+            blood_tests: values.blood_tests || []
+          },
+          surgeries: values.surgeries?.map((s: any) => ({
+            eye: s.eye, // Already a UUID from dropdown
+            surgery_name: s.surgery_name, // Already a UUID from dropdown
+            anesthesia: s.anesthesia
+          })) || [],
+          diagrams: {
+            right: values.right_eye_diagram || undefined,
+            left: values.left_eye_diagram || undefined
+          }
+        },
+        
+        // Diagnostic tests - combine manual tests with structured diagnostic_tests
+        diagnostic_tests: [
+          // Include structured diagnostic tests from the form
+          ...(values.diagnostic_tests?.map((t: any) => ({
+            test_id: t.test_id, // UUID from dropdown
+            eye: t.eye || undefined,
+            type: t.type || undefined,
+            problem: t.problem || undefined,
+            notes: t.notes || undefined
+          })) || []),
+          // Note: IOP and SAC tests should be added via the diagnostic_tests form
+          // The fields iop_right, iop_left, and sac_test are deprecated
+          // Remove the backward compatibility code that was adding invalid test_id strings
+        ],
+        
+        // Diagnosis (array of strings or UUIDs depending on how diagnosis dropdown is set up)
+        diagnosis: values.diagnosis || [],
+        
+        // Other text fields
+        examination_findings: values.anterior_remarks || values.posterior_remarks 
+          ? `Anterior: ${values.anterior_remarks || 'N/A'}. Posterior: ${values.posterior_remarks || 'N/A'}` 
+          : undefined,
+        treatment_plan: values.treatments?.join(', ') || undefined,
+        medications_prescribed: values.dosage || undefined,
+        follow_up_instructions: values.surgery_advised || undefined,
+        advice_remarks: values.advice_remarks || undefined,
+        status: 'active'
+      }
+      
+      console.log('Transformed case data:', transformedData)
+      
+      // Await the async callback - this will throw if there's an error
+      await onSubmitCallback(transformedData)
+      
+      // Only close dialog and reset form on successful submission
+      setOpen(false)
+      form.reset()
+      setCurrentStep("register")
+    } catch (error: any) {
+      // Error handling is done by the callback (handleAddCase), which shows toast and re-throws
+      // Keep dialog open on error so user can fix issues
+      console.error("Error submitting case form:", error)
+      // Don't close dialog or reset form - let user see the error and fix it
+    } finally {
+      setIsSubmitting(false)
     }
-    setOpen(false)
-    form.reset()
-    setCurrentStep("register")
   }
 
   const steps = [
     { id: "register", label: "Register", number: 1 },
     { id: "history", label: "Case History", number: 2 },
-    { id: "patient-history", label: "Patient History", number: 3 },
+    { id: "patient-history", label: "Treatments & Medications", number: 3 },
     { id: "complaints", label: "Complaints", number: 4 },
     { id: "vision", label: "Vision", number: 5 },
     { id: "examination", label: "Examination", number: 6 },
     { id: "blood", label: "Blood Investigation", number: 7 },
-    { id: "diagnosis", label: "Diagnosis", number: 8 },
-    { id: "tests", label: "Tests", number: 9 },
-    { id: "diagram", label: "Diagram", number: 10 },
-    { id: "advice", label: "Advice", number: 11 },
+    { id: "diagnosis", label: "Diagnosis & Tests", number: 8 },
+    { id: "diagram", label: "Diagram", number: 9 },
+    { id: "advice", label: "Advice", number: 10 },
   ]
 
   return (
@@ -872,19 +1306,24 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <Tabs value={currentStep} onValueChange={setCurrentStep} className="w-full">
-              <TabsList className="h-auto grid grid-cols-5 lg:grid-cols-10 w-full p-1">
+            <Tabs value={currentStep} onValueChange={(value) => {
+              // Allow free navigation between tabs without validation
+              setCurrentStep(value)
+            }} className="w-full">
+              <TabsList className="h-auto grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-5 w-full p-1 gap-1">
                 {steps.map((step) => (
-                  <TabsTrigger key={step.id} value={step.id} className="text-xs px-2 py-1.5">
-                    {step.label}
+                  <TabsTrigger key={step.id} value={step.id} className="text-xs px-2 py-2 whitespace-nowrap">
+                    <span className="hidden lg:inline">{step.number}. </span>{step.label}
                   </TabsTrigger>
                 ))}
               </TabsList>
               
               <div className="min-h-[400px] mt-4">
                 <TabsContent value="register" className="space-y-4 min-h-[350px]">
-                <h3 className="font-semibold text-lg">1. Register</h3>
-                <div className="grid grid-cols-4 gap-4">
+                <h3 className="font-semibold text-lg">1. Register & Patient Selection</h3>
+                
+                {/* Case Info Fields */}
+                <div className="grid grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
                     name="case_no"
@@ -915,68 +1354,78 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                     control={form.control}
                     name="visit_type"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Visit No *</FormLabel>
-                        <FormControl>
-                          <SearchableSelect
-                            options={masterDataAPI.data.visitTypes || []}
-                            value={field.value}
-                            onValueChange={field.onChange}
-                            placeholder="Select visit number"
-                            searchPlaceholder="Search visit types..."
-                            emptyText="No visit types found."
-                            loading={masterDataAPI.loading.visitTypes}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="patient_id"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Patient *</FormLabel>
-                        <FormControl>
-                          <SearchableSelect
-                            options={patients}
-                            value={field.value}
-                            onValueChange={field.onChange}
-                            placeholder="Select patient"
-                            searchPlaceholder="Search patients..."
-                            emptyText="No patients found."
-                            loading={loadingPatients}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
+                        <FormItem>
+                          <FormLabel>Visit Type * (Auto-detected)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              value={field.value} 
+                              readOnly 
+                              className="bg-muted"
+                              placeholder="Will be auto-detected..."
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
                     )}
                   />
                 </div>
+
+                {/* Patient Selection with Full History */}
+                <div className="mt-6">
+                  <PatientSelectorWithHistory
+                    selectedPatient={selectedPatient}
+                    onSelect={handlePatientSelect}
+                    showCreateNew={false}
+                  />
+                </div>
+
+                {/* Hidden field for form validation */}
+                <FormField
+                  control={form.control}
+                  name="patient_id"
+                  render={({ field }) => (
+                    <input type="hidden" {...field} />
+                  )}
+                />
               </TabsContent>
 
               <TabsContent value="history" className="space-y-4 min-h-[350px]">
-                <h3 className="font-semibold text-lg">Case History</h3>
-                <div className="flex flex-col items-center justify-center min-h-[300px] text-center">
-                  <div className="text-gray-400 text-lg font-semibold mb-2">No Case History Found</div>
-                  <div className="text-gray-400 text-sm">No case history available for this patient</div>
-                </div>
+                <h3 className="font-semibold text-lg">2. Case History</h3>
+                
+                {/* Chief Complaint Section */}
+                <FormField
+                  control={form.control}
+                  name="chief_complaint"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Chief Complaint</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} placeholder="Enter chief complaint..." rows={3} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* History Present Illness Section */}
+                <FormField
+                  control={form.control}
+                  name="history_present_illness"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>History of Present Illness</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} placeholder="Enter history of present illness..." rows={4} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </TabsContent>
 
               <TabsContent value="patient-history" className="space-y-6 min-h-[350px]">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-lg">3. Patient History</h3>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="past-history" className="h-4 w-4" />
-                      <label htmlFor="past-history" className="text-sm">Past</label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="history-print" className="h-4 w-4" />
-                      <label htmlFor="history-print" className="text-sm">Print</label>
-                    </div>
-                  </div>
+                  <h3 className="font-semibold text-lg">3. Treatments & Medications</h3>
                 </div>
 
                 {/* Treatment Section */}
@@ -1011,13 +1460,13 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                                   name={`past_history_treatments.${index}.treatment` as const}
                                   render={({ field }) => (
                                     <SearchableSelect
-                                      options={masterDataAPI.data.treatments}
+                                      options={masterData.data.treatments}
                                       value={field.value}
                                       onValueChange={field.onChange}
                                       placeholder="Select treatment"
                                       searchPlaceholder="Search treatments..."
                                       emptyText="No treatments found."
-                                      loading={masterDataAPI.loading.treatments}
+                                      loading={masterData.loading.treatments}
                                     />
                                   )}
                                 />
@@ -1092,13 +1541,13 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                                   name={`past_history_medicines.${index}.medicine_name` as const}
                                   render={({ field }) => (
                                     <SearchableSelect
-                                      options={masterDataAPI.data.medicines}
+                                      options={masterData.data.medicines}
                                       value={field.value}
                                       onValueChange={field.onChange}
                                       placeholder="Select medicine"
                                       searchPlaceholder="Search medicines..."
                                       emptyText="No medicines found."
-                                      loading={masterDataAPI.loading.medicines}
+                                      loading={masterData.loading.medicines}
                                     />
                                   )}
                                 />
@@ -1109,13 +1558,13 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                                   name={`past_history_medicines.${index}.type` as const}
                                   render={({ field }) => (
                                     <SearchableSelect
-                                      options={masterDataAPI.data.dosages}
+                                      options={masterData.data.dosages}
                                       value={field.value}
                                       onValueChange={field.onChange}
                                       placeholder="Select dosage"
                                       searchPlaceholder="Search dosages..."
                                       emptyText="No dosages found."
-                                      loading={masterDataAPI.loading.dosages}
+                                      loading={masterData.loading.dosages}
                                     />
                                   )}
                                 />
@@ -1142,59 +1591,62 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
 
               <TabsContent value="complaints" className="space-y-6 min-h-[350px]">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-lg">Complain</h3>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="complain-checkbox" className="h-4 w-4" />
-                      <label htmlFor="complain-checkbox" className="text-sm">Complain</label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="complain-print" className="h-4 w-4" />
-                      <label htmlFor="complain-print" className="text-sm">Print</label>
-                    </div>
-                  </div>
+                  <h3 className="font-semibold text-lg">Complaints</h3>
                 </div>
 
-                {/* Common Complain Toggle */}
-                <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium">Common Complain</label>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
-                  </label>
-                </div>
-
-                {/* Add Complain Form */}
-                <div className="grid grid-cols-4 gap-3 items-end">
-                  <div>
-                    <label className="text-sm font-medium">Complain</label>
-                    <SimpleCombobox
-                      options={masterData.complaints}
-                      value={newComplaint}
-                      onChange={(value) => setNewComplaint(value)}
-                      placeholder="Select complaint"
-                    />
+                {/* Add Complaint Form */}
+                <div className="border rounded-lg p-4 space-y-4 bg-gray-50">
+                  <h4 className="text-sm font-semibold">Add New Complaint</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="col-span-2">
+                      <label className="text-sm font-medium block mb-1.5">Complaint *</label>
+                      <GroupedSearchableSelect
+                        groups={complaintGroups}
+                        value={newComplaintId}
+                        onValueChange={(complaintId, categoryId) => {
+                          setNewComplaintId(complaintId)
+                          setNewComplaintCategoryId(categoryId)
+                        }}
+                        placeholder="Select complaint (grouped by category)"
+                        searchPlaceholder="Search complaints..."
+                        emptyText="No complaints found"
+                        loading={complaintGroups.length === 0}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium block mb-1.5">Eye</label>
+                      <SimpleCombobox
+                        options={(masterData.data.eyeSelection || [])}
+                        value={newComplaintEye}
+                        onChange={(value) => setNewComplaintEye(value)}
+                        placeholder="Select eye"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium block mb-1.5">Duration</label>
+                      <Input
+                        placeholder="e.g., 2 days, 1 week"
+                        value={newComplaintDuration}
+                        onChange={(e) => setNewComplaintDuration(e.target.value)}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-sm font-medium block mb-1.5">Notes</label>
+                      <Textarea
+                        placeholder="Additional details about the complaint..."
+                        value={newComplaintNotes}
+                        onChange={(e) => setNewComplaintNotes(e.target.value)}
+                        rows={2}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium">Eye</label>
-                    <SimpleCombobox
-                      options={masterData.eyeSelection}
-                      value={newComplaintEye}
-                      onChange={(value) => setNewComplaintEye(value)}
-                      placeholder="Select eye"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Duration</label>
-                    <Input
-                      placeholder="Duration"
-                      className="mt-1"
-                      value={newComplaintDuration}
-                      onChange={(e) => setNewComplaintDuration(e.target.value)}
-                    />
-                  </div>
-                  <Button type="button" onClick={handleAddComplaint}>
-                    Add
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleAddComplaint}
+                    disabled={!newComplaintId}
+                  >
+                    Add Complaint
                   </Button>
                 </div>
 
@@ -1203,84 +1655,59 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                   <table className="w-full">
                     <thead className="border-b bg-gray-50">
                       <tr>
-                        <th className="text-left p-3 text-sm font-medium">COMPLAIN</th>
+                        <th className="text-left p-3 text-sm font-medium">COMPLAINT</th>
                         <th className="text-left p-3 text-sm font-medium">EYE</th>
                         <th className="text-left p-3 text-sm font-medium">DURATION</th>
+                        <th className="text-left p-3 text-sm font-medium">NOTES</th>
                         <th className="text-left p-3 text-sm font-medium">ACTION</th>
                       </tr>
                     </thead>
                     <tbody>
                       {complaintFields.length === 0 ? (
                         <tr>
-                          <td colSpan={4} className="text-center p-8 text-muted-foreground text-sm">
+                          <td colSpan={5} className="text-center p-8 text-muted-foreground text-sm">
                             No complaints added.
                           </td>
                         </tr>
                       ) : (
-                        complaintFields.map((field, index) => (
-                          <tr key={field.id}>
-                            <td className="p-3 text-sm">{(field as any).complaint}</td>
-                            <td className="p-3 text-sm">{(field as any).eye}</td>
-                            <td className="p-3 text-sm">{(field as any).duration}</td>
-                            <td className="p-3 text-sm">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => removeComplaint(index)}
-                                className="text-red-600 hover:text-red-700"
-                              >
-                                Remove
-                              </Button>
-                            </td>
-                          </tr>
-                        ))
+                        complaintFields.map((field, index) => {
+                          // Find complaint name from groups
+                          const complaint = complaintGroups
+                            .flatMap(g => g.children)
+                            .find(c => c.id === (field as any).complaintId)
+                          
+                          // Find eye name from master data
+                          const eyeOption = masterData.data.eyeSelection?.find(
+                            e => e.value === (field as any).eye
+                          )
+                          
+                          return (
+                            <tr key={field.id} className="border-b">
+                              <td className="p-3 text-sm">{complaint?.name || (field as any).complaintId}</td>
+                              <td className="p-3 text-sm">{eyeOption?.label || (field as any).eye || '-'}</td>
+                              <td className="p-3 text-sm">{(field as any).duration || '-'}</td>
+                              <td className="p-3 text-sm max-w-xs truncate" title={(field as any).notes}>
+                                {(field as any).notes || '-'}
+                              </td>
+                              <td className="p-3 text-sm">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeComplaint(index)}
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  Remove
+                                </Button>
+                              </td>
+                            </tr>
+                          )
+                        })
                       )}
                     </tbody>
                   </table>
                 </div>
 
-                {/* Chief Complaint Section */}
-                <FormField
-                  control={form.control}
-                  name="chief_complaint"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Chief Complaint</FormLabel>
-                      <FormControl>
-                        <Textarea {...field} placeholder="Enter chief complaint..." rows={3} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* History Present Illness Section */}
-                <FormField
-                  control={form.control}
-                  name="history_present_illness"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>History of Present Illness</FormLabel>
-                      <FormControl>
-                        <Textarea {...field} placeholder="Enter history of present illness..." rows={4} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* Remarks Section */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium">Remarks</label>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="remarks-print" className="h-4 w-4" />
-                      <label htmlFor="remarks-print" className="text-sm">Print</label>
-                    </div>
-                  </div>
-                  <Textarea rows={4} placeholder="Enter remarks..." />
-                </div>
               </TabsContent>
 
               <TabsContent value="vision" className="space-y-6 min-h-[350px]">
@@ -1288,10 +1715,6 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                 <div className="space-y-4">
                   <div className="flex items-center justify-between border-b pb-2">
                     <h4 className="font-semibold text-md">VISION</h4>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <input type="checkbox" id="vision-print" className="h-4 w-4" />
-                      <label htmlFor="vision-print">Print</label>
-                    </div>
                   </div>
 
                   <div className="overflow-x-auto">
@@ -1308,34 +1731,24 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                           <td className="p-3 font-medium text-sm">VISUAL ACUITY (UNAIDED) (VP)</td>
                           <td className="p-3 border-l">
                             <FormField control={form.control} name="visual_acuity_unaided_right" render={({ field }) => (
-                              <FormItem>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger className="h-9"><SelectValue placeholder="VP" /></SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {VISUAL_ACUITY_OPTIONS.map(option => (
-                                      <SelectItem key={option} value={option}>{option}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </FormItem>
+                              <SimpleCombobox
+                                options={masterData.data.visualAcuity || []}
+                                value={field.value || ""}
+                                onChange={(value) => field.onChange(value)}
+                                placeholder="Select VP"
+                                className="h-9"
+                              />
                             )} />
                           </td>
                           <td className="p-3 border-l">
                             <FormField control={form.control} name="visual_acuity_unaided_left" render={({ field }) => (
-                              <FormItem>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger className="h-9"><SelectValue placeholder="VP" /></SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {VISUAL_ACUITY_OPTIONS.map(option => (
-                                      <SelectItem key={option} value={option}>{option}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </FormItem>
+                              <SimpleCombobox
+                                options={masterData.data.visualAcuity || []}
+                                value={field.value || ""}
+                                onChange={(value) => field.onChange(value)}
+                                placeholder="Select VP"
+                                className="h-9"
+                              />
                             )} />
                           </td>
                         </tr>
@@ -1343,34 +1756,24 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                           <td className="p-3 font-medium text-sm">PIN-HOLE (VP)</td>
                           <td className="p-3 border-l">
                             <FormField control={form.control} name="pinhole_right" render={({ field }) => (
-                              <FormItem>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger className="h-9"><SelectValue placeholder="VP" /></SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {VISUAL_ACUITY_OPTIONS.map(option => (
-                                      <SelectItem key={option} value={option}>{option}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </FormItem>
+                              <SimpleCombobox
+                                options={masterData.data.visualAcuity || []}
+                                value={field.value || ""}
+                                onChange={(value) => field.onChange(value)}
+                                placeholder="Select VP"
+                                className="h-9"
+                              />
                             )} />
                           </td>
                           <td className="p-3 border-l">
                             <FormField control={form.control} name="pinhole_left" render={({ field }) => (
-                              <FormItem>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger className="h-9"><SelectValue placeholder="VP" /></SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {VISUAL_ACUITY_OPTIONS.map(option => (
-                                      <SelectItem key={option} value={option}>{option}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </FormItem>
+                              <SimpleCombobox
+                                options={masterData.data.visualAcuity || []}
+                                value={field.value || ""}
+                                onChange={(value) => field.onChange(value)}
+                                placeholder="Select VP"
+                                className="h-9"
+                              />
                             )} />
                           </td>
                         </tr>
@@ -1378,34 +1781,24 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                           <td className="p-3 font-medium text-sm">VISUAL ACUITY (AIDED) (VP)</td>
                           <td className="p-3 border-l">
                             <FormField control={form.control} name="visual_acuity_aided_right" render={({ field }) => (
-                              <FormItem>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger className="h-9"><SelectValue placeholder="VP" /></SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {VISUAL_ACUITY_OPTIONS.map(option => (
-                                      <SelectItem key={option} value={option}>{option}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </FormItem>
+                              <SimpleCombobox
+                                options={masterData.data.visualAcuity || []}
+                                value={field.value || ""}
+                                onChange={(value) => field.onChange(value)}
+                                placeholder="Select VP"
+                                className="h-9"
+                              />
                             )} />
                           </td>
                           <td className="p-3 border-l">
                             <FormField control={form.control} name="visual_acuity_aided_left" render={({ field }) => (
-                              <FormItem>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger className="h-9"><SelectValue placeholder="VP" /></SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {VISUAL_ACUITY_OPTIONS.map(option => (
-                                      <SelectItem key={option} value={option}>{option}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </FormItem>
+                              <SimpleCombobox
+                                options={masterData.data.visualAcuity || []}
+                                value={field.value || ""}
+                                onChange={(value) => field.onChange(value)}
+                                placeholder="Select VP"
+                                className="h-9"
+                              />
                             )} />
                           </td>
                         </tr>
@@ -1413,34 +1806,24 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                           <td className="p-3 font-medium text-sm">NEAR VISUAL</td>
                           <td className="p-3 border-l">
                             <FormField control={form.control} name="near_visual_right" render={({ field }) => (
-                              <FormItem>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger className="h-9"><SelectValue placeholder="VP" /></SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {VISUAL_ACUITY_OPTIONS.map(option => (
-                                      <SelectItem key={option} value={option}>{option}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </FormItem>
+                              <SimpleCombobox
+                                options={masterData.data.visualAcuity || []}
+                                value={field.value || ""}
+                                onChange={(value) => field.onChange(value)}
+                                placeholder="Select VP"
+                                className="h-9"
+                              />
                             )} />
                           </td>
                           <td className="p-3 border-l">
                             <FormField control={form.control} name="near_visual_left" render={({ field }) => (
-                              <FormItem>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger className="h-9"><SelectValue placeholder="VP" /></SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {VISUAL_ACUITY_OPTIONS.map(option => (
-                                      <SelectItem key={option} value={option}>{option}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </FormItem>
+                              <SimpleCombobox
+                                options={masterData.data.visualAcuity || []}
+                                value={field.value || ""}
+                                onChange={(value) => field.onChange(value)}
+                                placeholder="Select VP"
+                                className="h-9"
+                              />
                             )} />
                           </td>
                         </tr>
@@ -1453,10 +1836,6 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                 <div className="space-y-4">
                   <div className="flex items-center justify-between border-b pb-2">
                     <h4 className="font-semibold text-md">REFRACTION</h4>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <input type="checkbox" id="refraction-print" className="h-4 w-4" />
-                      <label htmlFor="refraction-print">Print</label>
-                    </div>
                   </div>
 
                   <div className="overflow-x-auto">
@@ -1500,18 +1879,13 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                           </td>
                           <td className="p-2">
                             <FormField control={form.control} name="refraction_distant_va_right" render={({ field }) => (
-                              <FormItem>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="VP" /></SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {VISUAL_ACUITY_OPTIONS.map(option => (
-                                      <SelectItem key={option} value={option}>{option}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </FormItem>
+                              <SimpleCombobox
+                                options={masterData.data.visualAcuity || []}
+                                value={field.value || ""}
+                                onChange={(value) => field.onChange(value)}
+                                placeholder="VP"
+                                className="h-8 text-xs"
+                              />
                             )} />
                           </td>
                           <td className="p-2 border-l">
@@ -1531,18 +1905,13 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                           </td>
                           <td className="p-2">
                             <FormField control={form.control} name="refraction_distant_va_left" render={({ field }) => (
-                              <FormItem>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="VP" /></SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {VISUAL_ACUITY_OPTIONS.map(option => (
-                                      <SelectItem key={option} value={option}>{option}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </FormItem>
+                              <SimpleCombobox
+                                options={masterData.data.visualAcuity || []}
+                                value={field.value || ""}
+                                onChange={(value) => field.onChange(value)}
+                                placeholder="VP"
+                                className="h-8 text-xs"
+                              />
                             )} />
                           </td>
                         </tr>
@@ -1567,18 +1936,13 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                           </td>
                           <td className="p-2">
                             <FormField control={form.control} name="refraction_near_va_right" render={({ field }) => (
-                              <FormItem>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="VP" /></SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {VISUAL_ACUITY_OPTIONS.map(option => (
-                                      <SelectItem key={option} value={option}>{option}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </FormItem>
+                              <SimpleCombobox
+                                options={masterData.data.visualAcuity || []}
+                                value={field.value || ""}
+                                onChange={(value) => field.onChange(value)}
+                                placeholder="VP"
+                                className="h-8 text-xs"
+                              />
                             )} />
                           </td>
                           <td className="p-2 border-l">
@@ -1598,18 +1962,13 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                           </td>
                           <td className="p-2">
                             <FormField control={form.control} name="refraction_near_va_left" render={({ field }) => (
-                              <FormItem>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="VP" /></SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {VISUAL_ACUITY_OPTIONS.map(option => (
-                                      <SelectItem key={option} value={option}>{option}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </FormItem>
+                              <SimpleCombobox
+                                options={masterData.data.visualAcuity || []}
+                                value={field.value || ""}
+                                onChange={(value) => field.onChange(value)}
+                                placeholder="VP"
+                                className="h-8 text-xs"
+                              />
                             )} />
                           </td>
                         </tr>
@@ -1634,18 +1993,13 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                           </td>
                           <td className="p-2">
                             <FormField control={form.control} name="refraction_pg_va_right" render={({ field }) => (
-                              <FormItem>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="VP" /></SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {VISUAL_ACUITY_OPTIONS.map(option => (
-                                      <SelectItem key={option} value={option}>{option}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </FormItem>
+                              <SimpleCombobox
+                                options={masterData.data.visualAcuity || []}
+                                value={field.value || ""}
+                                onChange={(value) => field.onChange(value)}
+                                placeholder="VP"
+                                className="h-8 text-xs"
+                              />
                             )} />
                           </td>
                           <td className="p-2 border-l">
@@ -1665,18 +2019,13 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                           </td>
                           <td className="p-2">
                             <FormField control={form.control} name="refraction_pg_va_left" render={({ field }) => (
-                              <FormItem>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="VP" /></SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {VISUAL_ACUITY_OPTIONS.map(option => (
-                                      <SelectItem key={option} value={option}>{option}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </FormItem>
+                              <SimpleCombobox
+                                options={masterData.data.visualAcuity || []}
+                                value={field.value || ""}
+                                onChange={(value) => field.onChange(value)}
+                                placeholder="VP"
+                                className="h-8 text-xs"
+                              />
                             )} />
                           </td>
                         </tr>
@@ -1714,17 +2063,6 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                     </table>
                   </div>
                 </div>
-
-                {/* Auto Refraction Section */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between border-b pb-2">
-                    <h4 className="font-semibold text-md">AUTO REFRACTION</h4>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <input type="checkbox" id="auto-refraction-print" className="h-4 w-4" />
-                      <label htmlFor="auto-refraction-print">Print</label>
-                    </div>
-                  </div>
-                </div>
               </TabsContent>
 
               <TabsContent value="examination" className="space-y-6 min-h-[350px]">
@@ -1734,16 +2072,6 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                 <div className="space-y-4">
                   <div className="flex items-center justify-between border-b pb-2">
                     <h4 className="font-semibold text-md">ANTERIOR SEGMENT</h4>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                        <input type="checkbox" id="anterior-default" className="h-4 w-4" />
-                        <label htmlFor="anterior-default">Default</label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <input type="checkbox" id="anterior-print" className="h-4 w-4" />
-                        <label htmlFor="anterior-print">Print</label>
-                      </div>
-                    </div>
                   </div>
 
                   <div className="grid grid-cols-3 gap-4 items-center">
@@ -1910,16 +2238,6 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                 <div className="space-y-4">
                   <div className="flex items-center justify-between border-b pb-2">
                     <h4 className="font-semibold text-md">POSTERIOR SEGMENT</h4>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                        <input type="checkbox" id="posterior-default" className="h-4 w-4" />
-                        <label htmlFor="posterior-default">Default</label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <input type="checkbox" id="posterior-print" className="h-4 w-4" />
-                        <label htmlFor="posterior-print">Print</label>
-                      </div>
-                    </div>
                   </div>
 
                   <div className="grid grid-cols-3 gap-4 items-center">
@@ -2014,19 +2332,15 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
               <TabsContent value="blood" className="space-y-4 min-h-[350px]">
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold text-lg">Blood Investigation</h3>
-                  <div className="flex items-center gap-2">
-                    <input type="checkbox" id="blood-print" className="h-4 w-4" />
-                    <label htmlFor="blood-print" className="text-sm">Print</label>
-                  </div>
                 </div>
                 
-                <div className="grid grid-cols-4 gap-4">
-                  {/* Column 1 */}
-                  <div className="space-y-3">
+                          <div className="grid grid-cols-4 gap-4">
+                            {/* Column 1 */}
+                            <div className="space-y-3">
                     <div className="flex items-center gap-2">
                       <input type="checkbox" id="cbc" className="h-4 w-4" />
                       <label htmlFor="cbc" className="text-sm">CBC</label>
-                    </div>
+                                </div>
                     <div className="flex items-center gap-2">
                       <input type="checkbox" id="rbs" className="h-4 w-4" />
                       <label htmlFor="rbs" className="text-sm">RBS</label>
@@ -2043,14 +2357,14 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                       <input type="checkbox" id="t3t4" className="h-4 w-4" />
                       <label htmlFor="t3t4" className="text-sm">T3 , T4, TSH, ANTI TPO</label>
                     </div>
-                  </div>
+                            </div>
 
-                  {/* Column 2 */}
-                  <div className="space-y-3">
+                            {/* Column 2 */}
+                            <div className="space-y-3">
                     <div className="flex items-center gap-2">
                       <input type="checkbox" id="bt" className="h-4 w-4" />
                       <label htmlFor="bt" className="text-sm">BT</label>
-                    </div>
+                                </div>
                     <div className="flex items-center gap-2">
                       <input type="checkbox" id="fbs" className="h-4 w-4" />
                       <label htmlFor="fbs" className="text-sm">FBS</label>
@@ -2067,14 +2381,14 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                       <input type="checkbox" id="screatinine" className="h-4 w-4" />
                       <label htmlFor="screatinine" className="text-sm">S.CREATININE</label>
                     </div>
-                  </div>
+                            </div>
 
-                  {/* Column 3 */}
-                  <div className="space-y-3">
+                            {/* Column 3 */}
+                            <div className="space-y-3">
                     <div className="flex items-center gap-2">
                       <input type="checkbox" id="ct" className="h-4 w-4" />
                       <label htmlFor="ct" className="text-sm">CT</label>
-                    </div>
+                                </div>
                     <div className="flex items-center gap-2">
                       <input type="checkbox" id="ppbbs" className="h-4 w-4" />
                       <label htmlFor="ppbbs" className="text-sm">PPBBS</label>
@@ -2091,22 +2405,22 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                       <input type="checkbox" id="ssodium" className="h-4 w-4" />
                       <label htmlFor="ssodium" className="text-sm">S. SODIUM LEVELS</label>
                     </div>
-                  </div>
+                            </div>
 
-                  {/* Column 4 */}
-                  <div className="space-y-3">
+                            {/* Column 4 */}
+                            <div className="space-y-3">
                     <div className="flex items-center gap-2">
                       <input type="checkbox" id="ipinr" className="h-4 w-4" />
                       <label htmlFor="ipinr" className="text-sm">IP-INR</label>
-                    </div>
+                                </div>
                     <div className="flex items-center gap-2">
                       <input type="checkbox" id="hiv" className="h-4 w-4" />
                       <label htmlFor="hiv" className="text-sm">HIV</label>
-                    </div>
+                            </div>
                     <div className="flex items-center gap-2">
                       <input type="checkbox" id="panca" className="h-4 w-4" />
                       <label htmlFor="panca" className="text-sm">P-ANCA</label>
-                    </div>
+                          </div>
                     <div className="flex items-center gap-2">
                       <input type="checkbox" id="rafactor" className="h-4 w-4" />
                       <label htmlFor="rafactor" className="text-sm">R.A FACTOR</label>
@@ -2115,72 +2429,72 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                 </div>
               </TabsContent>
 
-              <TabsContent value="diagnosis" className="space-y-4 min-h-[350px]">
-                <h3 className="font-semibold text-lg">8. Diagnosis</h3>
+              <TabsContent value="diagnosis" className="space-y-6 min-h-[350px]">
+                <h3 className="font-semibold text-lg">8. Diagnosis & Tests</h3>
                 <FormField
                   control={form.control}
                   name="diagnosis"
                   render={({ field }) => (
                     <FormItem>
+                      <FormLabel>Diagnosis</FormLabel>
                       <FormControl>
-                        <TagMultiSelect
-                          options={masterData.diagnosis}
-                          values={field.value as any}
-                          onChange={field.onChange}
+                        <MultiSelect
+                          options={(masterData.data.diagnosis || []).map(d => ({
+                            value: d.value,
+                            label: d.label
+                          }))}
+                          value={field.value as any}
+                          onValueChange={field.onChange}
                           placeholder="Search and select diagnosis"
+                          searchPlaceholder="Search diagnoses..."
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              </TabsContent>
 
-              <TabsContent value="tests" className="space-y-6 min-h-[350px]">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-lg">Diagonsotic Test</h3>
-                  <div className="flex items-center gap-2">
-                    <input type="checkbox" id="tests-print" className="h-4 w-4" />
-                    <label htmlFor="tests-print" className="text-sm">Print</label>
-                  </div>
+                {/* Diagnostic Tests Section */}
+                <div className="border-t pt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold text-lg">Diagnostic Test</h3>
                 </div>
 
                 {/* SAC SYRINGING Section */}
-                <div className="space-y-4">
+                  <div className="space-y-4 mb-6">
                   <h4 className="font-medium text-sm">SAC SYRINGING</h4>
                   <div className="grid grid-cols-2 gap-6">
                     {/* Right Eye */}
                     <div className="space-y-3">
                       <div className="text-center text-sm font-medium text-muted-foreground">RIGHT EYE</div>
-                      <SimpleCombobox
-                        options={masterData.sacStatus}
-                        value=""
-                        onChange={(value) => console.log(value)}
-                        placeholder="Select status"
-                      />
-                      <div className="flex items-center justify-center gap-2">
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" className="sr-only peer" />
-                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
-                        </label>
-                      </div>
+                        <FormField
+                          control={form.control}
+                          name="sac_test"
+                          render={({ field }) => (
+                            <SimpleCombobox
+                              options={(masterData.data.sacStatus || [])}
+                              value={field.value || ""}
+                              onChange={(value) => field.onChange(value)}
+                                    placeholder="Select status"
+                            />
+                          )}
+                        />
                     </div>
-
                     {/* Left Eye */}
                     <div className="space-y-3">
                       <div className="text-center text-sm font-medium text-muted-foreground">LEFT EYE</div>
-                      <SimpleCombobox
-                        options={masterData.sacStatus}
-                        value=""
-                        onChange={(value) => console.log(value)}
-                        placeholder="Select status"
-                      />
-                      <div className="flex items-center justify-center gap-2">
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" className="sr-only peer" />
-                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
-                        </label>
-                      </div>
+                        <FormField
+                          control={form.control}
+                          name="sac_test"
+                          render={({ field }) => (
+                            <SimpleCombobox
+                              options={(masterData.data.sacStatus || [])}
+                              value={field.value || ""}
+                              onChange={(value) => field.onChange(value)}
+                                    placeholder="Select status"
+                            />
+                          )}
+                        />
                     </div>
                   </div>
                 </div>
@@ -2192,34 +2506,156 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                     {/* Right Eye */}
                     <div className="space-y-2">
                       <div className="text-center text-sm font-medium text-muted-foreground">RIGHT EYE</div>
-                      <SimpleCombobox
-                        options={masterData.iopRanges}
-                        value=""
-                        onChange={(value) => console.log(value)}
-                        placeholder="Select I.O.P. Right"
-                      />
+                        <FormField
+                          control={form.control}
+                          name="iop_right"
+                          render={({ field }) => (
+                            <SimpleCombobox
+                              options={(masterData.data.iopRanges || [])}
+                              value={field.value || ""}
+                              onChange={(value) => field.onChange(value)}
+                            placeholder="Select I.O.P. Right"
+                          />
+                          )}
+                        />
                     </div>
-
                     {/* Left Eye */}
                     <div className="space-y-2">
                       <div className="text-center text-sm font-medium text-muted-foreground">LEFT EYE</div>
-                      <SimpleCombobox
-                        options={masterData.iopRanges}
-                        value=""
-                        onChange={(value) => console.log(value)}
-                        placeholder="Select I.O.P. Left"
-                      />
+                        <FormField
+                          control={form.control}
+                          name="iop_left"
+                          render={({ field }) => (
+                            <SimpleCombobox
+                              options={(masterData.data.iopRanges || [])}
+                              value={field.value || ""}
+                              onChange={(value) => field.onChange(value)}
+                            placeholder="Select I.O.P. Left"
+                          />
+                          )}
+                        />
+                      </div>
                     </div>
                   </div>
+
+                {/* Additional Diagnostic Tests Section */}
+                <div className="border-t pt-6 space-y-4">
+                  <h4 className="font-medium text-sm">Additional Diagnostic Tests</h4>
+                  
+                  {/* Add Test Form */}
+                  <div className="border rounded-lg p-4 space-y-4 bg-gray-50">
+                    <h5 className="text-sm font-semibold">Add Diagnostic Test</h5>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="col-span-2">
+                        <label className="text-sm font-medium block mb-1.5">Test Type *</label>
+                        <SimpleCombobox
+                          options={masterData.data.diagnosticTests || []}
+                          value={newTestId}
+                          onChange={(value) => setNewTestId(value)}
+                          placeholder="Select diagnostic test"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium block mb-1.5">Eye</label>
+                        <SimpleCombobox
+                          options={masterData.data.eyeSelection || []}
+                          value={newTestEye}
+                          onChange={(value) => setNewTestEye(value)}
+                          placeholder="Select eye"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium block mb-1.5">Type/Category</label>
+                        <Input
+                          placeholder="e.g., Routine, Urgent"
+                          value={newTestType}
+                          onChange={(e) => setNewTestType(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium block mb-1.5">Problem/Indication</label>
+                        <Input
+                          placeholder="e.g., Glaucoma check"
+                          value={newTestProblem}
+                          onChange={(e) => setNewTestProblem(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium block mb-1.5">Notes</label>
+                        <Input
+                          placeholder="Additional details"
+                          value={newTestNotes}
+                          onChange={(e) => setNewTestNotes(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleAddDiagnosticTest}
+                      disabled={!newTestId}
+                    >
+                      Add Test
+                    </Button>
+                  </div>
+
+                  {/* Diagnostic Tests Table */}
+                  {diagnosticTestFields.length > 0 && (
+                    <div className="border rounded-lg">
+                      <table className="w-full">
+                        <thead className="border-b bg-gray-50">
+                          <tr>
+                            <th className="text-left p-3 text-sm font-medium">TEST</th>
+                            <th className="text-left p-3 text-sm font-medium">EYE</th>
+                            <th className="text-left p-3 text-sm font-medium">TYPE</th>
+                            <th className="text-left p-3 text-sm font-medium">PROBLEM</th>
+                            <th className="text-left p-3 text-sm font-medium">NOTES</th>
+                            <th className="text-left p-3 text-sm font-medium">ACTION</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {diagnosticTestFields.map((field, index) => {
+                            const test = masterData.data.diagnosticTests?.find(
+                              t => t.value === (field as any).test_id
+                            )
+                            const eyeOption = masterData.data.eyeSelection?.find(
+                              e => e.value === (field as any).eye
+                            )
+                            
+                            return (
+                              <tr key={field.id} className="border-b">
+                                <td className="p-3 text-sm">{test?.label || (field as any).test_id}</td>
+                                <td className="p-3 text-sm">{eyeOption?.label || (field as any).eye || '-'}</td>
+                                <td className="p-3 text-sm">{(field as any).type || '-'}</td>
+                                <td className="p-3 text-sm">{(field as any).problem || '-'}</td>
+                                <td className="p-3 text-sm">{(field as any).notes || '-'}</td>
+                                <td className="p-3 text-sm">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeDiagnosticTest(index)}
+                                    className="text-red-600 hover:text-red-700"
+                                  >
+                                    Remove
+                                  </Button>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
                 </div>
               </TabsContent>
 
               <TabsContent value="diagram" className="space-y-4 min-h-[350px]">
-                <h3 className="font-semibold text-lg">10. Diagram</h3>
+                <h3 className="font-semibold text-lg">9. Diagram</h3>
                 <EyeDrawingTool
                   rightEye={form.watch("right_eye_diagram")}
                   leftEye={form.watch("left_eye_diagram")}
-                  defaultBothUrl={"/eye-drawing-2025-11-07.png"}
                   onChangeAction={(side: 'right' | 'left', dataUrl: string) => {
                     if (side === 'right') form.setValue('right_eye_diagram', dataUrl, { shouldDirty: true })
                     else form.setValue('left_eye_diagram', dataUrl, { shouldDirty: true })
@@ -2232,24 +2668,14 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <h3 className="font-semibold text-lg">Advice</h3>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="advice-print" className="h-4 w-4" />
-                      <label htmlFor="advice-print" className="text-sm">Print</label>
-                    </div>
                   </div>
 
                   {/* Add Drug Form */}
                   <div className="grid grid-cols-7 gap-3 items-end">
                     <div className="col-span-2">
-                      <div className="flex items-center gap-2 mb-1">
-                        <label className="text-sm font-medium">Drug Name</label>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" className="sr-only peer" />
-                          <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
-                        </label>
-                      </div>
+                      <label className="text-sm font-medium mb-1 block">Drug Name</label>
                       <SimpleCombobox
-                        options={masterData.medicines}
+                        options={(masterData.data.medicines || [])}
                         value={newMedicineDrug}
                         onChange={(value) => setNewMedicineDrug(value)}
                         placeholder="Select drug"
@@ -2258,7 +2684,7 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                     <div>
                       <label className="text-sm font-medium">Eye</label>
                       <SimpleCombobox
-                        options={masterData.eyeSelection}
+                        options={(masterData.data.eyeSelection || [])}
                         value={newMedicineEye}
                         onChange={(value) => setNewMedicineEye(value)}
                         placeholder="Select eye"
@@ -2267,7 +2693,7 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                     <div>
                       <label className="text-sm font-medium">Dosage</label>
                       <SimpleCombobox
-                        options={masterData.dosages}
+                        options={(masterData.data.dosages || [])}
                         value={newMedicineDosage}
                         onChange={(value) => setNewMedicineDosage(value)}
                         placeholder="Select dosage"
@@ -2276,7 +2702,7 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                     <div>
                       <label className="text-sm font-medium">Route</label>
                       <SimpleCombobox
-                        options={masterData.routes}
+                        options={(masterData.data.routes || [])}
                         value={newMedicineRoute}
                         onChange={(value) => setNewMedicineRoute(value)}
                         placeholder="Select route"
@@ -2325,27 +2751,35 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                             </td>
                           </tr>
                         ) : (
-                          medicineAdviceFields.map((field, index) => (
-                            <tr key={field.id}>
-                              <td className="p-3 text-sm">{(field as any).drug_name}</td>
-                              <td className="p-3 text-sm">{(field as any).eye}</td>
-                              <td className="p-3 text-sm">{(field as any).dosage}</td>
-                              <td className="p-3 text-sm">{(field as any).route}</td>
-                              <td className="p-3 text-sm">{(field as any).duration}</td>
-                              <td className="p-3 text-sm">{(field as any).quantity}</td>
-                              <td className="p-3 text-sm">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => removeMedicine(index)}
-                                  className="text-red-600 hover:text-red-700"
-                                >
-                                  Remove
-                                </Button>
-                              </td>
-                            </tr>
-                          ))
+                          medicineAdviceFields.map((field, index) => {
+                            // Resolve UUIDs to display names
+                            const drug = masterData.data.medicines?.find(m => m.value === (field as any).drug_name)
+                            const eye = masterData.data.eyeSelection?.find(e => e.value === (field as any).eye)
+                            const dosage = masterData.data.dosages?.find(d => d.value === (field as any).dosage)
+                            const route = masterData.data.routes?.find(r => r.value === (field as any).route)
+                            
+                            return (
+                              <tr key={field.id}>
+                                <td className="p-3 text-sm">{drug?.label || (field as any).drug_name}</td>
+                                <td className="p-3 text-sm">{eye?.label || (field as any).eye}</td>
+                                <td className="p-3 text-sm">{dosage?.label || (field as any).dosage || '-'}</td>
+                                <td className="p-3 text-sm">{route?.label || (field as any).route || '-'}</td>
+                                <td className="p-3 text-sm">{(field as any).duration || '-'}</td>
+                                <td className="p-3 text-sm">{(field as any).quantity || '-'}</td>
+                                <td className="p-3 text-sm">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeMedicine(index)}
+                                    className="text-red-600 hover:text-red-700"
+                                  >
+                                    Remove
+                                  </Button>
+                                </td>
+                              </tr>
+                            )
+                          })
                         )}
                       </tbody>
                     </table>
@@ -2356,10 +2790,6 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <h3 className="font-semibold text-lg">Surgery Details</h3>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="surgery-print" className="h-4 w-4" />
-                      <label htmlFor="surgery-print" className="text-sm">Print</label>
-                    </div>
                   </div>
 
                   {/* Add Surgery Form */}
@@ -2367,22 +2797,16 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                     <div>
                       <label className="text-sm font-medium">Eye</label>
                       <SimpleCombobox
-                        options={masterData.eyeSelection}
+                        options={masterData.data.eyeSelection || []}
                         value={newSurgeryEye}
                         onChange={(value) => setNewSurgeryEye(value)}
                         placeholder="Select eye"
                       />
                     </div>
                     <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <label className="text-sm font-medium">Surgery Name</label>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" className="sr-only peer" />
-                          <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
-                        </label>
-                      </div>
+                      <label className="text-sm font-medium">Surgery Name</label>
                       <SimpleCombobox
-                        options={masterData.surgeries}
+                        options={masterData.data.surgeries || []}
                         value={newSurgeryName}
                         onChange={(value) => setNewSurgeryName(value)}
                         placeholder="Select surgery"
@@ -2420,24 +2844,30 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                             </td>
                           </tr>
                         ) : (
-                          surgeryFields.map((field, index) => (
-                            <tr key={field.id}>
-                              <td className="p-3 text-sm">{(field as any).eye}</td>
-                              <td className="p-3 text-sm">{(field as any).surgery_name}</td>
-                              <td className="p-3 text-sm">{(field as any).anesthesia}</td>
-                              <td className="p-3 text-sm">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => removeSurgery(index)}
-                                  className="text-red-600 hover:text-red-700"
-                                >
-                                  Remove
-                                </Button>
-                              </td>
-                            </tr>
-                          ))
+                          surgeryFields.map((field, index) => {
+                            // Resolve UUIDs to display names
+                            const eye = masterData.data.eyeSelection?.find(e => e.value === (field as any).eye)
+                            const surgery = masterData.data.surgeries?.find(s => s.value === (field as any).surgery_name)
+                            
+                            return (
+                              <tr key={field.id}>
+                                <td className="p-3 text-sm">{eye?.label || (field as any).eye}</td>
+                                <td className="p-3 text-sm">{surgery?.label || (field as any).surgery_name}</td>
+                                <td className="p-3 text-sm">{(field as any).anesthesia || '-'}</td>
+                                <td className="p-3 text-sm">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeSurgery(index)}
+                                    className="text-red-600 hover:text-red-700"
+                                  >
+                                    Remove
+                                  </Button>
+                                </td>
+                              </tr>
+                            )
+                          })
                         )}
                       </tbody>
                     </table>
@@ -2448,12 +2878,23 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-medium">Remarks</label>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="advice-remarks-print" className="h-4 w-4" />
-                      <label htmlFor="advice-remarks-print" className="text-sm">Print</label>
-                    </div>
                   </div>
-                  <Textarea rows={4} placeholder="Enter remarks..." />
+                  <FormField
+                    control={form.control}
+                    name="advice_remarks"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Textarea 
+                            rows={4} 
+                            placeholder="Enter remarks..." 
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
               </TabsContent>
               </div>
@@ -2488,10 +2929,19 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                   </Button>
                 ) : (
                   <>
-                    <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                    <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isSubmitting}>
                       Cancel
                     </Button>
-                    <Button type="submit">{mode === "edit" ? "Update Case" : "Save Case"}</Button>
+                    <Button type="submit" disabled={isSubmitting}>
+                      {isSubmitting ? (
+                        <>
+                          <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          {mode === "edit" ? "Updating..." : "Saving..."}
+                        </>
+                      ) : (
+                        mode === "edit" ? "Update Case" : "Save Case"
+                      )}
+                    </Button>
                   </>
                 )}
               </div>

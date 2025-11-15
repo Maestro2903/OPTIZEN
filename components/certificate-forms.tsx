@@ -86,25 +86,52 @@ export function CertificateForms({ children }: CertificateFormsProps) {
   const fitnessForm = useForm<z.infer<typeof fitnessCertSchema>>({
     resolver: zodResolver(fitnessCertSchema),
     defaultValues: {
+      patient_id: '',
       exam_date: new Date().toISOString().split("T")[0],
       purpose: "Employment",
+      findings: '',
     },
   })
 
   const medicalForm = useForm<z.infer<typeof medicalCertSchema>>({
     resolver: zodResolver(medicalCertSchema),
+    defaultValues: {
+      patient_id: '',
+      diagnosis: '',
+      treatment_period: '',
+      recommendations: '',
+    },
   })
 
   const eyeTestForm = useForm<z.infer<typeof eyeTestCertSchema>>({
     resolver: zodResolver(eyeTestCertSchema),
+    defaultValues: {
+      patient_id: '',
+      visual_acuity_right: '',
+      visual_acuity_left: '',
+      color_vision: '',
+      driving_fitness: '',
+    },
   })
 
   const sickLeaveForm = useForm<z.infer<typeof sickLeaveCertSchema>>({
     resolver: zodResolver(sickLeaveCertSchema),
+    defaultValues: {
+      patient_id: '',
+      illness: '',
+      leave_from: '',
+      leave_to: '',
+      recommendations: '',
+    },
   })
 
   const customForm = useForm<z.infer<typeof customCertSchema>>({
     resolver: zodResolver(customCertSchema),
+    defaultValues: {
+      patient_id: '',
+      title: '',
+      content: '',
+    },
   })
 
   // Load patients

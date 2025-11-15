@@ -204,66 +204,13 @@ export function EmployeePrint({ employee, children }: EmployeePrintProps) {
             </table>
           </PrintSection>
 
-          {/* Company Benefits & Policies */}
-          <div className="print-medical-section">
-            <h4 style={{ fontSize: '12pt', fontWeight: 'bold', marginBottom: '10pt', borderBottom: '1px solid #000' }}>
-              EMPLOYEE BENEFITS & POLICIES
-            </h4>
-            <ul style={{ fontSize: '11pt', lineHeight: '1.4', paddingLeft: '20pt' }}>
-              <li>Medical insurance coverage for employee and family</li>
-              <li>Annual leave entitlement: 24 days per year</li>
-              <li>Sick leave: 12 days per year</li>
-              <li>Provident fund contribution: 12% of basic salary</li>
-              <li>Annual performance review and increment</li>
-              <li>Professional development and training opportunities</li>
-              <li>Employee assistance program available</li>
-            </ul>
-          </div>
-
-          {/* Performance Summary */}
-          <div style={{ marginTop: '20pt', padding: '15pt', border: '1px solid #000', backgroundColor: '#f9f9f9' }}>
-            <h4 style={{ fontSize: '12pt', fontWeight: 'bold', marginBottom: '8pt', textAlign: 'center' }}>
-              PERFORMANCE & CONDUCT SUMMARY
-            </h4>
-            <div style={{ fontSize: '11pt', lineHeight: '1.4', textAlign: 'center' }}>
-              <strong>Overall Rating:</strong> Satisfactory<br />
-              <strong>Last Review Date:</strong> {formatDate(new Date().toISOString())}<br />
-              <strong>Next Review Due:</strong> {formatDate(new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString())}<br />
-              <strong>Disciplinary Actions:</strong> None on record
-            </div>
-          </div>
-
-          {/* HR Signatures */}
-          <div className="print-signature-section">
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '40pt' }}>
-              <div style={{ width: '200pt', textAlign: 'center' }}>
-                <div style={{ height: '30pt' }}></div>
-                <div style={{ borderTop: '1px solid #000', paddingTop: '5pt' }}>
-                  <strong>HR Manager</strong>
-                </div>
-                <div style={{ fontSize: '10pt' }}>Human Resources Department</div>
-                <div style={{ fontSize: '10pt' }}>Date: {formatDate(new Date().toISOString())}</div>
-              </div>
-
-              <div style={{ width: '200pt', textAlign: 'center' }}>
-                <div style={{ height: '30pt' }}></div>
-                <div style={{ borderTop: '1px solid #000', paddingTop: '5pt' }}>
-                  <strong>Department Head</strong>
-                </div>
-                <div style={{ fontSize: '10pt' }}>{employee.department} Department</div>
-                <div style={{ fontSize: '10pt' }}>Date: {formatDate(new Date().toISOString())}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Employee Record Footer */}
-          <div style={{ marginTop: '40pt', padding: '10pt', border: '1px solid #ccc', backgroundColor: '#f9f9f9' }}>
-            <div style={{ fontSize: '10pt', textAlign: 'center' }}>
-              <strong>CONFIDENTIAL EMPLOYEE RECORD</strong><br />
-              Employee ID: {employee.employee_id || employee.id} | Name: {employee.full_name} | Department: {employee.department}<br />
-              This document contains confidential information and should be handled according to company privacy policies.
-            </div>
-          </div>
+          {/* HR Signature */}
+          <PrintSignature 
+            doctorName="HR Manager"
+            qualification="Human Resources Department"
+            registrationNumber=""
+            date={formatDate(new Date().toISOString())}
+          />
         </PrintLayout>
       </DialogContent>
     </Dialog>

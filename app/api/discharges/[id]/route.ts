@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { requirePermission } from '@/lib/middleware/rbac'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  // Authorization check
+  const authCheck = await requirePermission('discharges', 'view')
+  if (!authCheck.authorized) return authCheck.response
+
   try {
     const supabase = createClient()
-    const { id } = params
+    const { id } = await params
 
     // UUID validation
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -17,38 +22,6 @@ export async function GET(
         { status: 400 }
       )
     }
-
-    // Authentication check
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    // Authorization check - verify user has access to this discharge
-    const { data: discharge, error: fetchError } = await supabase
-      .from('discharges')
-      .select('id, created_by, patient_id')
-      .eq('id', id)
-      .single()
-
-    if (fetchError || !discharge) {
-      return NextResponse.json(
-        { error: 'Discharge not found' },
-        { status: 404 }
-      )
-    }
-
-    // Check if user owns this discharge or has appropriate role
-    // For now, allowing any authenticated user - implement proper role check here
-    // if (discharge.created_by !== session.user.id && !userHasRole(session.user, 'staff')) {
-    //   return NextResponse.json(
-    //     { error: 'Forbidden' },
-    //     { status: 403 }
-    //   )
-    // }
 
     const { data: fullDischarge, error } = await supabase
       .from('discharges')
@@ -96,11 +69,15 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  // Authorization check
+  const authCheck = await requirePermission('discharges', 'edit')
+  if (!authCheck.authorized) return authCheck.response
+
   try {
     const supabase = createClient()
-    const { id } = params
+    const { id } = await params
 
     // UUID validation
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -108,15 +85,6 @@ export async function PUT(
       return NextResponse.json(
         { success: false, error: 'Invalid discharge ID format' },
         { status: 400 }
-      )
-    }
-
-    // Authentication check
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
       )
     }
 
@@ -185,11 +153,15 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  // Authorization check
+  const authCheck = await requirePermission('discharges', 'delete')
+  if (!authCheck.authorized) return authCheck.response
+
   try {
     const supabase = createClient()
-    const { id } = params
+    const { id } = await params
 
     // UUID validation
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -197,15 +169,6 @@ export async function DELETE(
       return NextResponse.json(
         { success: false, error: 'Invalid discharge ID format' },
         { status: 400 }
-      )
-    }
-
-    // Authentication check
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
       )
     }
 

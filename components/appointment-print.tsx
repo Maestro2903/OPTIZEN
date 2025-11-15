@@ -64,110 +64,107 @@ export function AppointmentPrint({ appointment, children }: AppointmentPrintProp
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <PrintLayout
           documentType="Appointment"
-          documentTitle="Appointment Confirmation"
+          documentTitle="Appointment Confirmation Slip"
         >
-          {/* Appointment Header */}
-          <PrintSection title="Appointment Details">
-            <PrintRow>
-              <PrintCol>
-                <PrintField label="Appointment No." value={appointment.appointment_no || appointment.id} uppercase />
-                <PrintField label="Date" value={formatDate(appointment.date)} />
-                <PrintField label="Time" value={formatTime(appointment.time)} center />
-              </PrintCol>
-              <PrintCol>
-                <PrintField label="Type" value={appointment.type} uppercase />
-                <PrintField label="Status" value={getStatusDisplay(appointment.status)} uppercase />
-                <PrintField label="Duration" value={appointment.duration || '30 minutes'} />
-              </PrintCol>
-            </PrintRow>
-          </PrintSection>
-
-          {/* Patient Information */}
-          <PrintSection title="Patient Information">
-            <PrintRow>
-              <PrintCol>
-                <PrintField label="Patient Name" value={appointment.patient_name} uppercase />
-                <PrintField label="Patient ID" value={appointment.patient_id} />
-              </PrintCol>
-              <PrintCol>
-                <PrintField label="Contact Number" value={appointment.contact_number} />
-                <PrintField label="Email" value={appointment.email} />
-              </PrintCol>
-            </PrintRow>
-          </PrintSection>
-
-          {/* Doctor & Department Information */}
-          <PrintSection title="Doctor & Department">
-            <PrintRow>
-              <PrintCol>
-                <PrintField label="Doctor" value={appointment.doctor || 'Dr. [To be assigned]'} />
-                <PrintField label="Department" value={appointment.department || 'Ophthalmology'} />
-              </PrintCol>
-              <PrintCol>
-                <PrintField label="Room Number" value={appointment.room_number || 'TBA'} />
-                <PrintField label="Booking Date" value={formatDate(appointment.created_at)} />
-              </PrintCol>
-            </PrintRow>
-          </PrintSection>
-
-          {/* Appointment Purpose */}
-          {appointment.reason && (
-            <PrintSection title="Purpose of Visit">
-              <PrintRow>
-                <PrintCol className="w-full">
-                  <PrintField label="Reason for Appointment" value={appointment.reason} />
-                </PrintCol>
-              </PrintRow>
-            </PrintSection>
-          )}
-
-          {/* Special Notes */}
-          {appointment.notes && (
-            <PrintSection title="Special Instructions">
-              <PrintRow>
-                <PrintCol className="w-full">
-                  <PrintField label="Notes" value={appointment.notes} />
-                </PrintCol>
-              </PrintRow>
-            </PrintSection>
-          )}
-
-          {/* Patient Instructions */}
-          <div className="print-medical-section">
-            <h4 style={{ fontSize: '12pt', fontWeight: 'bold', marginBottom: '10pt', borderBottom: '1px solid #000' }}>
-              IMPORTANT INSTRUCTIONS FOR PATIENTS
-            </h4>
-            <ul style={{ fontSize: '11pt', lineHeight: '1.4', paddingLeft: '20pt' }}>
-              <li>Please arrive 15 minutes before your scheduled appointment time</li>
-              <li>Bring a valid photo ID and insurance card if applicable</li>
-              <li>Bring any relevant medical records or previous test results</li>
-              <li>If you need to cancel, please call at least 24 hours in advance</li>
-              <li>For eye examinations, avoid wearing contact lenses if possible</li>
-              <li>Bring a list of current medications you are taking</li>
-              <li>If you have any allergies, please inform the staff upon arrival</li>
-            </ul>
-          </div>
-
-          {/* Contact Information Box */}
-          <div style={{ marginTop: '20pt', padding: '15pt', border: '2px solid #000', backgroundColor: '#f9f9f9' }}>
-            <h4 style={{ fontSize: '12pt', fontWeight: 'bold', marginBottom: '8pt', textAlign: 'center' }}>
-              CLINIC CONTACT INFORMATION
-            </h4>
-            <div style={{ fontSize: '11pt', lineHeight: '1.4', textAlign: 'center' }}>
-              <strong>Phone:</strong> +91 98765 43210<br />
-              <strong>Address:</strong> 123 Medical Plaza, Healthcare District, City - 123456<br />
-              <strong>Emergency:</strong> +91 98765 43211 (24/7)<br />
-              <strong>Email:</strong> appointments@eyezen.com
+          {/* Appointment Slip Container */}
+          <div className="print-appointment-slip">
+            {/* Large Appointment Number */}
+            <div className="print-appointment-number">
+              APPOINTMENT #{appointment.appointment_no || appointment.id}
             </div>
-          </div>
 
-          {/* Appointment confirmation footer */}
-          <div style={{ marginTop: '20pt', padding: '10pt', border: '1px solid #ccc', backgroundColor: '#f0f8ff' }}>
-            <div style={{ fontSize: '10pt', textAlign: 'center' }}>
-              <strong>APPOINTMENT CONFIRMATION</strong><br />
-              This document confirms your appointment on {formatDate(appointment.date)} at {formatTime(appointment.time)}<br />
-              Appointment Reference: {appointment.appointment_no || appointment.id}<br />
-              Please keep this document for your records and present it during your visit.
+            {/* Prominent Date/Time Display */}
+            <div className="print-appointment-datetime">
+              <div style={{ fontSize: '14pt', marginBottom: '4pt' }}>{formatDate(appointment.date)}</div>
+              <div style={{ fontSize: '18pt', fontWeight: 'bold' }}>{formatTime(appointment.time)}</div>
+            </div>
+
+            {/* Patient Information - Compact */}
+            <div style={{ marginBottom: '10pt', fontSize: '10pt' }}>
+              <div style={{ marginBottom: '6pt' }}>
+                <div className="print-label" style={{ fontSize: '8pt' }}>Patient Name</div>
+                <div style={{ fontSize: '12pt', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                  {appointment.patient_name}
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8pt', marginTop: '6pt' }}>
+                <div>
+                  <div className="print-label" style={{ fontSize: '8pt' }}>Patient ID</div>
+                  <div style={{ fontSize: '10pt' }}>{appointment.patient_id || '-'}</div>
+                </div>
+                <div>
+                  <div className="print-label" style={{ fontSize: '8pt' }}>Contact</div>
+                  <div style={{ fontSize: '10pt' }}>{appointment.contact_number || appointment.email || '-'}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Doctor & Department - Compact */}
+            <div style={{ marginBottom: '10pt', fontSize: '10pt', borderTop: '1px solid #ddd', paddingTop: '8pt' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8pt' }}>
+                <div>
+                  <div className="print-label" style={{ fontSize: '8pt' }}>Doctor</div>
+                  <div style={{ fontSize: '11pt', fontWeight: 'bold' }}>
+                    {appointment.doctor || 'Dr. [To be assigned]'}
+                  </div>
+                </div>
+                <div>
+                  <div className="print-label" style={{ fontSize: '8pt' }}>Department</div>
+                  <div style={{ fontSize: '11pt' }}>{appointment.department || 'Ophthalmology'}</div>
+                </div>
+                <div>
+                  <div className="print-label" style={{ fontSize: '8pt' }}>Type</div>
+                  <div style={{ fontSize: '10pt', textTransform: 'uppercase' }}>{appointment.type}</div>
+                </div>
+                <div>
+                  <div className="print-label" style={{ fontSize: '8pt' }}>Duration</div>
+                  <div style={{ fontSize: '10pt' }}>{appointment.duration || '30 minutes'}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Room Number */}
+            {appointment.room_number && (
+              <div style={{ marginBottom: '10pt', fontSize: '10pt' }}>
+                <div className="print-label" style={{ fontSize: '8pt' }}>Room Number</div>
+                <div style={{ fontSize: '12pt', fontWeight: 'bold' }}>{appointment.room_number}</div>
+              </div>
+            )}
+
+            {/* Purpose of Visit - Condensed */}
+            {appointment.reason && (
+              <div style={{ marginBottom: '10pt', fontSize: '9pt', borderTop: '1px solid #ddd', paddingTop: '8pt' }}>
+                <div className="print-label" style={{ fontSize: '8pt' }}>Purpose of Visit</div>
+                <div style={{ fontSize: '10pt', lineHeight: '1.4' }}>{appointment.reason}</div>
+              </div>
+            )}
+
+            {/* Special Notes - Condensed */}
+            {appointment.notes && (
+              <div style={{ marginBottom: '10pt', fontSize: '9pt', borderTop: '1px solid #ddd', paddingTop: '8pt' }}>
+                <div className="print-label" style={{ fontSize: '8pt' }}>Special Instructions</div>
+                <div style={{ fontSize: '10pt', lineHeight: '1.4' }}>{appointment.notes}</div>
+              </div>
+            )}
+
+            {/* Status */}
+            <div style={{ marginBottom: '10pt', textAlign: 'center' }}>
+              <div className="print-label" style={{ fontSize: '8pt', marginBottom: '4pt' }}>Status</div>
+              <div style={{ 
+                fontSize: '11pt', 
+                fontWeight: 'bold', 
+                textTransform: 'uppercase',
+                display: 'inline-block',
+                padding: '4pt 12pt',
+                border: '2px solid #000'
+              }}>
+                {getStatusDisplay(appointment.status)}
+              </div>
+            </div>
+
+            {/* Tear Line */}
+            <div className="print-tear-line">
+              Please bring this slip for your appointment
             </div>
           </div>
         </PrintLayout>

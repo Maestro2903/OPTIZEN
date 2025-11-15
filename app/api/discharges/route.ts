@@ -176,6 +176,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Handle JSONB data - if it's an object, store as JSONB, if string, parse it
+    const parsedDiagnosis = typeof body.final_diagnosis === 'string' 
+      ? (body.final_diagnosis ? JSON.parse(body.final_diagnosis) : null)
+      : body.final_diagnosis
+
+    const parsedTreatments = typeof body.treatment_given === 'string'
+      ? (body.treatment_given ? JSON.parse(body.treatment_given) : null)
+      : body.treatment_given
+
+    const parsedMedications = typeof body.medications === 'string'
+      ? (body.medications ? JSON.parse(body.medications) : null)
+      : body.medications
+
     const { data: discharge, error } = await supabase
       .from('discharges')
       .insert([
@@ -186,12 +199,12 @@ export async function POST(request: NextRequest) {
           discharge_date: body.discharge_date,
           discharge_type: body.discharge_type || 'regular',
           discharge_summary: body.discharge_summary,
-          final_diagnosis: body.final_diagnosis,
-          treatment_given: body.treatment_given,
+          final_diagnosis: parsedDiagnosis,
+          treatment_given: parsedTreatments,
           condition_on_discharge: body.condition_on_discharge,
           instructions: body.instructions,
           follow_up_date: body.follow_up_date,
-          medications: body.medications,
+          medications: parsedMedications,
           vitals_at_discharge: body.vitals_at_discharge,
           doctor_id: body.doctor_id,
           status: body.status || 'completed',

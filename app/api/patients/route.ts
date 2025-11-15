@@ -58,13 +58,14 @@ export async function GET(request: NextRequest) {
       .select('*', { count: 'exact' })
 
     // Apply search filter with sanitized input
+    // Search across patient_id, full_name, email, and mobile
     if (search) {
       // Escape special wildcard characters: backslash first, then % and _
       const sanitizedSearch = search
         .replace(/\\/g, '\\\\')
         .replace(/%/g, '\\%')
         .replace(/_/g, '\\_')
-      query = query.or(`full_name.ilike.%${sanitizedSearch}%,email.ilike.%${sanitizedSearch}%,mobile.ilike.%${sanitizedSearch}%`)
+      query = query.or(`patient_id.ilike.%${sanitizedSearch}%,full_name.ilike.%${sanitizedSearch}%,email.ilike.%${sanitizedSearch}%,mobile.ilike.%${sanitizedSearch}%`)
     }
 
     // Parse and validate status parameter (supports arrays)

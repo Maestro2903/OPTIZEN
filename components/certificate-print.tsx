@@ -238,15 +238,6 @@ export function CertificatePrint({ certificate, children }: CertificatePrintProp
 
           {/* Doctor Signature */}
           <PrintSignature date={formatDate(certificate.date)} />
-
-          {/* Verification Note */}
-          <div style={{ marginTop: '20pt', padding: '10pt', border: '1px solid #ccc', backgroundColor: '#f9f9f9' }}>
-            <div style={{ fontSize: '10pt', textAlign: 'center' }}>
-              <strong>VERIFICATION</strong><br />
-              Certificate No: {certificate.id} | Date: {formatDate(certificate.date)}<br />
-              For verification, please contact the clinic with this certificate number.
-            </div>
-          </div>
         </PrintLayout>
       </DialogContent>
     </Dialog>

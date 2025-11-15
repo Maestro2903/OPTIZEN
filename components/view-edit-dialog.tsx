@@ -56,14 +56,35 @@ export function ViewEditDialog<T extends FieldValues = Record<string, unknown>>(
     mode: "onChange",
   })
 
+  // Track previous open state to detect transitions
+  const prevOpenRef = React.useRef(false)
+  const resetFormRef = React.useRef(form.reset)
+  
+  // Keep resetFormRef up to date
   React.useEffect(() => {
-    // Reset form when dialog opens with new data
-    if (open) {
-      form.reset((data || {}) as any)
+    resetFormRef.current = form.reset
+  })
+
+  // Handle dialog open/close state changes
+  React.useEffect(() => {
+    // Dialog just opened
+    if (open && !prevOpenRef.current) {
+      resetFormRef.current((data || {}) as any)
       setIsEdit(!!defaultEdit)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
+    // Dialog just closed
+    if (!open && prevOpenRef.current) {
+      setIsEdit(false)
+    }
+    prevOpenRef.current = open
+  }, [open, data, defaultEdit])
+  
+  // Separate effect to sync data changes when dialog is already open
+  React.useEffect(() => {
+    if (open && prevOpenRef.current) {
+      resetFormRef.current((data || {}) as any)
+    }
+  }, [data, open])
 
   const handleSave = async () => {
     if (!renderEditAction) return

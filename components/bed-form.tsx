@@ -31,6 +31,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
+import { masterDataApi } from "@/lib/services/api"
+import { useToast } from "@/hooks/use-toast"
 
 const bedFormSchema = z.object({
   bed_number: z.string().min(1, "Bed number is required"),
@@ -57,38 +59,100 @@ interface BedFormProps {
   children: React.ReactNode
   bedData?: any
   mode?: "create" | "edit"
+  onSuccess?: () => void
 }
 
-export function BedForm({ children, bedData, mode = "create" }: BedFormProps) {
+export function BedForm({ children, bedData, mode = "create", onSuccess }: BedFormProps) {
+  const { toast } = useToast()
   const [isOpen, setIsOpen] = React.useState(false)
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
 
   const form = useForm<z.infer<typeof bedFormSchema>>({
     resolver: zodResolver(bedFormSchema),
     defaultValues: {
       bed_number: bedData?.bed_number || "",
-      ward_name: bedData?.ward_name || "",
-      ward_type: bedData?.ward_type || "general",
-      bed_type: bedData?.bed_type || "Standard",
-      floor_number: bedData?.floor_number?.toString() || "",
-      room_number: bedData?.room_number || "",
-      daily_rate: bedData?.daily_rate?.toString() || "",
+      ward_name: bedData?.name || "",
+      ward_type: bedData?.metadata?.ward_type || "general",
+      bed_type: bedData?.metadata?.bed_type || "Standard",
+      floor_number: bedData?.metadata?.floor_number?.toString() || "",
+      room_number: bedData?.metadata?.room_number || "",
+      daily_rate: bedData?.metadata?.daily_rate?.toString() || "",
       description: bedData?.description || "",
-      facilities: bedData?.facilities?.join(", ") || "",
+      facilities: bedData?.metadata?.facilities?.join(", ") || "",
     },
   })
 
-  const selectedWardType = form.watch("ward_type")
+  const selectedWardType = form.watch("ward_type") as keyof typeof suggestedRates
 
   React.useEffect(() => {
-    if (mode === "create" && !form.getValues("daily_rate")) {
+    if (mode === "create" && !form.getValues("daily_rate") && selectedWardType && suggestedRates[selectedWardType]) {
       form.setValue("daily_rate", suggestedRates[selectedWardType].toString())
     }
   }, [selectedWardType, mode, form])
 
-  function onSubmit(values: z.infer<typeof bedFormSchema>) {
-    console.log(mode === "edit" ? "Update Bed:" : "Create Bed:", values)
-    setIsOpen(false)
-    form.reset()
+  async function onSubmit(values: z.infer<typeof bedFormSchema>) {
+    setIsSubmitting(true)
+    try {
+      // Prepare facilities array
+      const facilitiesArray = values.facilities 
+        ? values.facilities.split(",").map(f => f.trim()).filter(f => f.length > 0)
+        : []
+
+      // Prepare data for master_data API
+      // Store bed-specific fields in metadata
+      const bedPayload: any = {
+        category: 'beds',
+        name: values.ward_name, // Ward name is the main name
+        bed_number: values.bed_number,
+        description: values.description || undefined,
+        is_active: true,
+        sort_order: bedData?.sort_order || 1, // Provide a default sort_order
+        metadata: {
+          bed_type: values.bed_type,
+          ward_type: values.ward_type,
+          floor_number: parseInt(values.floor_number),
+          room_number: values.room_number || null,
+          daily_rate: parseFloat(values.daily_rate),
+          facilities: facilitiesArray,
+          status: mode === "create" ? "available" : (bedData?.metadata?.status || "available"),
+          // Preserve any existing metadata
+          ...(mode === "edit" && bedData?.metadata ? bedData.metadata : {})
+        }
+      }
+
+      // Override with new values
+      bedPayload.metadata.bed_type = values.bed_type
+      bedPayload.metadata.ward_type = values.ward_type
+      bedPayload.metadata.floor_number = parseInt(values.floor_number)
+      bedPayload.metadata.room_number = values.room_number || null
+      bedPayload.metadata.daily_rate = parseFloat(values.daily_rate)
+      bedPayload.metadata.facilities = facilitiesArray
+
+      const response = mode === "create" 
+        ? await masterDataApi.create(bedPayload)
+        : await masterDataApi.update(bedData?.id || '', bedPayload)
+
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: mode === "create" ? "Bed added successfully" : "Bed updated successfully",
+        })
+        setIsOpen(false)
+        form.reset()
+        onSuccess?.() // Refresh the beds list
+      } else {
+        throw new Error(response.error || "Failed to save bed")
+      }
+    } catch (error) {
+      console.error("Error saving bed:", error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save bed. Please try again.",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -227,9 +291,11 @@ export function BedForm({ children, bedData, mode = "create" }: BedFormProps) {
                       />
                     </FormControl>
                     <FormMessage />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Suggested rate for {selectedWardType.replace("_", " ")}: ₹{suggestedRates[selectedWardType].toLocaleString()}
-                    </p>
+                    {selectedWardType && suggestedRates[selectedWardType] && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Suggested rate for {selectedWardType.replace("_", " ")}: ₹{suggestedRates[selectedWardType].toLocaleString()}
+                      </p>
+                    )}
                   </FormItem>
                 )}
               />
@@ -265,10 +331,12 @@ export function BedForm({ children, bedData, mode = "create" }: BedFormProps) {
             />
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => setIsOpen(false)} disabled={isSubmitting}>
                 Cancel
               </Button>
-              <Button type="submit">{mode === "edit" ? "Update Bed" : "Add Bed"}</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Saving..." : (mode === "edit" ? "Update Bed" : "Add Bed")}
+              </Button>
             </DialogFooter>
           </form>
         </Form>

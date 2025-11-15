@@ -72,6 +72,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select"
 import { countries, getStatesForCountry } from "@/lib/utils/countries"
 
 const patientFormSchema = z.object({
+  patient_id: z.string().optional(),
   full_name: z.string().min(2, "Name must be at least 2 characters"),
   date_of_birth: z.string().optional(),
   email: z.string().email("Invalid email").optional().or(z.literal("")),
@@ -133,6 +134,7 @@ export default function PatientsPage() {
   const form = useForm<z.infer<typeof patientFormSchema>>({
     resolver: zodResolver(patientFormSchema),
     defaultValues: {
+      patient_id: "",
       full_name: "",
       date_of_birth: "",
       email: "",
@@ -155,6 +157,14 @@ export default function PatientsPage() {
 
   // Watch country to update states
   const selectedCountry = form.watch("country")
+
+  // Generate patient ID
+  const generatePatientId = React.useCallback(() => {
+    const date = new Date()
+    const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '')
+    const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase()
+    return `PAT-${dateStr}-${randomStr}`
+  }, [])
 
   async function onSubmit(values: z.infer<typeof patientFormSchema>) {
     try {
@@ -180,21 +190,22 @@ export default function PatientsPage() {
         }
       } else {
         // Create new patient
-        // Generate globally unique patient ID using crypto.randomUUID()
-        // This eliminates collision risk under concurrent requests
-        const uuid = crypto.randomUUID().replace(/-/g, '').substring(0, 12).toUpperCase()
-        const patientId = `PAT-${uuid}`
-        
+        // patient_id is generated client-side and displayed in the form
         const result = await createPatient(
           () => patientsApi.create({
             ...values,
-            patient_id: patientId,
+            patient_id: values.patient_id || `PAT${Date.now()}`,
             status: 'active'
           }),
           {
-            successMessage: `${values.full_name} has been added successfully.`,
+            successMessage: "",  // We'll show custom message with patient_id
             onSuccess: (newPatient) => {
               addItem(newPatient)
+              // Show success toast with generated patient_id
+              toast({
+                title: "Patient Created Successfully",
+                description: `${newPatient.full_name} - ID: ${newPatient.patient_id}`
+              })
             }
           }
         )
@@ -211,6 +222,7 @@ export default function PatientsPage() {
   const handleEdit = (patient: Patient) => {
     setEditingPatient(patient)
     form.reset({
+      patient_id: patient.patient_id || "",
       full_name: patient.full_name,
       date_of_birth: patient.date_of_birth || "",
       email: patient.email || "",
@@ -375,12 +387,36 @@ export default function PatientsPage() {
           if (!open) {
             setEditingPatient(null)
             form.reset()
+          } else if (!editingPatient) {
+            // Generate new patient ID when opening for new patient
+            const newPatientId = generatePatientId()
+            form.setValue("patient_id", newPatientId)
           }
         }}>
           <DialogTrigger asChild>
             <Button className="gap-2" onClick={() => {
               setEditingPatient(null)
-              form.reset()
+              const newPatientId = generatePatientId()
+              form.reset({
+                patient_id: newPatientId,
+                full_name: "",
+                date_of_birth: "",
+                email: "",
+                mobile: "",
+                gender: "male",
+                country: "India",
+                state: "",
+                address: "",
+                city: "",
+                postal_code: "",
+                emergency_contact: "",
+                emergency_phone: "",
+                medical_history: "",
+                current_medications: "",
+                allergies: "",
+                insurance_provider: "",
+                insurance_number: "",
+              })
             }}>
               <Plus className="h-4 w-4" />
               Add Patient
@@ -395,6 +431,40 @@ export default function PatientsPage() {
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                {/* Patient ID Field */}
+                <FormField
+                  control={form.control}
+                  name="patient_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Patient ID</FormLabel>
+                      <div className="flex items-center gap-2">
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            readOnly 
+                            className="font-mono font-bold text-primary bg-primary/5 border-primary/20"
+                          />
+                        </FormControl>
+                        {!editingPatient && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const newId = generatePatientId()
+                              form.setValue("patient_id", newId)
+                            }}
+                          >
+                            Regenerate
+                          </Button>
+                        )}
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 <FormField
                   control={form.control}
                   name="full_name"
@@ -606,6 +676,7 @@ export default function PatientsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>SR. NO.</TableHead>
+                  <TableHead>PATIENT ID</TableHead>
                   <TableHead>NAME</TableHead>
                   <TableHead>AGE</TableHead>
                   <TableHead>EMAIL</TableHead>
@@ -619,13 +690,13 @@ export default function PatientsPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       Loading patients...
                     </TableCell>
                   </TableRow>
                 ) : patients.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       No patients found
                     </TableCell>
                   </TableRow>
@@ -633,6 +704,7 @@ export default function PatientsPage() {
                   patients.map((patient, index) => (
                   <TableRow key={patient.id}>
                     <TableCell>{((pagination?.page || 1) - 1) * (pagination?.limit || 10) + index + 1}</TableCell>
+                    <TableCell className="font-mono text-sm font-semibold text-primary">{patient.patient_id}</TableCell>
                     <TableCell className="font-medium uppercase">{patient.full_name}</TableCell>
                     <TableCell>{calculateAge(patient.date_of_birth) ?? '-'}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{patient.email || '-'}</TableCell>
@@ -652,6 +724,10 @@ export default function PatientsPage() {
                           renderViewAction={(data: any) => (
                             <div className="space-y-4">
                               <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Patient ID</p>
+                                  <p className="font-mono text-sm font-semibold text-primary">{data?.patient_id}</p>
+                                </div>
                                 <div>
                                   <p className="text-sm text-muted-foreground">Name</p>
                                   <p className="font-semibold uppercase">{data?.full_name}</p>

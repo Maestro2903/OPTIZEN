@@ -10,6 +10,7 @@ export interface MasterDataOption {
 
 export interface MasterDataCategories {
   complaints: MasterDataOption[]
+  complaintCategories: MasterDataOption[]
   treatments: MasterDataOption[]
   medicines: MasterDataOption[]
   surgeries: MasterDataOption[]
@@ -41,6 +42,8 @@ export interface MasterDataCategories {
   pharmacyCategories: MasterDataOption[]
   colorVisionTypes: MasterDataOption[]
   drivingFitnessTypes: MasterDataOption[]
+  revenueTypes: MasterDataOption[]
+  paymentStatuses: MasterDataOption[]
 }
 
 type CategoryKey = keyof MasterDataCategories
@@ -48,6 +51,7 @@ type CategoryKey = keyof MasterDataCategories
 // Mapping between frontend keys and API category names
 const CATEGORY_MAP: Record<CategoryKey, string> = {
   complaints: 'complaints',
+  complaintCategories: 'complaint_categories',
   treatments: 'treatments',
   medicines: 'medicines',
   surgeries: 'surgeries',
@@ -79,12 +83,22 @@ const CATEGORY_MAP: Record<CategoryKey, string> = {
   pharmacyCategories: 'pharmacy_categories',
   colorVisionTypes: 'color_vision_types',
   drivingFitnessTypes: 'driving_fitness_types',
+  revenueTypes: 'revenue_types',
+  paymentStatuses: 'payment_statuses',
 }
 
 export function useMasterData() {
   const { toast } = useToast()
+  const toastRef = React.useRef(toast)
+  
+  // Keep toast ref updated without causing re-renders
+  React.useEffect(() => {
+    toastRef.current = toast
+  }, [toast])
+  
   const [data, setData] = React.useState<MasterDataCategories>({
     complaints: [],
+    complaintCategories: [],
     treatments: [],
     medicines: [],
     surgeries: [],
@@ -116,6 +130,8 @@ export function useMasterData() {
     pharmacyCategories: [],
     colorVisionTypes: [],
     drivingFitnessTypes: [],
+    revenueTypes: [],
+    paymentStatuses: [],
   })
   const [loading, setLoading] = React.useState<Partial<Record<CategoryKey, boolean>>>({})
   const [errors, setErrors] = React.useState<Partial<Record<CategoryKey, string>>>({})
@@ -134,8 +150,8 @@ export function useMasterData() {
       const result = await response.json()
       if (result.data) {
         const options: MasterDataOption[] = result.data.map((item: any) => ({
-          value: item.id,
-          label: item.name,
+          value: item.id,     // Use ID (UUID) as value for proper foreign key relationships
+          label: item.name,   // Display name as label
         }))
 
         setData(prev => ({ ...prev, [category]: options }))
@@ -143,7 +159,7 @@ export function useMasterData() {
     } catch (error: any) {
       console.error(`Error fetching ${category}:`, error)
       setErrors(prev => ({ ...prev, [category]: error.message }))
-      toast({
+      toastRef.current({
         title: `Failed to load ${category}`,
         description: error.message || "Please try again",
         variant: "destructive",
@@ -151,7 +167,7 @@ export function useMasterData() {
     } finally {
       setLoading(prev => ({ ...prev, [category]: false }))
     }
-  }, [toast])
+  }, []) // No dependencies - stable function
 
   const fetchMultiple = React.useCallback(async (categories: CategoryKey[]) => {
     await Promise.all(categories.map(category => fetchCategory(category)))

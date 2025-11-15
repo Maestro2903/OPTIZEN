@@ -2,11 +2,34 @@
 const nextConfig = {
   images: {
     domains: ['localhost'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**.supabase.co',
+      },
+    ],
+  },
+  typescript: {
+    ignoreBuildErrors: false,
   },
   experimental: {
     serverActions: {
       bodySizeLimit: '10mb',
     },
+    typedRoutes: false,
+  },
+  // Webpack config to handle Node.js compatibility
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      // Set DNS resolver to prefer IPv4
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        dns: false,
+        net: false,
+        tls: false,
+      }
+    }
+    return config
   },
 }
 

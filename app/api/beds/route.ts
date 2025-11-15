@@ -41,29 +41,28 @@ export async function GET(request: NextRequest) {
     // Calculate offset for pagination
     const offset = (page - 1) * limit
 
-    // Build query for beds with assignments
+    // Build query for beds with ACTIVE assignments only
+    // Using filters on the relationship to only get active assignments
     let query = supabase
       .from('beds')
       .select(`
         *,
-        bed_assignments (
+        bed_assignments!bed_assignments_bed_id_fkey (
           id,
           patient_id,
           admission_date,
           expected_discharge_date,
           admission_reason,
-          doctor_id,
-          patients:patient_id (
+          surgery_scheduled_time,
+          surgery_type,
+          assigned_doctor_id,
+          status,
+          patients!bed_assignments_patient_id_fkey (
             id,
             patient_id,
             full_name,
             gender,
             date_of_birth
-          ),
-          doctors:doctor_id (
-            id,
-            employee_id,
-            full_name
           )
         )
       `, { count: 'exact' })
@@ -101,23 +100,51 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Get doctor names for assignments
+    const assignmentIds = beds?.filter(b => b.bed_assignments && b.bed_assignments.length > 0)
+      .map(b => b.bed_assignments[0].assigned_doctor_id)
+      .filter(id => id) || []
+
+    let doctorsMap: Record<string, string> = {}
+    if (assignmentIds.length > 0) {
+      const { data: doctors } = await supabase
+        .from('users')
+        .select('id, full_name')
+        .in('id', assignmentIds)
+      
+      if (doctors) {
+        doctorsMap = doctors.reduce((acc, doc) => ({
+          ...acc,
+          [doc.id]: doc.full_name
+        }), {})
+      }
+    }
+
     // Transform data to match frontend format
-    const transformedBeds = beds?.map(bed => ({
-      bed,
-      assignment: bed.bed_assignments && bed.bed_assignments.length > 0 ? {
-        ...bed.bed_assignments[0],
-        patient_name: bed.bed_assignments[0].patients?.full_name,
-        patient_age: bed.bed_assignments[0].patients?.date_of_birth
-          ? new Date().getFullYear() - new Date(bed.bed_assignments[0].patients.date_of_birth).getFullYear()
-          : null,
-        patient_mrn: bed.bed_assignments[0].patients?.patient_id,
-        doctor_name: bed.bed_assignments[0].doctors?.full_name,
-        days_in_ward: Math.floor(
-          (new Date().getTime() - new Date(bed.bed_assignments[0].admission_date).getTime())
-          / (1000 * 60 * 60 * 24)
-        )
-      } : null
-    }))
+    // Filter to only show ACTIVE assignments (not discharged or transferred)
+    const transformedBeds = beds?.map(bed => {
+      // Find the active assignment for this bed
+      const activeAssignment = bed.bed_assignments && bed.bed_assignments.length > 0 
+        ? bed.bed_assignments.find((a: any) => a.status === 'active') || null
+        : null
+
+      return {
+        bed,
+        assignment: activeAssignment ? {
+          ...activeAssignment,
+          patient_name: activeAssignment.patients?.full_name,
+          patient_age: activeAssignment.patients?.date_of_birth
+            ? new Date().getFullYear() - new Date(activeAssignment.patients.date_of_birth).getFullYear()
+            : null,
+          patient_mrn: activeAssignment.patients?.patient_id,
+          doctor_name: activeAssignment.assigned_doctor_id ? doctorsMap[activeAssignment.assigned_doctor_id] : null,
+          days_in_ward: Math.floor(
+            (new Date().getTime() - new Date(activeAssignment.admission_date).getTime())
+            / (1000 * 60 * 60 * 24)
+          )
+        } : null
+      }
+    })
 
     // Calculate pagination metadata
     const totalPages = Math.ceil((count || 0) / limit)

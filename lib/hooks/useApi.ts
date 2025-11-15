@@ -112,6 +112,7 @@ export function useApiList<T>(
     hasNextPage: false,
     hasPrevPage: false,
   })
+  const [meta, setMeta] = useState<Record<string, any> | null>(null)
   const [params, setParams] = useState(initialParams)
   const { toast } = useToast()
 
@@ -127,6 +128,11 @@ export function useApiList<T>(
         setData(response.data)
         if (response.pagination) {
           setPagination(response.pagination)
+        }
+        // Capture any additional metadata from response
+        const { success, data, pagination: pag, error: err, message, ...rest } = response as any
+        if (Object.keys(rest).length > 0) {
+          setMeta(rest)
         }
       } else {
         const errorMsg = response.error || 'Failed to fetch data'
@@ -203,6 +209,7 @@ export function useApiList<T>(
     loading,
     error,
     pagination,
+    meta,
     params,
     fetchData,
     updateParams,
@@ -290,10 +297,12 @@ export function useApiForm<T>() {
       const response = await apiCall()
 
       if (response.success && response.data) {
-        toast({
-          title: 'Success',
-          description: successMessage || response.message || 'Operation completed successfully',
-        })
+        if (successMessage) {
+          toast({
+            title: 'Success',
+            description: successMessage || response.message || 'Operation completed successfully',
+          })
+        }
 
         onSuccess?.(response.data)
         return response.data
@@ -306,7 +315,8 @@ export function useApiForm<T>() {
         })
 
         onError?.(errorMsg)
-        return null
+        // Throw error so calling code knows it failed
+        throw new Error(errorMsg)
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'An unexpected error occurred'
@@ -317,7 +327,8 @@ export function useApiForm<T>() {
       })
 
       onError?.(errorMsg)
-      return null
+      // Re-throw so calling code can handle it
+      throw err
     } finally {
       setLoading(false)
     }

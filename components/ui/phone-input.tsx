@@ -11,6 +11,8 @@ interface PhoneInputProps {
   disabled?: boolean
   className?: string
   defaultCountry?: Country
+  id?: string
+  name?: string
 }
 
 export function PhoneNumberInput({
@@ -19,6 +21,8 @@ export function PhoneNumberInput({
   disabled = false,
   className,
   defaultCountry = "IN",
+  id,
+  name,
 }: PhoneInputProps) {
   return (
     <PhoneInput
@@ -27,6 +31,8 @@ export function PhoneNumberInput({
       value={value}
       onChange={onChange}
       disabled={disabled}
+      id={id}
+      name={name}
       className={cn(
         "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
         className

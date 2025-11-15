@@ -29,11 +29,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { InvoiceForm } from "@/components/invoice-form"
+import { InvoiceForm } from "@/components/invoice-form-new"
 import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
 import { ViewEditDialog } from "@/components/view-edit-dialog"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
 import { BillingPrint } from "@/components/billing-print"
+import { InvoiceViewDialog } from "@/components/invoice-view-dialog"
 import { useApiList, useApiForm, useApiDelete } from "@/lib/hooks/useApi"
 import { invoicesApi, type Invoice, type InvoiceFilters } from "@/lib/services/api"
 import { useToast } from "@/hooks/use-toast"
@@ -179,6 +180,142 @@ export default function BillingPage() {
     )
   }
 
+  const handleDownloadInvoice = (invoice: Invoice) => {
+    // Create a simple HTML invoice for download
+    const invoiceHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Invoice ${invoice.invoice_number}</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; }
+    .header { text-align: center; margin-bottom: 40px; border-bottom: 2px solid #333; padding-bottom: 20px; }
+    .invoice-details { display: flex; justify-content: space-between; margin-bottom: 30px; }
+    .patient-info { margin-bottom: 30px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+    th { background-color: #f5f5f5; font-weight: bold; }
+    .text-right { text-align: right; }
+    .summary { margin-left: auto; width: 300px; }
+    .summary-row { display: flex; justify-content: space-between; padding: 8px 0; }
+    .total { font-weight: bold; font-size: 1.2em; border-top: 2px solid #333; padding-top: 10px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>INVOICE</h1>
+    <h2>${invoice.invoice_number}</h2>
+  </div>
+  
+  <div class="invoice-details">
+    <div>
+      <strong>Invoice Date:</strong> ${new Date(invoice.invoice_date).toLocaleDateString('en-GB')}<br>
+      ${invoice.due_date ? `<strong>Due Date:</strong> ${new Date(invoice.due_date).toLocaleDateString('en-GB')}<br>` : ''}
+      <strong>Status:</strong> ${invoice.status.toUpperCase()}<br>
+      <strong>Payment Status:</strong> ${invoice.payment_status.toUpperCase()}
+    </div>
+  </div>
+  
+  <div class="patient-info">
+    <h3>Bill To:</h3>
+    <strong>${invoice.patients?.full_name || 'Unknown Patient'}</strong><br>
+    ${invoice.patients?.patient_id ? `Patient ID: ${invoice.patients.patient_id}<br>` : ''}
+    ${invoice.patients?.mobile ? `Phone: ${invoice.patients.mobile}<br>` : ''}
+    ${invoice.patients?.email ? `Email: ${invoice.patients.email}<br>` : ''}
+  </div>
+  
+  ${invoice.items && invoice.items.length > 0 ? `
+  <table>
+    <thead>
+      <tr>
+        <th>Service</th>
+        <th>Description</th>
+        <th class="text-right">Qty</th>
+        <th class="text-right">Rate</th>
+        <th class="text-right">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${invoice.items.map(item => `
+        <tr>
+          <td>${item.service}</td>
+          <td>${item.description || '-'}</td>
+          <td class="text-right">${item.quantity}</td>
+          <td class="text-right">₹${item.rate.toLocaleString()}</td>
+          <td class="text-right">₹${item.amount.toLocaleString()}</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+  ` : ''}
+  
+  <div class="summary">
+    <div class="summary-row">
+      <span>Subtotal:</span>
+      <span>₹${invoice.subtotal.toLocaleString()}</span>
+    </div>
+    ${invoice.discount_amount > 0 ? `
+    <div class="summary-row">
+      <span>Discount:</span>
+      <span>-₹${invoice.discount_amount.toLocaleString()}</span>
+    </div>
+    ` : ''}
+    ${invoice.tax_amount > 0 ? `
+    <div class="summary-row">
+      <span>Tax (GST):</span>
+      <span>₹${invoice.tax_amount.toLocaleString()}</span>
+    </div>
+    ` : ''}
+    <div class="summary-row total">
+      <span>Total Amount:</span>
+      <span>₹${invoice.total_amount.toLocaleString()}</span>
+    </div>
+    ${invoice.amount_paid > 0 ? `
+    <div class="summary-row">
+      <span>Amount Paid:</span>
+      <span>₹${invoice.amount_paid.toLocaleString()}</span>
+    </div>
+    <div class="summary-row">
+      <span>Balance Due:</span>
+      <span>₹${invoice.balance_due.toLocaleString()}</span>
+    </div>
+    ` : ''}
+  </div>
+  
+  ${invoice.payment_method ? `
+  <div style="margin-top: 30px;">
+    <strong>Payment Method:</strong> ${invoice.payment_method}
+  </div>
+  ` : ''}
+  
+  ${invoice.notes ? `
+  <div style="margin-top: 20px; padding: 15px; background: #f9f9f9; border-left: 3px solid #333;">
+    <strong>Notes:</strong><br>
+    ${invoice.notes}
+  </div>
+  ` : ''}
+</body>
+</html>
+    `
+
+    // Create a blob and download it
+    const blob = new Blob([invoiceHtml], { type: 'text/html' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${invoice.invoice_number}.html`
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+
+    toast({
+      title: "Invoice Downloaded",
+      description: `${invoice.invoice_number} has been downloaded as HTML.`
+    })
+  }
+
   const handleFilterChange = (filters: string[]) => {
     setAppliedFilters(filters)
     const filterParams: InvoiceFilters = {}
@@ -233,7 +370,7 @@ export default function BillingPage() {
             Manage patient billing and invoice records
           </p>
         </div>
-        <InvoiceForm>
+        <InvoiceForm onSubmit={handleAddInvoice}>
           <Button className="gap-2">
             <Plus className="h-4 w-4" />
             Create Invoice
@@ -293,6 +430,7 @@ export default function BillingPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>INVOICE NO.</TableHead>
+                  <TableHead>PATIENT ID</TableHead>
                   <TableHead>PATIENT</TableHead>
                   <TableHead>DATE</TableHead>
                   <TableHead>AMOUNT</TableHead>
@@ -306,13 +444,13 @@ export default function BillingPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       Loading invoices...
                     </TableCell>
                   </TableRow>
                 ) : invoices.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       No invoices found
                     </TableCell>
                   </TableRow>
@@ -320,6 +458,7 @@ export default function BillingPage() {
                   invoices.map((invoice) => (
                     <TableRow key={invoice.id}>
                       <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
+                      <TableCell className="font-mono text-sm font-semibold text-primary">{invoice.patients?.patient_id || '-'}</TableCell>
                       <TableCell className="font-medium uppercase">{invoice.patients?.full_name || '-'}</TableCell>
                       <TableCell>{new Date(invoice.invoice_date).toLocaleDateString('en-GB')}</TableCell>
                       <TableCell>₹{invoice.total_amount.toLocaleString()}</TableCell>
@@ -337,21 +476,21 @@ export default function BillingPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8"
-                            onClick={() => {
-                              toast({
-                                title: "View Invoice",
-                                description: "Invoice detail view coming soon."
-                              })
-                            }}
-                            title="View invoice"
+                          <InvoiceViewDialog invoice={invoice}>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8"
+                              title="View invoice"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </InvoiceViewDialog>
+                          <InvoiceForm 
+                            mode="edit" 
+                            invoiceData={invoice}
+                            onSubmit={(data) => handleUpdateInvoice(invoice.id, data)}
                           >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <InvoiceForm>
                             <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit invoice">
                               <Edit className="h-4 w-4" />
                             </Button>
@@ -360,13 +499,8 @@ export default function BillingPage() {
                             variant="ghost" 
                             size="icon" 
                             className="h-8 w-8"
-                            onClick={() => {
-                              toast({
-                                title: "Download Invoice",
-                                description: "Invoice download coming soon."
-                              })
-                            }}
-                            title="Download invoice"
+                            onClick={() => handleDownloadInvoice(invoice)}
+                            title="Download invoice as HTML"
                           >
                             <Download className="h-4 w-4" />
                           </Button>

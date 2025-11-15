@@ -83,119 +83,123 @@ export function BillingPrint({ billing, children }: BillingPrintProps) {
           documentType="Invoice"
           documentTitle="Medical Services Invoice"
         >
-          {/* Invoice Header */}
-          <PrintSection title="Invoice Information">
-            <PrintRow>
-              <PrintCol>
-                <PrintField label="Invoice No." value={billing.invoice_no || billing.id} uppercase />
-                <PrintField label="Invoice Date" value={formatDate(billing.date)} />
-                <PrintField label="Payment Status" value={getPaymentStatusDisplay(billing.payment_status)} uppercase />
-              </PrintCol>
-              <PrintCol>
-                <PrintField label="Due Date" value={billing.due_date ? formatDate(billing.due_date) : 'Immediate'} />
-                <PrintField label="Payment Method" value={billing.payment_method || 'Cash'} />
-                <PrintField label="GST Number" value={billing.gst_number || 'GSTIN123456789'} />
-              </PrintCol>
-            </PrintRow>
-          </PrintSection>
+          <div className="print-invoice">
+            {/* Invoice Header - Professional Format */}
+            <div className="print-invoice-header">
+              <div>
+                <div className="print-invoice-number-large">
+                  INVOICE #{billing.invoice_no || billing.id}
+                </div>
+                <div style={{ fontSize: '10pt', marginTop: '4pt' }}>
+                  Date: {formatDate(billing.date)}
+                </div>
+                {billing.due_date && (
+                  <div style={{ fontSize: '10pt', marginTop: '2pt' }}>
+                    Due Date: {formatDate(billing.due_date)}
+                  </div>
+                )}
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '11pt', fontWeight: 'bold', marginBottom: '4pt' }}>
+                  Payment Status
+                </div>
+                <div style={{ 
+                  fontSize: '12pt', 
+                  fontWeight: 'bold', 
+                  textTransform: 'uppercase',
+                  padding: '4pt 12pt',
+                  border: '2px solid #000',
+                  display: 'inline-block'
+                }}>
+                  {getPaymentStatusDisplay(billing.payment_status)}
+                </div>
+              </div>
+            </div>
 
-          {/* Patient/Bill-to Information */}
-          <PrintSection title="Bill To">
-            <PrintRow>
-              <PrintCol>
-                <PrintField label="Patient Name" value={billing.patient_name} uppercase />
-                <PrintField label="Patient ID" value={billing.patient_id} />
-              </PrintCol>
-              <PrintCol>
-                <PrintField label="Contact Number" value={billing.contact_number} />
-                <PrintField label="Address" value={billing.address} />
-              </PrintCol>
-            </PrintRow>
-          </PrintSection>
+            {/* Bill-to Section */}
+            <div className="print-bill-to">
+              <div style={{ fontSize: '11pt', fontWeight: 'bold', marginBottom: '6pt', textTransform: 'uppercase' }}>Bill To:</div>
+              <div style={{ fontSize: '11pt', lineHeight: '1.6' }}>
+                <div style={{ fontWeight: 'bold', marginBottom: '4pt' }}>{billing.patient_name}</div>
+                {billing.patient_id && <div>Patient ID: {billing.patient_id}</div>}
+                {billing.contact_number && <div>Contact: {billing.contact_number}</div>}
+                {billing.address && <div>{billing.address}</div>}
+              </div>
+            </div>
 
-          {/* Invoice Items Table */}
-          <PrintSection title="Service Details">
-            <table className="print-table" style={{ width: '100%', marginBottom: '15pt' }}>
-              <thead>
-                <tr>
-                  <th style={{ width: '5%', textAlign: 'center' }}>S.No</th>
-                  <th style={{ width: '50%' }}>Description</th>
-                  <th style={{ width: '10%', textAlign: 'center' }}>Qty</th>
-                  <th style={{ width: '15%', textAlign: 'right' }}>Rate (₹)</th>
-                  <th style={{ width: '20%', textAlign: 'right' }}>Amount (₹)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoiceItems.map((item, index) => (
-                  <tr key={index}>
-                    <td style={{ textAlign: 'center' }}>{index + 1}</td>
-                    <td>{item.description}</td>
-                    <td style={{ textAlign: 'center' }}>{item.quantity}</td>
-                    <td style={{ textAlign: 'right' }}>{item.rate.toFixed(2)}</td>
-                    <td style={{ textAlign: 'right' }}>{item.amount.toFixed(2)}</td>
+            {/* Service Details - Itemized Table */}
+            <PrintSection title="Service Details">
+              <table className="print-invoice-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '5%', textAlign: 'center' }}>S.No</th>
+                    <th style={{ width: '50%' }}>Description</th>
+                    <th style={{ width: '10%', textAlign: 'center' }}>Qty</th>
+                    <th style={{ width: '15%', textAlign: 'right' }}>Rate (₹)</th>
+                    <th style={{ width: '20%', textAlign: 'right' }}>Amount (₹)</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </PrintSection>
+                </thead>
+                <tbody>
+                  {invoiceItems.map((item, index) => (
+                    <tr key={index}>
+                      <td style={{ textAlign: 'center' }}>{index + 1}</td>
+                      <td>{item.description}</td>
+                      <td style={{ textAlign: 'center' }}>{item.quantity}</td>
+                      <td style={{ textAlign: 'right' }}>{formatCurrency(item.rate)}</td>
+                      <td style={{ textAlign: 'right' }}>{formatCurrency(item.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </PrintSection>
 
-          {/* Billing Summary */}
-          <PrintSection title="Billing Summary">
-            <div style={{ float: 'right', width: '300pt', border: '1px solid #000' }}>
+            {/* Billing Summary - Prominent Totals */}
+            <div className="print-invoice-summary">
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <tbody>
                   <tr>
-                    <td style={{ padding: '8pt', borderBottom: '1px solid #ccc', textAlign: 'left' }}>
+                    <td style={{ padding: '6pt', textAlign: 'right', borderBottom: '1px solid #ccc' }}>
                       <strong>Subtotal:</strong>
                     </td>
-                    <td style={{ padding: '8pt', borderBottom: '1px solid #ccc', textAlign: 'right' }}>
+                    <td style={{ padding: '6pt', textAlign: 'right', borderBottom: '1px solid #ccc', width: '40%' }}>
                       {formatCurrency(calculatedSubtotal)}
                     </td>
                   </tr>
                   {discountAmount > 0 && (
                     <tr>
-                      <td style={{ padding: '8pt', borderBottom: '1px solid #ccc', textAlign: 'left' }}>
+                      <td style={{ padding: '6pt', textAlign: 'right', borderBottom: '1px solid #ccc' }}>
                         <strong>Discount:</strong>
                       </td>
-                      <td style={{ padding: '8pt', borderBottom: '1px solid #ccc', textAlign: 'right' }}>
+                      <td style={{ padding: '6pt', textAlign: 'right', borderBottom: '1px solid #ccc' }}>
                         -{formatCurrency(discountAmount)}
                       </td>
                     </tr>
                   )}
                   <tr>
-                    <td style={{ padding: '8pt', borderBottom: '1px solid #ccc', textAlign: 'left' }}>
+                    <td style={{ padding: '6pt', textAlign: 'right', borderBottom: '1px solid #ccc' }}>
                       <strong>GST (18%):</strong>
                     </td>
-                    <td style={{ padding: '8pt', borderBottom: '1px solid #ccc', textAlign: 'right' }}>
+                    <td style={{ padding: '6pt', textAlign: 'right', borderBottom: '1px solid #ccc' }}>
                       {formatCurrency(taxAmount)}
                     </td>
                   </tr>
-                  <tr style={{ backgroundColor: '#f0f0f0', fontWeight: 'bold', fontSize: '14pt' }}>
-                    <td style={{ padding: '12pt', textAlign: 'left' }}>
+                  <tr>
+                    <td className="print-invoice-total" style={{ padding: '10pt', textAlign: 'right' }}>
                       <strong>TOTAL AMOUNT:</strong>
                     </td>
-                    <td style={{ padding: '12pt', textAlign: 'right' }}>
-                      {formatCurrency(finalTotal)}
+                    <td className="print-invoice-total" style={{ padding: '10pt', textAlign: 'right' }}>
+                      <strong style={{ fontSize: '16pt' }}>{formatCurrency(finalTotal)}</strong>
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
-            <div style={{ clear: 'both' }}></div>
-          </PrintSection>
 
-          {/* Amount in Words */}
-          <div style={{ margin: '20pt 0', padding: '10pt', border: '1px solid #ccc', backgroundColor: '#f9f9f9' }}>
-            <strong>Amount in Words:</strong><br />
-            <em>Rupees {finalTotal.toFixed(0)} Only</em>
-          </div>
-
-          {/* Payment Information */}
-          {billing.payment_method && (
+            {/* Payment Information */}
             <PrintSection title="Payment Information">
               <PrintRow>
                 <PrintCol>
-                  <PrintField label="Payment Method" value={billing.payment_method} />
+                  <PrintField label="Payment Method" value={billing.payment_method || 'Cash'} />
                   <PrintField label="Payment Status" value={getPaymentStatusDisplay(billing.payment_status)} uppercase />
                 </PrintCol>
                 <PrintCol>
@@ -206,56 +210,33 @@ export function BillingPrint({ billing, children }: BillingPrintProps) {
                 </PrintCol>
               </PrintRow>
             </PrintSection>
-          )}
 
-          {/* Terms and Conditions */}
-          <div className="print-medical-section">
-            <h4 style={{ fontSize: '12pt', fontWeight: 'bold', marginBottom: '10pt', borderBottom: '1px solid #000' }}>
-              TERMS AND CONDITIONS
-            </h4>
-            <ul style={{ fontSize: '10pt', lineHeight: '1.3', paddingLeft: '20pt' }}>
-              <li>Payment is due within 30 days of invoice date unless otherwise specified</li>
-              <li>Late payment charges may apply after due date</li>
-              <li>All services are subject to applicable taxes</li>
-              <li>Please quote invoice number in all correspondence</li>
-              <li>For any queries, contact our billing department</li>
-              <li>Thank you for choosing our medical services</li>
-            </ul>
-          </div>
-
-          {/* Bank Details for Payment */}
-          <div style={{ marginTop: '20pt', padding: '10pt', border: '1px solid #000', backgroundColor: '#f0f8ff' }}>
-            <h4 style={{ fontSize: '12pt', fontWeight: 'bold', marginBottom: '8pt' }}>
-              BANK DETAILS FOR PAYMENT
-            </h4>
-            <div style={{ fontSize: '10pt', lineHeight: '1.3' }}>
-              <strong>Account Name:</strong> EyeCare Medical Center<br />
-              <strong>Bank Name:</strong> State Bank of India<br />
-              <strong>Account Number:</strong> 1234567890<br />
-              <strong>IFSC Code:</strong> SBIN0001234<br />
-              <strong>UPI ID:</strong> eyecare@sbi
-            </div>
-          </div>
-
-          {/* Authorized Signature */}
-          <div className="print-signature-section">
-            <div style={{ float: 'right', width: '200pt', textAlign: 'center', marginTop: '30pt' }}>
-              <div style={{ height: '30pt' }}></div>
-              <div style={{ borderTop: '1px solid #000', paddingTop: '5pt' }}>
-                <strong>Authorized Signature</strong>
+            {/* Payment Terms */}
+            <div className="print-payment-terms">
+              <div style={{ fontWeight: 'bold', marginBottom: '4pt' }}>Payment Terms:</div>
+              <div style={{ marginBottom: '4pt' }}>
+                • Payment is due within {billing.due_date ? formatDate(billing.due_date) : '7 days'} of invoice date
               </div>
-              <div style={{ fontSize: '10pt' }}>EyeCare Medical Center</div>
-              <div style={{ fontSize: '10pt' }}>Date: {formatDate(billing.date)}</div>
+              <div style={{ marginBottom: '4pt' }}>
+                • Late payments may incur additional charges
+              </div>
+              <div>
+                • For payment inquiries, contact the billing department
+              </div>
             </div>
-            <div style={{ clear: 'both' }}></div>
-          </div>
 
-          {/* Invoice Footer */}
-          <div style={{ marginTop: '40pt', padding: '10pt', border: '1px solid #ccc', backgroundColor: '#f9f9f9' }}>
-            <div style={{ fontSize: '10pt', textAlign: 'center' }}>
-              <strong>INVOICE VERIFICATION</strong><br />
-              Invoice No: {billing.invoice_no || billing.id} | Date: {formatDate(billing.date)} | Amount: {formatCurrency(finalTotal)}<br />
-              This is a computer-generated invoice. For payment queries, contact our billing department.
+            {/* Footer - GST Number and Signature */}
+            <div style={{ marginTop: '20pt', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+              <div style={{ fontSize: '9pt' }}>
+                <div><strong>GST Number:</strong> {billing.gst_number || 'GSTIN123456789'}</div>
+                <div style={{ marginTop: '4pt' }}>This is a computer-generated invoice</div>
+              </div>
+              <PrintSignature 
+                doctorName="Authorized Signatory"
+                qualification="Billing Department"
+                registrationNumber=""
+                date={formatDate(billing.date)}
+              />
             </div>
           </div>
         </PrintLayout>

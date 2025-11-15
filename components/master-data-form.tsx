@@ -28,23 +28,27 @@ import { Textarea } from "@/components/ui/textarea"
 const masterDataSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   description: z.string().optional(),
+  bed_number: z.string().optional(),
 })
 
 interface MasterDataFormProps {
   children: React.ReactNode
   title: string
   fieldLabel: string
-  onSubmit?: (data: { name: string; description?: string }) => void
+  category?: string
+  onSubmit?: (data: { name: string; description?: string; bed_number?: string }) => void
 }
 
-export function MasterDataForm({ children, title, fieldLabel, onSubmit: onSubmitCallback }: MasterDataFormProps) {
+export function MasterDataForm({ children, title, fieldLabel, category, onSubmit: onSubmitCallback }: MasterDataFormProps) {
   const [open, setOpen] = React.useState(false)
+  const isBedCategory = category === 'beds'
 
   const form = useForm<z.infer<typeof masterDataSchema>>({
     resolver: zodResolver(masterDataSchema),
     defaultValues: {
       name: "",
       description: "",
+      bed_number: "",
     },
   })
 
@@ -52,7 +56,8 @@ export function MasterDataForm({ children, title, fieldLabel, onSubmit: onSubmit
     if (onSubmitCallback) {
       onSubmitCallback({
         name: values.name,
-        description: values.description
+        description: values.description,
+        bed_number: isBedCategory ? values.bed_number : undefined
       })
     }
     setOpen(false)
@@ -72,6 +77,29 @@ export function MasterDataForm({ children, title, fieldLabel, onSubmit: onSubmit
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {isBedCategory && (
+              <FormField
+                control={form.control}
+                name="bed_number"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bed Number *</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="e.g., A-101, B-202" 
+                        {...field}
+                        onChange={(e) => {
+                          // Auto-uppercase the input
+                          field.onChange(e.target.value.toUpperCase())
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                    <p className="text-xs text-muted-foreground">Format: Ward-Number (e.g., A-101)</p>
+                  </FormItem>
+                )}
+              />
+            )}
             <FormField
               control={form.control}
               name="name"

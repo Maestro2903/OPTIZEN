@@ -1,10 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, createServiceClient } from '@/lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+/**
+ * Type-safe wrappers for database RPC calls not yet in generated types
+ */
+type RoleResult = { id: string; name: string; description: string | null }
+type PermissionResult = { id: string; action: string; resource: string }
+
+async function callGetRoleByName(client: SupabaseClient, roleName: string): Promise<{
+  data: RoleResult[] | null
+  error: unknown
+}> {
+  const result = await client.rpc('get_role_by_name', { role_name: roleName })
+  return {
+    data: result.data as RoleResult[] | null,
+    error: result.error
+  }
+}
+
+async function callGetPermissionByResourceAction(
+  client: SupabaseClient, 
+  resource: string, 
+  action: string
+): Promise<{
+  data: PermissionResult[] | null
+  error: unknown
+}> {
+  const result = await client.rpc('get_permission_by_resource_action', { 
+    p_resource: resource, 
+    p_action: action 
+  })
+  return {
+    data: result.data as PermissionResult[] | null,
+    error: result.error
+  }
+}
 
 /**
  * Helper function to fetch and transform permissions for a role
  */
-async function fetchAndTransformPermissions(serviceClient: any, roleId: string) {
+async function fetchAndTransformPermissions(serviceClient: SupabaseClient, roleId: string) {
   const { data: permissions, error: permError } = await serviceClient
     .from('role_permissions')
     .select(`
@@ -103,7 +139,10 @@ async function togglePermission(
  */
 export async function GET(request: NextRequest) {
   try {
-    console.log('🔍 GET /api/access-control - Request received')
+    const { searchParams } = new URL(request.url)
+    const roleName = searchParams.get('role')
+    console.log('🔍 GET /api/access-control - Request received for role:', roleName)
+    
     const supabase = await createAuthenticatedClient()
     
     // Check authentication
@@ -145,13 +184,11 @@ export async function GET(request: NextRequest) {
     
     console.log('✅ Authorization passed for', user.email)
 
-    // Get role from query params
-    const { searchParams } = new URL(request.url)
-    const roleName = searchParams.get('role')
-
+    // Validate role parameter
     if (!roleName) {
+      console.error('❌ Missing role parameter in GET request')
       return NextResponse.json(
-        { error: 'Role parameter is required' },
+        { error: 'Role parameter is required', hint: 'Add ?role=<role_name> to the URL' },
         { status: 400 }
       )
     }
@@ -159,25 +196,34 @@ export async function GET(request: NextRequest) {
     // Fetch role by name using service client to bypass PostgREST cache
     // This is critical for access control to work properly
     const serviceClient = createServiceClient()
+    
+    type RoleData = {
+      id: string
+      name: string
+      description: string | null
+    }
+    
     const { data: roleData, error: roleError } = await serviceClient
       .from('roles')
       .select('id, name, description')
       .eq('name', roleName)
-      .single()
+      .single<RoleData>()
 
     if (roleError || !roleData) {
       console.error('❌ Role not found:', roleName, roleError)
       
       // Fallback: Try using database function to bypass cache
-      const { data: roleFromRpc, error: rpcError } = await serviceClient
-        .rpc('get_role_by_name', { role_name: roleName } as any) as any
+      const { data: roleFromRpc, error: rpcError } = await callGetRoleByName(serviceClient, roleName)
       
-      if (rpcError || !roleFromRpc || (Array.isArray(roleFromRpc) && roleFromRpc.length === 0)) {
+      if (rpcError || !roleFromRpc || roleFromRpc.length === 0) {
         console.error('❌ RPC fallback also failed:', rpcError)
+        console.error('❌ Requested role:', roleName)
+        console.error('💡 Available roles: super_admin, admin, doctor, nurse, receptionist, finance, pharmacy, lab_technician')
         return NextResponse.json(
           { 
             error: 'Role not found in database', 
             roleName,
+            availableRoles: ['super_admin', 'admin', 'doctor', 'nurse', 'receptionist', 'finance', 'pharmacy', 'lab_technician'],
             hint: 'PostgREST cache may need refresh. Try running: node scripts/reload-postgrest-cache.js'
           },
           { status: 404 }
@@ -206,7 +252,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch all permissions for this role using the role ID
     // This connects the Permission Matrix UI to the actual database role IDs
-    // Use service client for consistent cache-free access and helper function
+    // Use helper function to fetch and transform permissions
     const result = await fetchAndTransformPermissions(serviceClient, roleData.id)
     
     if (result.error) {
@@ -220,10 +266,15 @@ export async function GET(request: NextRequest) {
       role: roleData,
       permissions: result.permissionsMap
     })
-  } catch (error) {
-    console.error('Error in GET /api/access-control:', error)
+  } catch (error: any) {
+    console.error('💥 Error in GET /api/access-control:', error)
+    console.error('💥 Error stack:', error?.stack)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Internal server error', 
+        details: error?.message,
+        hint: 'Check server logs for more details'
+      },
       { status: 500 }
     )
   }
@@ -236,6 +287,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     console.log('🔍 POST /api/access-control - Request received')
+    console.log('📍 Request URL:', request.url)
     const supabase = await createAuthenticatedClient()
     
     // Parse request body first
@@ -294,49 +346,55 @@ export async function POST(request: NextRequest) {
     // Get role ID from database by name using service client to bypass cache
     console.log('🔍 Looking up role:', roleName)
     const serviceClient = createServiceClient()
-    let roleData = null
-    let roleError = null
     
     // Try direct query first
+    type RoleQueryResult = { id: string; name: string }
     const roleResult = await serviceClient
       .from('roles')
       .select('id, name')
       .eq('name', roleName)
-      .single()
+      .single<RoleQueryResult>()
     
-    roleData = roleResult.data
-    roleError = roleResult.error
+    let finalRoleData: { id: string; name: string; description?: string | null } | null = null
 
-    if (roleError || !roleData) {
+    if (roleResult.error || !roleResult.data) {
       console.error('❌ Role not found in database (direct query):', roleName)
-      console.error('❌ Error details:', roleError)
+      console.error('❌ Error details:', roleResult.error)
       
       // Fallback: Try using database function to bypass cache
       console.log('🔄 Trying RPC fallback...')
-      const { data: roleFromRpc, error: rpcError } = await serviceClient
-        .rpc('get_role_by_name', { role_name: roleName })
+      const { data: roleFromRpc, error: rpcError } = await callGetRoleByName(serviceClient, roleName)
       
       if (rpcError || !roleFromRpc || roleFromRpc.length === 0) {
         console.error('❌ RPC fallback also failed:', rpcError)
         
         // Provide detailed error for debugging
+        console.error('❌ Role not found - requested:', roleName)
+        console.error('💡 Available roles: super_admin, admin, doctor, nurse, receptionist, finance, pharmacy, lab_technician')
         const errorDetails = {
           error: 'Role not found in database',
           roleName: roleName,
-          postgrestCode: roleError?.code,
-          message: roleError?.message,
+          postgrestCode: roleResult.error?.code,
+          message: roleResult.error?.message,
           hint: 'PostgREST cache may need refresh. Try running: node scripts/reload-postgrest-cache.js',
-          availableRoles: ['super_admin', 'admin', 'doctor', 'nurse', 'receptionist', 'finance', 'pharmacy', 'lab_technician']
+          availableRoles: ['super_admin', 'admin', 'doctor', 'nurse', 'receptionist', 'finance', 'pharmacy', 'lab_technician'],
+          troubleshooting: {
+            step1: 'Verify the role exists in the database',
+            step2: 'Run: node scripts/reload-postgrest-cache.js',
+            step3: 'Restart the Next.js development server',
+            step4: 'Check Supabase connection and credentials'
+          }
         }
         
         return NextResponse.json(errorDetails, { status: 404 })
       }
       
       // Use role from RPC
-      roleData = roleFromRpc[0]
-      console.log('✅ Role found via RPC fallback:', roleData.name, 'ID:', roleData.id)
+      finalRoleData = roleFromRpc[0]
+      console.log('✅ Role found via RPC fallback:', finalRoleData.name, 'ID:', finalRoleData.id)
     } else {
-      console.log('✅ Role found:', roleData.name, 'ID:', roleData.id)
+      finalRoleData = roleResult.data
+      console.log('✅ Role found:', finalRoleData.name, 'ID:', finalRoleData.id)
     }
 
     // Get permission ID from database by action and resource using service client
@@ -352,13 +410,23 @@ export async function POST(request: NextRequest) {
       console.error('❌ Permission not found:', resource, action, permError)
       
       // Try RPC fallback
-      const { data: permFromRpc, error: permRpcError } = await serviceClient
-        .rpc('get_permission_by_resource_action', { p_resource: resource, p_action: action })
+      const { data: permFromRpc, error: permRpcError } = await callGetPermissionByResourceAction(
+        serviceClient, 
+        resource, 
+        action
+      )
       
       if (permRpcError || !permFromRpc || permFromRpc.length === 0) {
         console.error('❌ Permission RPC fallback failed:', permRpcError)
+        console.error('❌ Requested permission:', { resource, action })
         return NextResponse.json(
-          { error: 'Permission not found', resource, action, details: permError?.message },
+          { 
+            error: 'Permission not found', 
+            resource, 
+            action, 
+            details: permError?.message,
+            hint: 'This permission may not exist in the database. Check the permissions table.'
+          },
           { status: 404 }
         )
       }
@@ -369,7 +437,7 @@ export async function POST(request: NextRequest) {
       // Use helper function to toggle permission
       const toggleResult = await togglePermission(
         serviceClient,
-        roleData.id,
+        finalRoleData.id,
         permDataFromRpc.id,
         enabled,
         session.user.id
@@ -388,35 +456,45 @@ export async function POST(request: NextRequest) {
         message: `Permission ${enabled ? 'added' : 'removed'} successfully`,
         data: { role: roleName, resource, action, enabled }
       })
-    }
-    console.log('✅ Permission found:', permData.resource, permData.action, 'ID:', permData.id)
-
-    // Use helper function to toggle permission
-    const toggleResult = await togglePermission(
-      serviceClient,
-      roleData.id,
-      permData.id,
-      enabled,
-      session.user.id
-    )
-
-    if (!toggleResult.success) {
-      return NextResponse.json(
-        { error: `Failed to ${enabled ? 'add' : 'remove'} permission`, details: toggleResult.error?.message },
-        { status: 500 }
+    } else {
+      // Handle successful permission lookup (no error)
+      // TypeScript type guard: permData is confirmed to exist here
+      const confirmedPermData = permData as { id: string; action: string; resource: string }
+      console.log('✅ Permission found:', confirmedPermData.resource, confirmedPermData.action, 'ID:', confirmedPermData.id)
+      
+      // Use helper function to toggle permission
+      const toggleResult = await togglePermission(
+        serviceClient,
+        finalRoleData.id,
+        confirmedPermData.id,
+        enabled,
+        session.user.id
       )
-    }
 
-    console.log('✅ Operation completed successfully')
-    return NextResponse.json({
-      success: true,
-      message: `Permission ${enabled ? 'added' : 'removed'} successfully`,
-      data: { role: roleName, resource, action, enabled }
-    })
-  } catch (error) {
-    console.error('Error in POST /api/access-control:', error)
+      if (!toggleResult.success) {
+        return NextResponse.json(
+          { error: `Failed to ${enabled ? 'add' : 'remove'} permission`, details: toggleResult.error?.message },
+          { status: 500 }
+        )
+      }
+
+      console.log('✅ Operation completed successfully')
+      return NextResponse.json({
+        success: true,
+        message: `Permission ${enabled ? 'added' : 'removed'} successfully`,
+        data: { role: roleName, resource, action, enabled }
+      })
+    }
+  } catch (error: any) {
+    console.error('💥 Error in POST /api/access-control:', error)
+    console.error('💥 Error message:', error?.message)
+    console.error('💥 Error stack:', error?.stack)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Internal server error',
+        details: error?.message,
+        hint: 'Check server logs for more details. Ensure database connection is working.'
+      },
       { status: 500 }
     )
   }

@@ -186,52 +186,13 @@ export function AttendancePrint({ attendance, children }: AttendancePrintProps) 
             </table>
           </PrintSection>
 
-          {/* Company Policies Reminder */}
-          <div className="print-medical-section">
-            <h4 style={{ fontSize: '12pt', fontWeight: 'bold', marginBottom: '10pt', borderBottom: '1px solid #000' }}>
-              ATTENDANCE POLICY REMINDERS
-            </h4>
-            <ul style={{ fontSize: '11pt', lineHeight: '1.4', paddingLeft: '20pt' }}>
-              <li>Standard working hours: 9:00 AM to 6:00 PM</li>
-              <li>Grace period for check-in: 15 minutes</li>
-              <li>Lunch break: 1 hour (12:00 PM to 1:00 PM)</li>
-              <li>Overtime approval required for work beyond standard hours</li>
-              <li>Monthly attendance requirement: Minimum 22 working days</li>
-              <li>Leave applications must be submitted in advance</li>
-            </ul>
-          </div>
-
-          {/* HR Signature Section */}
-          <div className="print-signature-section">
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '40pt' }}>
-              <div style={{ width: '200pt', textAlign: 'center' }}>
-                <div style={{ height: '30pt' }}></div>
-                <div style={{ borderTop: '1px solid #000', paddingTop: '5pt' }}>
-                  <strong>Employee Signature</strong>
-                </div>
-                <div style={{ fontSize: '10pt' }}>{attendance.employee_name}</div>
-                <div style={{ fontSize: '10pt' }}>Date: {formatDate(new Date().toISOString())}</div>
-              </div>
-
-              <div style={{ width: '200pt', textAlign: 'center' }}>
-                <div style={{ height: '30pt' }}></div>
-                <div style={{ borderTop: '1px solid #000', paddingTop: '5pt' }}>
-                  <strong>HR Manager</strong>
-                </div>
-                <div style={{ fontSize: '10pt' }}>HR Department</div>
-                <div style={{ fontSize: '10pt' }}>Date: {formatDate(new Date().toISOString())}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Record Reference Footer */}
-          <div style={{ marginTop: '40pt', padding: '10pt', border: '1px solid #ccc', backgroundColor: '#f9f9f9' }}>
-            <div style={{ fontSize: '10pt', textAlign: 'center' }}>
-              <strong>ATTENDANCE RECORD VERIFICATION</strong><br />
-              Record ID: {attendance.id} | Date: {formatDate(attendance.date)} | Employee: {attendance.employee_name}<br />
-              This document is generated electronically and serves as official attendance record.
-            </div>
-          </div>
+          {/* HR Signature */}
+          <PrintSignature 
+            doctorName="HR Manager"
+            qualification="Human Resources Department"
+            registrationNumber=""
+            date={formatDate(new Date().toISOString())}
+          />
         </PrintLayout>
       </DialogContent>
     </Dialog>

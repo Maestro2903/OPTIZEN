@@ -13,12 +13,13 @@ interface BedCardProps {
     ward_type: string
     status: 'available' | 'occupied' | 'maintenance' | 'reserved' | 'cleaning'
     floor_number: number
+    daily_rate: number
   }
   assignment?: {
-    patient_name: string
-    patient_age: number
-    admission_date: string
-    days_in_ward: number
+    patient_name?: string
+    patient_age?: number
+    admission_date?: string
+    days_in_ward?: number
     surgery_scheduled_time?: string
     doctor_name?: string
   } | null
@@ -89,14 +90,17 @@ export function BedCard({ bed, assignment, onClick }: BedCardProps) {
       )}
       onClick={onClick}
     >
-      {/* Bed Number */}
+      {/* Bed Number and Ward */}
       <div className="flex items-start justify-between mb-2">
-        <div>
+        <div className="flex-1">
           <div className="text-2xl font-bold text-gray-900">
             {bed.bed_number}
           </div>
           <div className="text-xs text-muted-foreground capitalize">
             {bed.ward_name}
+          </div>
+          <div className="text-xs font-semibold text-blue-600 mt-1">
+            ₹{bed.daily_rate.toLocaleString()}/day
           </div>
         </div>
         <Icon className={cn("h-5 w-5", config.iconColor)} />
@@ -104,19 +108,21 @@ export function BedCard({ bed, assignment, onClick }: BedCardProps) {
 
       {/* Content based on status */}
       <div className="flex-1">
-        {bed.status === 'occupied' && assignment ? (
+        {bed.status === 'occupied' && assignment && assignment.patient_name ? (
           <div className="space-y-1">
             <div className="flex items-center gap-1">
               <User className="h-3 w-3 text-muted-foreground" />
               <span className="font-semibold text-sm truncate">
                 {assignment.patient_name}
               </span>
-              <span className="text-xs text-muted-foreground">({assignment.patient_age}y)</span>
+              {assignment.patient_age && <span className="text-xs text-muted-foreground">({assignment.patient_age}y)</span>}
             </div>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Calendar className="h-3 w-3" />
-              <span>{assignment.days_in_ward} {assignment.days_in_ward === 1 ? 'day' : 'days'}</span>
-            </div>
+            {assignment.days_in_ward && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Calendar className="h-3 w-3" />
+                <span>{assignment.days_in_ward} {assignment.days_in_ward === 1 ? 'day' : 'days'}</span>
+              </div>
+            )}
             {assignment.surgery_scheduled_time && (
               <div className="flex items-center gap-1 text-xs font-medium text-orange-600">
                 <Clock className="h-3 w-3" />

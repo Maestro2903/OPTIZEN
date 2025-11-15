@@ -67,6 +67,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Parse and validate filters (support arrays)
+    // Note: users table has is_active (boolean), not status (text)
     const allowedStatuses = ['active', 'inactive']
     const statusValues = status ? validateArrayParam(
       parseArrayParam(status),
@@ -78,9 +79,13 @@ export async function GET(request: NextRequest) {
     const roleValues = role ? parseArrayParam(role) : []
     const departmentValues = department ? parseArrayParam(department) : []
 
-    // Apply status filter (supports multiple values)
+    // Apply status filter using is_active column (boolean)
     if (statusValues.length > 0) {
-      query = applyArrayFilter(query, 'status', statusValues)
+      if (statusValues.includes('active')) {
+        query = query.eq('is_active', true)
+      } else if (statusValues.includes('inactive')) {
+        query = query.eq('is_active', false)
+      }
     }
 
     // Apply role filter (supports multiple values)
@@ -130,7 +135,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/employees - Create a new employee
+// POST /api/employees - Create a new employee with authentication
 export async function POST(request: NextRequest) {
   // Authorization check
   const authCheck = await requirePermission('employees', 'create')
@@ -146,9 +151,11 @@ export async function POST(request: NextRequest) {
       employee_id,
       full_name,
       email,
+      password,
       phone,
       role,
       department,
+      position,
       hire_date,
       salary,
       address,
@@ -156,59 +163,149 @@ export async function POST(request: NextRequest) {
       emergency_phone,
       qualifications,
       license_number,
-      status = 'active'
+      date_of_birth,
+      gender,
+      blood_group,
+      marital_status,
+      experience,
+      is_active = true
     } = body
 
-    if (!employee_id || !full_name || !email || !phone || !role) {
+    // Validate required fields
+    if (!employee_id || !full_name || !email || !password || !phone || !role) {
       return NextResponse.json(
-        { error: 'Missing required fields: employee_id, full_name, email, phone, role' },
+        { error: 'Missing required fields: employee_id, full_name, email, password, phone, role' },
         { status: 400 }
       )
     }
 
-    // Insert new employee - employees are stored in the users table
-    const { data: employee, error } = await supabase
+    // Validate password strength
+    if (password.length < 6) {
+      return NextResponse.json(
+        { error: 'Password must be at least 6 characters long' },
+        { status: 400 }
+      )
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        { error: 'Invalid email format' },
+        { status: 400 }
+      )
+    }
+
+    // Validate role against allowed enum values
+    const validRoles = [
+      'super_admin', 'hospital_admin', 'receptionist', 'optometrist', 
+      'ophthalmologist', 'technician', 'billing_staff', 'admin', 
+      'doctor', 'nurse', 'finance', 'pharmacy_staff', 'pharmacy', 
+      'lab_technician', 'manager', 'read_only'
+    ]
+    if (!validRoles.includes(role.toLowerCase())) {
+      return NextResponse.json(
+        { error: `Invalid role. Must be one of: ${validRoles.join(', ')}` },
+        { status: 400 }
+      )
+    }
+
+    // Step 1: Create Supabase Auth user
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true, // Auto-confirm email
+      user_metadata: {
+        full_name,
+        employee_id,
+        role: role.toLowerCase()
+      }
+    })
+
+    if (authError) {
+      console.error('Auth user creation error:', authError)
+      if (authError.message.includes('already registered') || authError.message.includes('already been registered')) {
+        return NextResponse.json(
+          { error: 'Email already registered in the system' },
+          { status: 409 }
+        )
+      }
+      return NextResponse.json(
+        { error: `Failed to create user account: ${authError.message}` },
+        { status: 500 }
+      )
+    }
+
+    if (!authData?.user) {
+      return NextResponse.json(
+        { error: 'Failed to create user account: No user data returned' },
+        { status: 500 }
+      )
+    }
+
+    // Step 2: Create user profile in public.users table
+    const { data: employee, error: profileError } = await supabase
       .from('users')
-      .insert([
-        {
-          employee_id,
-          full_name,
-          email,
-          phone,
-          role,
-          department,
-          hire_date,
-          salary,
-          address,
-          emergency_contact,
-          emergency_phone,
-          qualifications,
-          license_number,
-          status,
-          created_by: context.user_id
-        }
-      ])
+      .insert({
+        id: authData.user.id, // Use auth user ID
+        employee_id,
+        full_name,
+        email,
+        phone,
+        role: role.toLowerCase(), // Normalize to lowercase for DB enum
+        department,
+        position,
+        hire_date,
+        salary: salary ? parseFloat(salary) : null,
+        address,
+        emergency_contact,
+        emergency_phone,
+        qualifications,
+        license_number,
+        date_of_birth,
+        gender,
+        blood_group,
+        marital_status,
+        experience,
+        is_active,
+        created_by: context.user_id
+      })
       .select()
       .single()
 
-    if (error) {
-      console.error('Database error:', error)
-      if (error.code === '23505') { // Unique constraint violation
+    if (profileError) {
+      console.error('Profile creation error:', profileError)
+      
+      // Rollback: Delete the auth user if profile creation fails
+      try {
+        await supabase.auth.admin.deleteUser(authData.user.id)
+        console.log('Rolled back auth user creation due to profile error')
+      } catch (rollbackError) {
+        console.error('Failed to rollback auth user:', rollbackError)
+      }
+      
+      if (profileError.code === '23505') { // Unique constraint violation
         return NextResponse.json({
           error: 'Employee ID or email already exists'
         }, { status: 409 })
       }
-      return NextResponse.json({ error: 'Failed to create employee' }, { status: 500 })
+      return NextResponse.json({ 
+        error: 'Failed to create employee profile',
+        details: profileError.message 
+      }, { status: 500 })
     }
 
     return NextResponse.json({
       success: true,
       data: employee,
-      message: 'Employee created successfully'
+      message: `Employee ${full_name} created successfully. Login credentials have been set up.`
     }, { status: 201 })
 
   } catch (error) {
     console.error('API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
   }
 }

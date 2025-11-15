@@ -31,10 +31,12 @@ import {
 import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
 import { PharmacyPrint } from "@/components/pharmacy-print"
+import { PharmacyViewDialog } from "@/components/pharmacy-view-dialog"
 import { useApiList, useApiForm, useApiDelete } from "@/lib/hooks/useApi"
 import { pharmacyApi, type PharmacyItem, type PharmacyFilters } from "@/lib/services/api"
 import { useToast } from "@/hooks/use-toast"
 import { Pagination } from "@/components/ui/pagination"
+import { createClient } from "@/lib/supabase/client"
 import {
   Dialog,
   DialogContent,
@@ -64,17 +66,25 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 
 const pharmacyItemSchema = z.object({
-  item_name: z.string().min(1, "Item name is required"),
+  name: z.string().min(1, "Item name is required"),
   generic_name: z.string().optional(),
   manufacturer: z.string().optional(),
+  supplier: z.string().optional(),
   category: z.string().min(1, "Category is required"),
   unit_price: z.number().min(0, "Unit price must be positive"),
-  selling_price: z.number().min(0, "Selling price must be positive"),
-  current_stock: z.number().min(0, "Stock cannot be negative"),
+  mrp: z.number().min(0, "MRP must be positive"),
+  stock_quantity: z.number().min(0, "Stock cannot be negative"),
   reorder_level: z.number().min(0, "Reorder level cannot be negative"),
   batch_number: z.string().optional(),
   expiry_date: z.string().optional(),
+  hsn_code: z.string().optional(),
+  gst_percentage: z.number().optional(),
+  prescription_required: z.boolean().optional(),
+  dosage_form: z.string().optional(),
+  strength: z.string().optional(),
+  storage_instructions: z.string().optional(),
   description: z.string().optional(),
+  image_url: z.string().optional(),
 })
 
 const categoryColors = {
@@ -125,17 +135,25 @@ export default function PharmacyPage() {
   const form = useForm<z.infer<typeof pharmacyItemSchema>>({
     resolver: zodResolver(pharmacyItemSchema),
     defaultValues: {
-      item_name: "",
+      name: "",
       generic_name: "",
       manufacturer: "",
+      supplier: "",
       category: "",
       unit_price: 0,
-      selling_price: 0,
-      current_stock: 0,
-      reorder_level: 0,
+      mrp: 0,
+      stock_quantity: 0,
+      reorder_level: 10,
       batch_number: "",
       expiry_date: "",
+      hsn_code: "",
+      gst_percentage: 0,
+      prescription_required: false,
+      dosage_form: "",
+      strength: "",
+      storage_instructions: "",
       description: "",
+      image_url: "",
     },
   })
 
@@ -166,7 +184,7 @@ export default function PharmacyPage() {
       const result = await createItem(
         () => pharmacyApi.create(values),
         {
-          successMessage: `${values.item_name} has been added to inventory.`,
+          successMessage: `${values.name} has been added to inventory.`,
           onSuccess: (newItem) => {
             addItem(newItem)
           }
@@ -219,7 +237,7 @@ export default function PharmacyPage() {
     const success = await deleteItem(
       () => pharmacyApi.delete(itemId),
       {
-        successMessage: `${item.item_name} has been removed from inventory.`,
+        successMessage: `${item.name} has been removed from inventory.`,
         onSuccess: () => {
           removeItem(itemId)
         }
@@ -230,17 +248,25 @@ export default function PharmacyPage() {
   const handleEdit = (item: PharmacyItem) => {
     setEditingItem(item)
     form.reset({
-      item_name: item.item_name,
+      name: item.name,
       generic_name: item.generic_name || "",
       manufacturer: item.manufacturer || "",
+      supplier: item.supplier || "",
       category: item.category,
       unit_price: item.unit_price,
-      selling_price: item.selling_price,
-      current_stock: item.current_stock,
+      mrp: item.mrp,
+      stock_quantity: item.stock_quantity,
       reorder_level: item.reorder_level,
       batch_number: item.batch_number || "",
       expiry_date: item.expiry_date || "",
+      hsn_code: item.hsn_code || "",
+      gst_percentage: item.gst_percentage || 0,
+      prescription_required: item.prescription_required || false,
+      dosage_form: item.dosage_form || "",
+      strength: item.strength || "",
+      storage_instructions: item.storage_instructions || "",
       description: item.description || "",
+      image_url: item.image_url || "",
     })
     setIsDialogOpen(true)
   }
@@ -281,8 +307,40 @@ export default function PharmacyPage() {
 
   // TODO: CRITICAL - Replace with API aggregate values
   // Current calculations only use pharmacyItems (current page), not the entire inventory
-  const lowStockItems = pharmacyItems.filter(item => item.current_stock <= item.reorder_level)
-  const totalValue = pharmacyItems.reduce((sum, item) => sum + (item.current_stock * item.unit_price), 0)
+  const lowStockItems = pharmacyItems.filter(item => item.stock_quantity <= item.reorder_level)
+  const totalValue = pharmacyItems.reduce((sum, item) => sum + (item.stock_quantity * item.unit_price), 0)
+
+  // Realtime subscription for pharmacy items
+  React.useEffect(() => {
+    const supabase = createClient()
+    
+    const channel = supabase
+      .channel('pharmacy_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'pharmacy_items'
+        },
+        (payload) => {
+          console.log('Pharmacy change received:', payload)
+          
+          if (payload.eventType === 'INSERT') {
+            addItem(payload.new as PharmacyItem)
+          } else if (payload.eventType === 'UPDATE') {
+            updateItem(payload.new.id, payload.new as PharmacyItem)
+          } else if (payload.eventType === 'DELETE') {
+            removeItem(payload.old.id)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [addItem, updateItem, removeItem])
 
   const viewOptionsConfig: ViewOptionsConfig = {
     filters: [
@@ -292,14 +350,14 @@ export default function PharmacyPage() {
       { id: "supplements", label: "Supplements", count: pharmacyItems.filter(i => i.category === "supplements").length },
     ],
     sortOptions: [
-      { id: "item_name", label: "Name" },
+      { id: "name", label: "Name" },
       { id: "category", label: "Category" },
-      { id: "current_stock", label: "Stock Level" },
+      { id: "stock_quantity", label: "Stock Level" },
       { id: "unit_price", label: "Price" },
       { id: "expiry_date", label: "Expiry Date" },
     ],
     showExport: false,
-    showSettings: true,
+    showSettings: false,
   }
 
   return (
@@ -336,7 +394,7 @@ export default function PharmacyPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="item_name"
+                    name="name"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Item Name *</FormLabel>
@@ -424,10 +482,10 @@ export default function PharmacyPage() {
                   />
                   <FormField
                     control={form.control}
-                    name="selling_price"
+                    name="mrp"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Selling Price *</FormLabel>
+                        <FormLabel>MRP *</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -446,7 +504,7 @@ export default function PharmacyPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="current_stock"
+                    name="stock_quantity"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Current Stock *</FormLabel>
@@ -588,7 +646,7 @@ export default function PharmacyPage() {
                   <TableHead>CATEGORY</TableHead>
                   <TableHead>STOCK</TableHead>
                   <TableHead>UNIT PRICE</TableHead>
-                  <TableHead>SELLING PRICE</TableHead>
+                  <TableHead>MRP</TableHead>
                   <TableHead>BATCH</TableHead>
                   <TableHead>EXPIRY</TableHead>
                   <TableHead>STATUS</TableHead>
@@ -613,7 +671,7 @@ export default function PharmacyPage() {
                     <TableRow key={item.id}>
                       <TableCell className="font-medium">
                         <div>
-                          <div className="font-semibold">{item.item_name}</div>
+                          <div className="font-semibold">{item.name}</div>
                           {item.generic_name && <div className="text-sm text-muted-foreground">{item.generic_name}</div>}
                         </div>
                       </TableCell>
@@ -623,17 +681,17 @@ export default function PharmacyPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium">{item.current_stock}</div>
+                        <div className="font-medium">{item.stock_quantity}</div>
                         <div className="text-sm text-muted-foreground">Reorder: {item.reorder_level}</div>
                       </TableCell>
                       <TableCell>₹{item.unit_price.toFixed(2)}</TableCell>
-                      <TableCell>₹{item.selling_price.toFixed(2)}</TableCell>
+                      <TableCell>₹{item.mrp.toFixed(2)}</TableCell>
                       <TableCell>{item.batch_number || '-'}</TableCell>
                       <TableCell>
                         {item.expiry_date ? new Date(item.expiry_date).toLocaleDateString('en-GB') : '-'}
                       </TableCell>
                       <TableCell>
-                        {item.current_stock <= item.reorder_level ? (
+                        {item.stock_quantity <= item.reorder_level ? (
                           <Badge variant="destructive">Low Stock</Badge>
                         ) : (
                           <Badge variant="secondary">In Stock</Badge>
@@ -641,9 +699,11 @@ export default function PharmacyPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <Eye className="h-4 w-4" />
-                          </Button>
+                          <PharmacyViewDialog item={item}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </PharmacyViewDialog>
                           <Button
                             variant="ghost"
                             size="icon"
@@ -652,22 +712,19 @@ export default function PharmacyPage() {
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <ShoppingCart className="h-4 w-4" />
-                          </Button>
                           <PharmacyPrint
                             pharmacy={{
                               id: item.id,
                               patient_name: 'Stock Report',
                               date: new Date().toISOString(),
                               items: [{
-                                medicine_name: item.item_name,
+                                medicine_name: item.name,
                                 dosage: item.generic_name || 'Standard',
-                                quantity: item.current_stock,
-                                instructions: `Stock: ${item.current_stock} | Reorder: ${item.reorder_level}`,
-                                price: item.selling_price
+                                quantity: item.stock_quantity,
+                                instructions: `Stock: ${item.stock_quantity} | Reorder: ${item.reorder_level}`,
+                                price: item.mrp
                               }],
-                              total_amount: item.current_stock * item.selling_price,
+                              total_amount: item.stock_quantity * item.mrp,
                               pharmacy_location: 'Main Inventory',
                               pharmacist_name: 'Inventory Manager',
                               notes: `Batch: ${item.batch_number || 'N/A'} | Expiry: ${item.expiry_date ? new Date(item.expiry_date).toLocaleDateString('en-GB') : 'N/A'}`
@@ -684,7 +741,7 @@ export default function PharmacyPage() {
                           </PharmacyPrint>
                           <DeleteConfirmDialog
                             title="Delete Item"
-                            description={`Are you sure you want to delete ${item.item_name}? This action cannot be undone.`}
+                            description={`Are you sure you want to delete ${item.name}? This action cannot be undone.`}
                             onConfirm={() => handleDeleteItem(item.id)}
                           >
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">

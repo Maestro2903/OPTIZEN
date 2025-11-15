@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { requirePermission } from '@/lib/middleware/rbac'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    // RBAC check
+    const authCheck = await requirePermission('certificates', 'view')
+    if (!authCheck.authorized) return authCheck.response
+    
     const supabase = createClient()
     const { id } = params
 
@@ -63,52 +68,24 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // RBAC check
+    const authCheck = await requirePermission('certificates', 'edit')
+    if (!authCheck.authorized) return authCheck.response
+    
     const supabase = createClient()
-    
-    // Check authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
     const { id } = await params
     const body = await request.json()
 
-    // Get user role from users table (secure authorization)
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user?.id)
-      .eq('is_active', true)
-      .single()
-
-    if (userError || !userData) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    // Check if certificate exists and get ownership info
-    const { data: certAuth, error: fetchError } = await supabase
-      .from('certificates')
-      .select('user_id')
-      .eq('certificate_number', id)
-      .single()
-
-    if (fetchError || !certAuth) {
-      return NextResponse.json({ error: 'Certificate not found' }, { status: 404 })
-    }
-
-    // Check if user owns the certificate or is admin
-    const isAuthorized = certAuth.user_id === user?.id ||
-                        userData.role === 'super_admin' ||
-                        userData.role === 'hospital_admin'
-
-    if (!isAuthorized) {
-      return NextResponse.json({ error: 'Forbidden - insufficient permissions' }, { status: 403 })
-    }
-
     // Whitelist allowed fields to prevent mass assignment
-    const allowedFields = ['type', 'purpose', 'status', 'issue_date', 'patient_id']
+    const allowedFields = [
+      'type', 'purpose', 'status', 'issue_date', 'patient_id',
+      'exam_date', 'findings', 'diagnosis', 'treatment_period',
+      'recommendations', 'visual_acuity_right', 'visual_acuity_left',
+      'color_vision', 'driving_fitness', 'illness', 'leave_from',
+      'leave_to', 'title', 'content', 'issued_by', 'hospital_name',
+      'hospital_address', 'doctor_name', 'doctor_qualification',
+      'doctor_registration_number', 'hospital_logo_url', 'doctor_signature_url'
+    ]
     const updateData = Object.keys(body)
       .filter(key => allowedFields.includes(key))
       .reduce((obj, key) => ({ ...obj, [key]: body[key] }), {})
@@ -172,48 +149,12 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // RBAC check
+    const authCheck = await requirePermission('certificates', 'delete')
+    if (!authCheck.authorized) return authCheck.response
+    
     const supabase = createClient()
-    
-    // Check authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
     const { id } = await params
-
-    // Get user role from users table (secure authorization)
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user?.id)
-      .eq('is_active', true)
-      .single()
-
-    if (userError || !userData) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    // Authorization check - verify ownership or admin role
-    const { data: certificate, error: fetchError } = await supabase
-      .from('certificates')
-      .select('user_id')
-      .eq('certificate_number', id)
-      .single()
-
-    if (fetchError || !certificate) {
-      return NextResponse.json({ error: 'Certificate not found' }, { status: 404 })
-    }
-
-    // Check if user owns the certificate or is admin
-    const isAuthorized = certificate.user_id === user?.id ||
-                        userData.role === 'super_admin' ||
-                        userData.role === 'hospital_admin'
-
-    if (!isAuthorized) {
-      return NextResponse.json({ error: 'Forbidden - insufficient permissions' }, { status: 403 })
-    }
 
     const { error } = await supabase
       .from('certificates')

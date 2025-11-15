@@ -71,7 +71,15 @@ class ApiService {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || `HTTP ${response.status}`)
+        // Preserve error details from API response
+        const errorMessage = data.details
+          ? Array.isArray(data.details)
+            ? data.details.join(', ')
+            : typeof data.details === 'string'
+            ? data.details
+            : data.error || `HTTP ${response.status}`
+          : data.error || `HTTP ${response.status}`
+        throw new Error(errorMessage)
       }
 
       return data
@@ -185,6 +193,92 @@ export const patientsApi = {
 // CASES API
 // ===============================
 
+// JSONB field types for Case
+export interface CaseComplaint {
+  categoryId?: string | null
+  complaintId: string
+  duration?: string
+  eye?: string
+  notes?: string
+}
+
+export interface CaseTreatment {
+  drug_id: string
+  dosage_id?: string
+  route_id?: string
+  duration?: string
+  eye?: string
+  quantity?: string
+  drug_name?: string
+  dosage_name?: string
+  route_name?: string
+}
+
+export interface CaseDiagnosticTest {
+  test_id: string
+  eye?: string
+  type?: string
+  problem?: string
+  notes?: string
+}
+
+export interface VisionData {
+  unaided?: {
+    right?: string
+    left?: string
+  }
+  pinhole?: {
+    right?: string
+    left?: string
+  }
+  aided?: {
+    right?: string
+    left?: string
+  }
+  near?: {
+    right?: string
+    left?: string
+  }
+}
+
+export interface ExaminationData {
+  refraction?: any
+  anterior_segment?: any
+  posterior_segment?: any
+  tests?: {
+    iop?: {
+      right?: { id: string; value: string }
+      left?: { id: string; value: string }
+    }
+    sac_test?: string
+  }
+  blood_investigation?: {
+    blood_pressure?: string
+    blood_sugar?: string
+    blood_tests?: string[]
+  }
+  surgeries?: Array<{
+    eye: string
+    surgery_name: string
+    anesthesia: string
+  }>
+  diagrams?: {
+    right_eye?: string
+    left_eye?: string
+  }
+  remarks?: string
+}
+
+export interface PastMedication {
+  medicine_id?: string
+  medicine_name: string
+  type?: string
+  dosage?: string
+  frequency?: string
+  duration?: string
+  notes?: string
+}
+
 export interface Case {
   id: string
   case_no: string
@@ -195,12 +289,21 @@ export interface Case {
   history_of_present_illness?: string
   past_medical_history?: string
   examination_findings?: string
-  diagnosis?: string
+  diagnosis?: string | string[]
   treatment_plan?: string
   medications_prescribed?: string
   follow_up_instructions?: string
-  status: 'active' | 'completed' | 'cancelled'
-  patients?: Pick<Patient, 'id' | 'patient_id' | 'full_name' | 'email' | 'mobile' | 'gender'>
+  advice_remarks?: string  // ✅ Added missing field
+  status: 'active' | 'completed' | 'cancelled' | 'pending'
+  complaints?: CaseComplaint[]
+  treatments?: CaseTreatment[]
+  diagnostic_tests?: CaseDiagnosticTest[]
+  past_medications?: PastMedication[]
+  vision_data?: VisionData
+  examination_data?: ExaminationData
+  created_by?: string
+  provider_id?: string
+  patients?: Pick<Patient, 'id' | 'patient_id' | 'full_name' | 'email' | 'mobile' | 'gender' | 'date_of_birth' | 'state'>
   created_at: string
   updated_at: string
 }
@@ -234,18 +337,19 @@ export const casesApi = {
 export interface Appointment {
   id: string
   patient_id: string
+  provider_id: string
   appointment_date: string
-  appointment_time: string
-  appointment_type: 'consult' | 'follow-up' | 'surgery' | 'refraction' | 'other'
-  doctor_id?: string
-  reason?: string
-  duration_minutes: number
+  start_time: string
+  end_time: string
+  type: 'consult' | 'follow-up' | 'surgery' | 'refraction' | 'other'
   status: 'scheduled' | 'checked-in' | 'in-progress' | 'completed' | 'cancelled' | 'no-show'
+  room?: string
   notes?: string
   patients?: Pick<Patient, 'id' | 'patient_id' | 'full_name' | 'email' | 'mobile' | 'gender'>
-  doctors?: Pick<Employee, 'id' | 'employee_id' | 'full_name' | 'role' | 'department'>
+  users?: Pick<Employee, 'id' | 'full_name' | 'email' | 'role'> // Provider/doctor joined from users table
   created_at: string
   updated_at: string
+  updated_by?: string
 }
 
 export interface AppointmentFilters extends PaginationParams {
@@ -300,6 +404,13 @@ export interface Invoice {
   notes?: string
   status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'
   patients?: Pick<Patient, 'id' | 'patient_id' | 'full_name' | 'email' | 'mobile' | 'gender'>
+  items?: Array<{
+    service: string
+    description?: string
+    quantity: number
+    rate: number
+    amount: number
+  }>
   invoice_items?: InvoiceItem[]
   created_at: string
   updated_at: string
@@ -335,12 +446,13 @@ export const invoicesApi = {
 
 export interface Employee {
   id: string
-  employee_id: string
+  employee_id?: string
   full_name: string
   email: string
   phone: string
   role: string
   department?: string
+  position?: string
   hire_date?: string
   salary?: number
   address?: string
@@ -348,9 +460,22 @@ export interface Employee {
   emergency_phone?: string
   qualifications?: string
   license_number?: string
-  status: 'active' | 'inactive'
+  date_of_birth?: string
+  gender?: string
+  blood_group?: string
+  marital_status?: string
+  experience?: string
+  is_active: boolean // Primary status field (boolean in DB)
+  avatar_url?: string
   created_at: string
   updated_at: string
+  created_by?: string
+  updated_by?: string
+}
+
+// Helper function to get employee status for display
+export const getEmployeeStatus = (employee: Employee): 'active' | 'inactive' => {
+  return employee.is_active ? 'active' : 'inactive'
 }
 
 export interface EmployeeFilters extends PaginationParams {
@@ -366,7 +491,7 @@ export const employeesApi = {
   getById: (id: string) =>
     apiService.getById<Employee>('employees', id),
 
-  create: (data: Omit<Employee, 'id' | 'employee_id' | 'created_at' | 'updated_at'>) =>
+  create: (data: Omit<Employee, 'id' | 'created_at' | 'updated_at' | 'created_by' | 'updated_by'>) =>
     apiService.create<Employee>('employees', data),
 
   update: (id: string, data: Partial<Employee>) =>
@@ -385,6 +510,13 @@ export interface MasterDataItem {
   category: string
   name: string
   description?: string
+  bed_number?: string
+  status?: string
+  bed_type?: string
+  floor_number?: number
+  room_number?: string
+  daily_rate?: number
+  facilities?: string | string[]
   is_active: boolean
   sort_order: number
   metadata: Record<string, any>
@@ -427,17 +559,26 @@ export const masterDataApi = {
 
 export interface PharmacyItem {
   id: string
-  item_name: string
+  name: string
   generic_name?: string
   manufacturer?: string
   category: string
+  supplier?: string
   unit_price: number
-  selling_price: number
-  current_stock: number
+  mrp: number
+  stock_quantity: number
   reorder_level: number
   batch_number?: string
   expiry_date?: string
+  hsn_code?: string
+  gst_percentage?: number
+  prescription_required?: boolean
+  dosage_form?: string
+  strength?: string
+  storage_instructions?: string
   description?: string
+  image_url?: string
+  is_low_stock?: boolean
   created_at: string
   updated_at: string
 }
@@ -454,7 +595,7 @@ export const pharmacyApi = {
   getById: (id: string) =>
     apiService.getById<PharmacyItem>('pharmacy', id),
 
-  create: (data: Omit<PharmacyItem, 'id' | 'created_at' | 'updated_at'>) =>
+  create: (data: Omit<PharmacyItem, 'id' | 'created_at' | 'updated_at' | 'is_low_stock'>) =>
     apiService.create<PharmacyItem>('pharmacy', data),
 
   update: (id: string, data: Partial<PharmacyItem>) =>
@@ -514,16 +655,29 @@ export const attendanceApi = {
       body: JSON.stringify(data),
     }),
 
-  // Get attendance summary
-  getSummary: (params: { date?: string; month?: string; year?: string } = {}) =>
-    apiService.fetchApi<{
+  // Get attendance summary/metrics
+  getSummary: (params: { date?: string; date_from?: string; date_to?: string } = {}) => {
+    const queryParams = new URLSearchParams()
+    if (params.date) queryParams.append('date', params.date)
+    if (params.date_from) queryParams.append('date_from', params.date_from)
+    if (params.date_to) queryParams.append('date_to', params.date_to)
+    const query = queryParams.toString() ? `?${queryParams.toString()}` : ''
+    return apiService.fetchApi<{
       total_staff: number
       present: number
       absent: number
       on_leave: number
       attendance_percentage: number
-    }>('/attendance/summary', {
+      average_working_hours: number
+    }>(`/attendance/metrics${query}`, {
       method: 'GET',
+    })
+  },
+  // Bulk create attendance records
+  bulkCreate: (data: { attendance_date: string; default_status: string; employees: any[] }) =>
+    apiService.fetchApi<AttendanceRecord[]>('/attendance/bulk', {
+      method: 'POST',
+      body: JSON.stringify(data),
     }),
 }
 
@@ -551,11 +705,27 @@ export interface Operation {
   print_notes?: boolean
   print_payment?: boolean
   print_iol?: boolean
+  follow_up_date?: string
+  follow_up_visit_type?: string
+  follow_up_notes?: string
   status: 'scheduled' | 'in-progress' | 'completed' | 'cancelled'
   patients?: Pick<Patient, 'id' | 'patient_id' | 'full_name' | 'email' | 'mobile' | 'gender'>
-  cases?: Pick<Case, 'id' | 'case_no' | 'diagnosis'>
+  encounters?: {
+    id: string
+    encounter_date?: string
+    diagnosis?: string | string[]
+    chief_complaint?: string
+  }
+  cases?: {
+    id: string
+    case_no?: string
+    diagnosis?: string | string[]
+  } // Keep for backward compatibility
   created_at: string
   updated_at: string
+  created_by?: string
+  updated_by?: string
+  deleted_at?: string
 }
 
 export interface OperationFilters extends PaginationParams {
@@ -595,12 +765,27 @@ export interface Discharge {
   discharge_date: string
   discharge_type: 'regular' | 'LAMA' | 'transfer' | 'death'
   discharge_summary?: string
-  final_diagnosis?: string
-  treatment_given?: string
+  final_diagnosis?: {
+    ids: string[]
+    labels: string[]
+  } | string | null // Support JSONB object, legacy string, or null
+  treatment_given?: {
+    ids: string[]
+    labels: string[]
+  } | string | null // Support JSONB object, legacy string, or null
   condition_on_discharge?: string
   instructions?: string
   follow_up_date?: string
-  medications?: string
+  medications?: {
+    medicines: {
+      ids: string[]
+      labels: string[]
+    }
+    dosages: {
+      ids: string[]
+      labels: string[]
+    }
+  } | string | null // Support JSONB object, legacy string, or null
   vitals_at_discharge?: string
   doctor_id?: string
   status: 'completed' | 'pending' | 'cancelled'
@@ -850,6 +1035,166 @@ export class RealtimeService {
 }
 
 export const realtimeService = new RealtimeService()
+
+// ===============================
+// EXPENSES API
+// ===============================
+
+export interface Expense {
+  id: string
+  expense_date: string
+  category: string
+  sub_category?: string
+  description: string
+  amount: number
+  payment_method?: string
+  vendor?: string
+  bill_number?: string
+  approved_by?: string
+  added_by?: string
+  notes?: string
+  receipt_url?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ExpenseFilters extends PaginationParams {
+  category?: string
+  date_from?: string
+  date_to?: string
+}
+
+export const expensesApi = {
+  list: (params: ExpenseFilters = {}) =>
+    apiService.getList<Expense>('expenses', params),
+
+  getById: (id: string) =>
+    apiService.getById<Expense>('expenses', id),
+
+  create: (data: Omit<Expense, 'id' | 'created_at' | 'updated_at' | 'added_by'>) =>
+    apiService.create<Expense>('expenses', data),
+
+  update: (id: string, data: Partial<Expense>) =>
+    apiService.update<Expense>('expenses', id, data),
+
+  delete: (id: string) =>
+    apiService.delete<Expense>('expenses', id),
+}
+
+// ===============================
+// FINANCE DASHBOARD API
+// ===============================
+
+export interface FinanceDashboard {
+  summary: {
+    totalRevenue: number
+    totalPaid: number
+    totalExpenses: number
+    netProfit: number
+    profitMargin: number
+    totalOutstanding: number
+  }
+  comparison: {
+    revenueChange: number
+    expenseChange: number
+    profitChange: number
+  }
+  invoiceStats: {
+    total: number
+    paid: number
+    unpaid: number
+    partial: number
+    byStatus: {
+      draft: number
+      sent: number
+      paid: number
+      overdue: number
+      cancelled: number
+    }
+  }
+  expenseStats: {
+    total: number
+    totalAmount: number
+    byCategory: Record<string, number>
+  }
+  recentTransactions: Array<{
+    id: any
+    date: string
+    type: string
+    amount: number
+    status: string
+  }>
+  dateRange: {
+    from: string
+    to: string
+  }
+}
+
+export const financeApi = {
+  getDashboard: (params: { date_from?: string; date_to?: string } = {}): Promise<ApiResponse<FinanceDashboard>> => {
+    const queryParams = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value) queryParams.append(key, String(value))
+    })
+    const query = queryParams.toString() ? `?${queryParams.toString()}` : ''
+    return apiService.fetchApi<FinanceDashboard>(`/finance/dashboard${query}`)
+  },
+}
+
+// ===============================
+// FINANCE REVENUE API
+// ===============================
+
+export interface FinanceRevenue {
+  id: string
+  entry_date: string
+  revenue_type: 'consultation' | 'surgery' | 'pharmacy' | 'diagnostic' | 'lab' | 'other'
+  description: string
+  amount: number
+  payment_method: 'cash' | 'card' | 'upi' | 'bank_transfer' | 'cheque' | 'other'
+  payment_status: 'received' | 'pending' | 'partial'
+  paid_amount: number
+  patient_id?: string
+  patient_name?: string
+  invoice_reference?: string
+  category?: string
+  notes?: string
+  created_at: string
+  updated_at: string
+}
+
+export const financeRevenueApi = {
+  list: (params: PaginationParams & Record<string, any> = {}): Promise<ApiResponse<FinanceRevenue[]>> => {
+    const queryParams = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        queryParams.append(key, String(value))
+      }
+    })
+    const query = queryParams.toString() ? `?${queryParams.toString()}` : ''
+    return apiService.fetchApi<FinanceRevenue[]>(`/finance-revenue${query}`)
+  },
+  
+  getById: (id: string): Promise<ApiResponse<FinanceRevenue>> =>
+    apiService.fetchApi<FinanceRevenue>(`/finance-revenue/${id}`),
+  
+  create: (data: Partial<FinanceRevenue>): Promise<ApiResponse<FinanceRevenue>> =>
+    apiService.fetchApi<FinanceRevenue>('/finance-revenue', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  
+  update: (id: string, data: Partial<FinanceRevenue>): Promise<ApiResponse<FinanceRevenue>> =>
+    apiService.fetchApi<FinanceRevenue>(`/finance-revenue/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  
+  delete: (id: string): Promise<ApiResponse<FinanceRevenue>> =>
+    apiService.fetchApi<FinanceRevenue>(`/finance-revenue/${id}`, {
+      method: 'DELETE',
+    }),
+}
 
 // ===============================
 // UTILITY FUNCTIONS

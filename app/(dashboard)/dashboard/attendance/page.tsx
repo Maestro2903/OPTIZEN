@@ -4,15 +4,14 @@ import * as React from "react"
 import {
   Plus,
   Search,
-  Filter,
-  UserCheck,
-  Users,
-  Calendar as CalendarIcon,
-  TrendingUp,
+  Users as UsersIcon,
   Edit,
   Clock,
   Trash2,
   Printer,
+  RefreshCw,
+  Download,
+  FileSpreadsheet,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -27,14 +26,15 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { AttendanceForm } from "@/components/attendance-form"
+import { BulkAttendanceForm } from "@/components/attendance-bulk-form"
 import { AttendancePrint } from "@/components/attendance-print"
+import { AttendanceDashboardStats } from "@/components/attendance-dashboard-stats"
 import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
 import { useApiList, useApiForm, useApiDelete } from "@/lib/hooks/useApi"
-import { attendanceApi, employeesApi, type AttendanceRecord, type AttendanceFilters } from "@/lib/services/api"
+import { attendanceApi, type AttendanceRecord, type AttendanceFilters } from "@/lib/services/api"
 import { useToast } from "@/hooks/use-toast"
 import { Pagination } from "@/components/ui/pagination"
-
 
 const statusColors = {
   present: "bg-green-100 text-green-700 border-green-200",
@@ -63,13 +63,18 @@ export default function AttendancePage() {
   const [currentSort, setCurrentSort] = React.useState("attendance_date")
   const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('desc')
   const [selectedDate, setSelectedDate] = React.useState(new Date().toISOString().split('T')[0])
+  const [dateRangeMode, setDateRangeMode] = React.useState(false)
+  const [dateFrom, setDateFrom] = React.useState('')
+  const [dateTo, setDateTo] = React.useState('')
   const [attendanceSummary, setAttendanceSummary] = React.useState({
     total_staff: 0,
     present: 0,
     absent: 0,
     on_leave: 0,
-    attendance_percentage: 0
+    attendance_percentage: 0,
+    average_working_hours: 0
   })
+  const [loadingSummary, setLoadingSummary] = React.useState(false)
 
   // API hooks
   const {
@@ -85,13 +90,14 @@ export default function AttendancePage() {
     addItem,
     updateItem,
     removeItem,
-    refresh
+    refresh,
+    meta
   } = useApiList<AttendanceRecord>(attendanceApi.list, {
     page: currentPage,
     limit: pageSize,
     sortBy: currentSort,
     sortOrder: sortDirection,
-    date: selectedDate
+    ...(dateRangeMode ? { date_from: dateFrom, date_to: dateTo } : { date: selectedDate })
   })
 
   const { submitForm: createAttendance, loading: createLoading } = useApiForm<AttendanceRecord>()
@@ -99,27 +105,33 @@ export default function AttendancePage() {
   const { deleteItem, loading: deleteLoading } = useApiDelete()
 
   // Load attendance summary
-  React.useEffect(() => {
-    const loadSummary = async () => {
-      try {
-        const response = await attendanceApi.getSummary({ date: selectedDate })
-        if (response.success && response.data) {
-          setAttendanceSummary(response.data)
-        } else {
-          throw new Error(response.error || 'Failed to load attendance summary')
-        }
-      } catch (err) {
-        console.error('Failed to load attendance summary:', err)
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: err instanceof Error ? err.message : "Failed to load attendance summary"
-        })
-        // Keep previous summary data on error (don't clear with null due to TypeScript constraints)
+  const loadSummary = React.useCallback(async () => {
+    setLoadingSummary(true)
+    try {
+      const params = dateRangeMode 
+        ? { date_from: dateFrom, date_to: dateTo }
+        : { date: selectedDate }
+      const response = await attendanceApi.getSummary(params)
+      if (response.success && response.data) {
+        setAttendanceSummary(response.data)
+      } else {
+        throw new Error(response.error || 'Failed to load attendance summary')
       }
+    } catch (err) {
+      console.error('Failed to load attendance summary:', err)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err instanceof Error ? err.message : "Failed to load attendance summary"
+      })
+    } finally {
+      setLoadingSummary(false)
     }
+  }, [selectedDate, dateRangeMode, dateFrom, dateTo, toast])
+
+  React.useEffect(() => {
     loadSummary()
-  }, [selectedDate, toast])
+  }, [loadSummary])
 
   // Handle search with debouncing
   React.useEffect(() => {
@@ -145,26 +157,31 @@ export default function AttendancePage() {
 
   // Handle date filter
   React.useEffect(() => {
-    filter({ date: selectedDate })
-  }, [selectedDate, filter])
+    if (dateRangeMode) {
+      if (dateFrom && dateTo) {
+        filter({ date_from: dateFrom, date_to: dateTo })
+      }
+    } else {
+      filter({ date: selectedDate })
+    }
+  }, [selectedDate, dateRangeMode, dateFrom, dateTo, filter])
 
   const handleAddAttendance = async (attendanceData: any) => {
     try {
       const result = await createAttendance(
         () => attendanceApi.create({
-          user_id: attendanceData.employee_id,
-          attendance_date: attendanceData.date,
+          user_id: attendanceData.user_id,
+          attendance_date: attendanceData.attendance_date,
           status: attendanceData.status,
-          check_in_time: attendanceData.check_in_time,
-          check_out_time: attendanceData.check_out_time,
-          working_hours: attendanceData.working_hours,
-          notes: attendanceData.notes,
-          marked_by: attendanceData.marked_by
+          check_in_time: attendanceData.check_in_time || undefined,
+          check_out_time: attendanceData.check_out_time || undefined,
+          notes: attendanceData.notes || undefined,
         }),
         {
           successMessage: "Attendance marked successfully.",
           onSuccess: (newRecord) => {
             addItem(newRecord)
+            loadSummary() // Refresh summary stats
           }
         }
       )
@@ -173,14 +190,23 @@ export default function AttendancePage() {
     }
   }
 
-  const handleUpdateAttendance = async (recordId: string, values: any) => {
+  const handleUpdateAttendance = async (values: any) => {
+    if (!values.id) return
+    
     try {
       const result = await updateAttendance(
-        () => attendanceApi.update(recordId, values),
+        () => attendanceApi.update(values.id, {
+          attendance_date: values.attendance_date,
+          status: values.status,
+          check_in_time: values.check_in_time || undefined,
+          check_out_time: values.check_out_time || undefined,
+          notes: values.notes || undefined,
+        }),
         {
           successMessage: "Attendance updated successfully.",
           onSuccess: (updatedRecord) => {
-            updateItem(recordId, updatedRecord)
+            updateItem(values.id, updatedRecord)
+            loadSummary() // Refresh summary stats
           }
         }
       )
@@ -190,18 +216,36 @@ export default function AttendancePage() {
   }
 
   const handleDeleteAttendance = async (recordId: string) => {
-    const record = attendanceRecords.find(r => r.id === recordId)
-    if (!record) return
-
     const success = await deleteItem(
       () => attendanceApi.delete(recordId),
       {
-        successMessage: "Attendance record has been deleted successfully.",
+        successMessage: "Attendance record deleted successfully.",
         onSuccess: () => {
           removeItem(recordId)
+          loadSummary() // Refresh summary stats
         }
       }
     )
+  }
+
+  const handleBulkAttendance = async (bulkData: any) => {
+    try {
+      const response = await attendanceApi.bulkCreate(bulkData)
+      if (response.success) {
+        const created = (response.data as any)?.length || 0
+        toast({
+          title: "Success",
+          description: (response as any).message || `Attendance marked for ${created} employee(s)`
+        })
+        refresh() // Refresh the list
+        loadSummary() // Refresh summary stats
+      } else {
+        throw new Error(response.error || 'Failed to mark bulk attendance')
+      }
+    } catch (error) {
+      console.error('Error marking bulk attendance:', error)
+      throw error
+    }
   }
 
   const handleFilterChange = (filters: string[]) => {
@@ -210,10 +254,10 @@ export default function AttendancePage() {
 
     // Collect all status filters
     const statusFilters = filters.filter(f => 
-      ["present", "absent", "sick_leave", "casual_leave", "half_day"].includes(f)
+      ["present", "absent", "sick_leave", "casual_leave", "paid_leave", "half_day"].includes(f)
     )
     if (statusFilters.length > 0) {
-      filterParams.status = statusFilters
+      filterParams.status = statusFilters.join(',')
     }
 
     filter(filterParams)
@@ -225,15 +269,114 @@ export default function AttendancePage() {
     sort(sortBy, direction)
   }
 
-  // TODO: Replace with server-provided aggregate counts from API
-  // Current counts only reflect the current page, not total records
+  const handleRefresh = () => {
+    refresh()
+    loadSummary()
+    toast({
+      title: "Refreshed",
+      description: "Attendance data has been refreshed."
+    })
+  }
+
+  const handleExport = async () => {
+    try {
+      // Fetch all records with current filters (no pagination)
+      const params: any = {
+        limit: 10000, // Large limit to get all records
+        sortBy: currentSort,
+        sortOrder: sortDirection,
+        ...(dateRangeMode ? { date_from: dateFrom, date_to: dateTo } : { date: selectedDate }),
+      }
+      
+      if (searchTerm) params.search = searchTerm
+      if (appliedFilters.length > 0) {
+        params.status = appliedFilters.join(',')
+      }
+      
+      const response = await attendanceApi.list(params)
+      
+      if (!response.success || !response.data) {
+        throw new Error('Failed to fetch attendance data for export')
+      }
+      
+      // Convert to CSV
+      const headers = [
+        'Date',
+        'Employee Name',
+        'Employee ID',
+        'Role',
+        'Department',
+        'Status',
+        'Check-In',
+        'Check-Out',
+        'Hours Worked',
+        'Notes'
+      ]
+      
+      const csvRows = [
+        headers.join(','),
+        ...response.data.map(record => [
+          record.attendance_date,
+          `"${record.employees?.full_name || 'N/A'}"`,
+          record.employees?.employee_id || '',
+          `"${record.employees?.role || ''}"`,
+          `"${record.employees?.department || ''}"`,
+          record.status,
+          record.check_in_time || '',
+          record.check_out_time || '',
+          record.working_hours || '',
+          `"${(record.notes || '').replace(/"/g, '""')}"` // Escape quotes in notes
+        ].join(','))
+      ]
+      
+      const csvContent = csvRows.join('\n')
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const link = document.createElement('a')
+      const url = URL.createObjectURL(blob)
+      
+      const filename = dateRangeMode 
+        ? `attendance_${dateFrom}_to_${dateTo}.csv`
+        : `attendance_${selectedDate}.csv`
+      
+      link.setAttribute('href', url)
+      link.setAttribute('download', filename)
+      link.style.visibility = 'hidden'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      
+      toast({
+        title: "Export Successful",
+        description: `Exported ${response.data.length} attendance records to ${filename}`
+      })
+    } catch (error) {
+      console.error('Export error:', error)
+      toast({
+        variant: "destructive",
+        title: "Export Failed",
+        description: error instanceof Error ? error.message : "Failed to export attendance data"
+      })
+    }
+  }
+
+  // Use server-provided aggregate counts from API
+  const statusCounts = (meta as any)?.statusCounts || {
+    present: 0,
+    absent: 0,
+    sick_leave: 0,
+    casual_leave: 0,
+    paid_leave: 0,
+    half_day: 0
+  }
+  
   const viewOptionsConfig: ViewOptionsConfig = {
     filters: [
-      { id: "present", label: "Present (page)", count: attendanceRecords.filter(r => r.status === "present").length },
-      { id: "absent", label: "Absent (page)", count: attendanceRecords.filter(r => r.status === "absent").length },
-      { id: "sick_leave", label: "Sick Leave (page)", count: attendanceRecords.filter(r => r.status === "sick_leave").length },
-      { id: "casual_leave", label: "Casual Leave (page)", count: attendanceRecords.filter(r => r.status === "casual_leave").length },
-      { id: "half_day", label: "Half Day (page)", count: attendanceRecords.filter(r => r.status === "half_day").length },
+      { id: "present", label: "Present", count: statusCounts.present },
+      { id: "absent", label: "Absent", count: statusCounts.absent },
+      { id: "sick_leave", label: "Sick Leave", count: statusCounts.sick_leave },
+      { id: "casual_leave", label: "Casual Leave", count: statusCounts.casual_leave },
+      { id: "paid_leave", label: "Paid Leave", count: statusCounts.paid_leave },
+      { id: "half_day", label: "Half Day", count: statusCounts.half_day },
     ],
     sortOptions: [
       { id: "attendance_date", label: "Date" },
@@ -241,17 +384,8 @@ export default function AttendancePage() {
       { id: "working_hours", label: "Hours" },
     ],
     showExport: false,
-    showSettings: true,
+    showSettings: false,
   }
-
-  const todayRecords = attendanceRecords.filter(r => r.attendance_date === selectedDate)
-  const presentToday = todayRecords.filter(r => r.status === "present" || r.status === "half_day").length
-  const absentToday = todayRecords.filter(r => r.status === "absent").length
-  const onLeave = todayRecords.filter(r => r.status.includes("leave")).length
-
-  // Calculate month statistics
-  const thisMonthLeaves = attendanceRecords.filter(r => r.status.includes("leave")).length
-  const thisMonthAbsent = attendanceRecords.filter(r => r.status === "absent").length
 
   return (
     <div className="flex flex-col gap-6">
@@ -262,31 +396,102 @@ export default function AttendancePage() {
             Track and manage daily staff attendance
           </p>
         </div>
-        <AttendanceForm>
-          <Button className="gap-2">
-            <Plus className="h-4 w-4" />
-            Mark Attendance
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" onClick={handleRefresh} title="Refresh">
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
-        </AttendanceForm>
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={handleExport} 
+            title="Export to CSV"
+            disabled={loading || attendanceRecords.length === 0}
+          >
+            <Download className="h-4 w-4" />
+          </Button>
+          <BulkAttendanceForm onSubmit={handleBulkAttendance}>
+            <Button variant="outline" className="gap-2">
+              <UsersIcon className="h-4 w-4" />
+              Bulk Mark
+            </Button>
+          </BulkAttendanceForm>
+          <AttendanceForm onSubmit={handleAddAttendance}>
+            <Button className="gap-2">
+              <Plus className="h-4 w-4" />
+              Mark Attendance
+            </Button>
+          </AttendanceForm>
+        </div>
       </div>
 
+      {/* Dashboard Stats */}
+      <AttendanceDashboardStats 
+        stats={attendanceSummary} 
+        loading={loadingSummary}
+        date={dateRangeMode ? undefined : selectedDate}
+        dateRange={dateRangeMode ? { from: dateFrom, to: dateTo } : undefined}
+      />
+
+      {/* Attendance Records Table */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Attendance Records</CardTitle>
               <CardDescription>
-                Daily attendance tracking for all staff members
+                {dateRangeMode 
+                  ? `Viewing ${dateFrom && dateTo ? `${new Date(dateFrom).toLocaleDateString('en-GB')} - ${new Date(dateTo).toLocaleDateString('en-GB')}` : 'date range'}`
+                  : `View and manage attendance for ${selectedDate ? new Date(selectedDate).toLocaleDateString('en-GB') : 'all dates'}`
+                }
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
-              <Input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="w-[150px]"
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setDateRangeMode(!dateRangeMode)
+                  if (!dateRangeMode) {
+                    // Initialize range with current week
+                    const today = new Date()
+                    const weekAgo = new Date(today)
+                    weekAgo.setDate(weekAgo.getDate() - 7)
+                    setDateFrom(weekAgo.toISOString().split('T')[0])
+                    setDateTo(today.toISOString().split('T')[0])
+                  }
+                }}
                 disabled={loading}
-              />
+              >
+                {dateRangeMode ? 'Single Date' : 'Date Range'}
+              </Button>
+              {dateRangeMode ? (
+                <>
+                  <Input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    className="w-[150px]"
+                    disabled={loading}
+                    placeholder="From"
+                  />
+                  <Input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    className="w-[150px]"
+                    disabled={loading}
+                    placeholder="To"
+                  />
+                </>
+              ) : (
+                <Input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="w-[150px]"
+                  disabled={loading}
+                />
+              )}
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -307,18 +512,6 @@ export default function AttendancePage() {
                 onViewChange={() => {}}
                 onFilterChange={handleFilterChange}
                 onSortChange={handleSortChange}
-                onExport={() => {
-                  toast({
-                    title: "Export feature",
-                    description: "Attendance export functionality coming soon."
-                  })
-                }}
-                onSettings={() => {
-                  toast({
-                    title: "Settings",
-                    description: "Attendance settings functionality coming soon."
-                  })
-                }}
               />
             </div>
           </div>
@@ -330,6 +523,7 @@ export default function AttendancePage() {
                 <TableRow>
                   <TableHead>DATE</TableHead>
                   <TableHead>STAFF NAME</TableHead>
+                  <TableHead>EMPLOYEE ID</TableHead>
                   <TableHead>ROLE</TableHead>
                   <TableHead>STATUS</TableHead>
                   <TableHead>CHECK-IN</TableHead>
@@ -341,14 +535,14 @@ export default function AttendancePage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       Loading attendance records...
                     </TableCell>
                   </TableRow>
                 ) : attendanceRecords.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                      No attendance records found
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      No attendance records found for this date
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -357,11 +551,16 @@ export default function AttendancePage() {
                       <TableCell className="text-sm">
                         {new Date(record.attendance_date).toLocaleDateString('en-GB')}
                       </TableCell>
-                      <TableCell className="font-medium uppercase">
+                      <TableCell className="font-medium">
                         {record.employees?.full_name || 'N/A'}
                       </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {record.employees?.employee_id || '-'}
+                      </TableCell>
                       <TableCell>
-                        <Badge variant="secondary">{record.employees?.role || 'N/A'}</Badge>
+                        <Badge variant="secondary" className="text-xs">
+                          {record.employees?.role || 'N/A'}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <Badge
@@ -405,8 +604,17 @@ export default function AttendancePage() {
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <AttendanceForm
-                            attendanceData={record}
+                            attendanceData={{
+                              id: record.id,
+                              user_id: record.user_id,
+                              attendance_date: record.attendance_date,
+                              status: record.status,
+                              check_in_time: record.check_in_time,
+                              check_out_time: record.check_out_time,
+                              notes: record.notes
+                            }}
                             mode="edit"
+                            onSubmit={handleUpdateAttendance}
                           >
                             <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit">
                               <Edit className="h-4 w-4" />
@@ -424,7 +632,7 @@ export default function AttendancePage() {
                             department: record.employees?.role,
                             notes: record.notes
                           }}>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" title="Print Attendance">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" title="Print">
                               <Printer className="h-4 w-4" />
                             </Button>
                           </AttendancePrint>
@@ -461,4 +669,3 @@ export default function AttendancePage() {
     </div>
   )
 }
-

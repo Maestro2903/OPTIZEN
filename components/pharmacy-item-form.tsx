@@ -41,14 +41,14 @@ const pharmacyItemSchema = z.object({
   category: z.string().min(1, "Category is required"),
   manufacturer: z.string().optional(),
   supplier: z.string().optional(),
-  unit_price: z.string().min(1, "Unit price is required"),
-  mrp: z.string().min(1, "MRP is required"),
-  stock_quantity: z.string().min(1, "Stock quantity is required"),
-  reorder_level: z.string().min(1, "Reorder level is required"),
+  unit_price: z.number().min(0, "Unit price must be non-negative"),
+  mrp: z.number().min(0, "MRP must be non-negative"),
+  stock_quantity: z.number().min(0, "Stock quantity must be non-negative"),
+  reorder_level: z.number().min(0, "Reorder level must be non-negative"),
   batch_number: z.string().optional(),
   expiry_date: z.string().optional(),
   hsn_code: z.string().optional(),
-  gst_percentage: z.string().optional(),
+  gst_percentage: z.number().optional(),
   prescription_required: z.boolean(),
   dosage_form: z.string().optional(),
   strength: z.string().optional(),
@@ -77,14 +77,14 @@ export function PharmacyItemForm({ children, itemData, mode = "create", onSubmit
       category: itemData?.category || "",
       manufacturer: itemData?.manufacturer || "",
       supplier: itemData?.supplier || "",
-      unit_price: itemData?.unit_price?.toString() || "",
-      mrp: itemData?.mrp?.toString() || "",
-      stock_quantity: itemData?.stock_quantity?.toString() || "0",
-      reorder_level: itemData?.reorder_level?.toString() || "10",
+      unit_price: itemData?.unit_price || 0,
+      mrp: itemData?.mrp || 0,
+      stock_quantity: itemData?.stock_quantity || 0,
+      reorder_level: itemData?.reorder_level || 10,
       batch_number: itemData?.batch_number || "",
       expiry_date: itemData?.expiry_date || "",
       hsn_code: itemData?.hsn_code || "",
-      gst_percentage: itemData?.gst_percentage?.toString() || "12",
+      gst_percentage: itemData?.gst_percentage || 0,
       prescription_required: itemData?.prescription_required || false,
       dosage_form: itemData?.dosage_form || "",
       strength: itemData?.strength || "",
@@ -325,7 +325,13 @@ export function PharmacyItemForm({ children, itemData, mode = "create", onSubmit
                   <FormItem>
                     <FormLabel>Unit Price (₹) *</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" placeholder="50.00" {...field} />
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        placeholder="50.00" 
+                        {...field}
+                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -338,7 +344,13 @@ export function PharmacyItemForm({ children, itemData, mode = "create", onSubmit
                   <FormItem>
                     <FormLabel>MRP (₹) *</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" placeholder="60.00" {...field} />
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        placeholder="60.00" 
+                        {...field}
+                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -351,7 +363,13 @@ export function PharmacyItemForm({ children, itemData, mode = "create", onSubmit
                   <FormItem>
                     <FormLabel>GST %</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" placeholder="12" {...field} />
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        placeholder="12" 
+                        {...field}
+                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -367,7 +385,12 @@ export function PharmacyItemForm({ children, itemData, mode = "create", onSubmit
                   <FormItem>
                     <FormLabel>Stock Quantity *</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="100" {...field} />
+                      <Input 
+                        type="number" 
+                        placeholder="100" 
+                        {...field}
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -380,7 +403,12 @@ export function PharmacyItemForm({ children, itemData, mode = "create", onSubmit
                   <FormItem>
                     <FormLabel>Reorder Level *</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="10" {...field} />
+                      <Input 
+                        type="number" 
+                        placeholder="10" 
+                        {...field}
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

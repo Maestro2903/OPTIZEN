@@ -71,13 +71,19 @@ export function AttendanceForm({ children, attendanceData, mode = "create", onSu
 
   const selectedStatus = form.watch("status")
 
-  // Load staff members from employees API
+  // Load staff members from employees API with search
+  const [staffSearch, setStaffSearch] = React.useState("")
+  
   React.useEffect(() => {
     const loadStaff = async () => {
       if (!isOpen) return
       setLoadingStaff(true)
       try {
-        const response = await employeesApi.list({ status: 'active', limit: 1000 })
+        const response = await employeesApi.list({ 
+          is_active: true, 
+          limit: 50,
+          search: staffSearch || undefined
+        })
         if (response.success && response.data) {
           setStaffMembers(
             response.data.map((employee) => ({
@@ -97,8 +103,14 @@ export function AttendanceForm({ children, attendanceData, mode = "create", onSu
         setLoadingStaff(false)
       }
     }
-    loadStaff()
-  }, [isOpen, toast])
+    
+    // Debounce the search
+    const timeoutId = setTimeout(() => {
+      loadStaff()
+    }, 300)
+    
+    return () => clearTimeout(timeoutId)
+  }, [isOpen, staffSearch, toast])
 
   async function onSubmit(values: z.infer<typeof attendanceSchema>) {
     try {
@@ -114,16 +126,13 @@ export function AttendanceForm({ children, attendanceData, mode = "create", onSu
       await onSubmitProp(values)
       setIsOpen(false)
       form.reset()
-      toast({
-        title: "Success",
-        description: mode === "edit" ? "Attendance updated successfully." : "Attendance marked successfully."
-      })
     } catch (error) {
       console.error("Error submitting attendance:", error)
+      const errorMessage = error instanceof Error ? error.message : "Failed to save attendance"
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to save attendance. Please try again."
+        description: errorMessage
       })
     }
   }
