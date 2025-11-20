@@ -784,7 +784,7 @@ export default function BedsPage() {
                     ) : (
                       filteredBeds.map(({ bed, assignment }) => {
                         const statusStyle = getBedStatusStyle(bed.status)
-                        const StatusIcon = statusStyle.icon
+                        const StatusIcon = 'icon' in statusStyle ? statusStyle.icon : undefined
                         const isOutOfService = bed.status === 'maintenance' || bed.status === 'cleaning'
 
                         return (
