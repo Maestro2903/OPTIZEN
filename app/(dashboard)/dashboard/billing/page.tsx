@@ -16,11 +16,20 @@ import {
   CheckCircle,
   XCircle,
   Printer,
+  MoreHorizontal,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   Table,
   TableBody,
@@ -48,10 +57,53 @@ const statusColors = {
   cancelled: "bg-orange-100 text-orange-700 border-orange-200",
 }
 
-const paymentStatusColors = {
-  paid: "bg-green-100 text-green-700 border-green-200",
-  partial: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  unpaid: "bg-red-100 text-red-700 border-red-200",
+const paymentStatusStyles: Record<
+  string,
+  { bg: string; text: string; dot: string }
+> = {
+  paid: {
+    bg: "bg-emerald-50",
+    text: "text-emerald-700",
+    dot: "bg-emerald-500",
+  },
+  partial: {
+    bg: "bg-amber-50",
+    text: "text-amber-700",
+    dot: "bg-amber-500",
+  },
+  unpaid: {
+    bg: "bg-red-50",
+    text: "text-red-700",
+    dot: "bg-red-500",
+  },
+  overdue: {
+    bg: "bg-rose-50",
+    text: "text-rose-700",
+    dot: "bg-rose-500",
+  },
+}
+
+const dateFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+})
+
+const formatInvoiceDate = (dateString?: string | null) => {
+  if (!dateString) return "-"
+  const date = new Date(dateString)
+  return isNaN(date.getTime()) ? "-" : dateFormatter.format(date)
+}
+
+const getPatientInitials = (name?: string | null) => {
+  if (!name) return "PT"
+  const initials = name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("")
+  return initials || "PT"
 }
 
 export default function BillingPage() {
@@ -362,23 +414,24 @@ export default function BillingPage() {
   const pendingAmount = invoices.reduce((sum, invoice) => sum + invoice.balance_due, 0)
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Billing & Invoices</h1>
-          <p className="text-muted-foreground">
-            Manage patient billing and invoice records
-          </p>
+    <div className="min-h-screen bg-slate-50 px-5 py-6">
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight font-jakarta">Billing & Invoices</h1>
+            <p className="text-muted-foreground">
+              Manage patient billing and invoice records
+            </p>
+          </div>
+          <InvoiceForm onSubmit={handleAddInvoice}>
+            <Button className="gap-2 rounded-lg bg-indigo-600 text-white shadow-md transition hover:bg-indigo-700">
+              <Receipt className="h-4 w-4" />
+              Create Invoice
+            </Button>
+          </InvoiceForm>
         </div>
-        <InvoiceForm onSubmit={handleAddInvoice}>
-          <Button className="gap-2">
-            <Plus className="h-4 w-4" />
-            Create Invoice
-          </Button>
-        </InvoiceForm>
-      </div>
 
-      <Card>
+        <Card className="rounded-xl border border-gray-200 bg-white shadow-sm">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -428,17 +481,16 @@ export default function BillingPage() {
           <div className="rounded-md border">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>INVOICE NO.</TableHead>
-                  <TableHead>PATIENT ID</TableHead>
-                  <TableHead>PATIENT</TableHead>
-                  <TableHead>DATE</TableHead>
-                  <TableHead>AMOUNT</TableHead>
-                  <TableHead>PAID</TableHead>
-                  <TableHead>BALANCE</TableHead>
-                  <TableHead>STATUS</TableHead>
-                  <TableHead>PAYMENT</TableHead>
-                  <TableHead>ACTIONS</TableHead>
+                <TableRow className="bg-gray-50">
+                  <TableHead className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Invoice No.</TableHead>
+                  <TableHead className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Patient</TableHead>
+                  <TableHead className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Date</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Amount</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Paid</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Balance</TableHead>
+                  <TableHead className="text-center text-xs font-semibold uppercase tracking-wide text-gray-500">Status</TableHead>
+                  <TableHead className="text-center text-xs font-semibold uppercase tracking-wide text-gray-500">Payment</TableHead>
+                  <TableHead className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -457,58 +509,96 @@ export default function BillingPage() {
                 ) : (
                   invoices.map((invoice) => (
                     <TableRow key={invoice.id}>
-                      <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
-                      <TableCell className="font-mono text-sm font-semibold text-primary">{invoice.patients?.patient_id || '-'}</TableCell>
-                      <TableCell className="font-medium uppercase">{invoice.patients?.full_name || '-'}</TableCell>
-                      <TableCell>{new Date(invoice.invoice_date).toLocaleDateString('en-GB')}</TableCell>
-                      <TableCell>₹{invoice.total_amount.toLocaleString()}</TableCell>
-                      <TableCell>₹{invoice.amount_paid.toLocaleString()}</TableCell>
-                      <TableCell>₹{invoice.balance_due.toLocaleString()}</TableCell>
+                      <TableCell className="font-mono text-xs text-gray-700">{invoice.invoice_number}</TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className={`capitalize ${statusColors[invoice.status as keyof typeof statusColors] || ''}`}>
-                          {invoice.status}
-                        </Badge>
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={invoice.patients?.avatar_url || undefined} alt={invoice.patients?.full_name || "Patient"} />
+                            <AvatarFallback>{getPatientInitials(invoice.patients?.full_name)}</AvatarFallback>
+                          </Avatar>
+                          <div className="space-y-0.5">
+                            <div className="text-sm font-medium text-gray-900">
+                              {invoice.patients?.full_name || "Unknown Patient"}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {invoice.patients?.patient_id || "N/A"}
+                            </div>
+                          </div>
+                        </div>
                       </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className={`capitalize ${paymentStatusColors[invoice.payment_status as keyof typeof paymentStatusColors] || ''}`}>
-                          {invoice.payment_status}
-                        </Badge>
+                      <TableCell className="text-sm text-gray-600">{formatInvoiceDate(invoice.invoice_date)}</TableCell>
+                      <TableCell className="text-right font-mono tabular-nums text-sm font-semibold text-gray-900">
+                        ₹{invoice.total_amount.toLocaleString()}
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
+                      <TableCell
+                        className={`text-right font-mono tabular-nums text-sm font-medium ${
+                          invoice.amount_paid > 0 ? "text-emerald-600" : "text-gray-400"
+                        }`}
+                      >
+                        ₹{invoice.amount_paid.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {invoice.balance_due > 0 ? (
+                          <span className="font-mono tabular-nums text-sm font-medium text-red-600">
+                            ₹{invoice.balance_due.toLocaleString()}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center justify-end gap-1 font-mono text-sm text-gray-400">
+                            <CheckCircle className="h-4 w-4 text-emerald-500" />
+                            Paid
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {invoice.status && invoice.status !== "active" ? (
+                          invoice.status === "cancelled" ? (
+                            <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-gray-600 line-through">
+                              {invoice.status}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full border border-gray-200 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-gray-600">
+                              {invoice.status}
+                            </span>
+                          )
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {(() => {
+                          const paymentStyle =
+                            paymentStatusStyles[invoice.payment_status] || {
+                              bg: "bg-slate-100",
+                              text: "text-slate-700",
+                              dot: "bg-slate-400",
+                            }
+                          return (
+                            <span
+                              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold capitalize ${paymentStyle.bg} ${paymentStyle.text}`}
+                            >
+                              <span
+                                className={`h-2.5 w-2.5 rounded-full ${paymentStyle.dot}`}
+                              />
+                              {invoice.payment_status}
+                            </span>
+                          )
+                        })()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-3">
                           <InvoiceViewDialog invoice={invoice}>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8"
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-9 w-9 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900"
                               title="View invoice"
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
                           </InvoiceViewDialog>
-                          <InvoiceForm 
-                            mode="edit" 
-                            invoiceData={invoice}
-                            onSubmit={(data) => handleUpdateInvoice(invoice.id, data)}
-                          >
-                            <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit invoice">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          </InvoiceForm>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8"
-                            onClick={() => handleDownloadInvoice(invoice)}
-                            title="Download invoice as HTML"
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
                           <BillingPrint
                             billing={{
                               id: invoice.id,
                               invoice_no: invoice.invoice_number,
-                              patient_name: invoice.patients?.full_name || 'Unknown Patient',
+                              patient_name: invoice.patients?.full_name || "Unknown Patient",
                               patient_id: invoice.patient_id,
                               date: invoice.invoice_date,
                               total_amount: invoice.total_amount,
@@ -518,40 +608,71 @@ export default function BillingPage() {
                               discount_amount: invoice.discount_amount,
                               payment_method: invoice.payment_method,
                               due_date: invoice.due_date,
-                              notes: invoice.notes
+                              notes: invoice.notes,
                             }}
                           >
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8"
-                              title="Print Invoice"
+                              className="h-9 w-9 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                              title="Print invoice"
                             >
                               <Printer className="h-4 w-4" />
                             </Button>
                           </BillingPrint>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => {
-                              if (window.confirm(`Mark invoice ${invoice.invoice_number} as paid?`)) {
-                                handleUpdateInvoice(invoice.id, { payment_status: 'paid', status: 'paid' })
-                              }
-                            }}
-                            title="Mark as paid"
-                          >
-                            <CheckCircle className="h-4 w-4 text-green-600" />
-                          </Button>
-                          <DeleteConfirmDialog
-                            title="Delete Invoice"
-                            description={`Are you sure you want to delete invoice ${invoice.invoice_number}? This action cannot be undone.`}
-                            onConfirm={() => handleDeleteInvoice(invoice.id)}
-                          >
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </DeleteConfirmDialog>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-9 w-9 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                                title="More actions"
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48 rounded-lg border border-gray-100 shadow-lg">
+                              <DropdownMenuLabel className="text-xs uppercase text-gray-400">Invoice Actions</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <InvoiceForm
+                                mode="edit"
+                                invoiceData={invoice}
+                                onSubmit={(data) => handleUpdateInvoice(invoice.id, data)}
+                              >
+                                <DropdownMenuItem className="cursor-pointer text-gray-700">
+                                  <Edit className="h-4 w-4" />
+                                  Edit invoice
+                                </DropdownMenuItem>
+                              </InvoiceForm>
+                              <DropdownMenuItem
+                                className="cursor-pointer text-gray-700"
+                                onSelect={() => handleDownloadInvoice(invoice)}
+                              >
+                                <Download className="h-4 w-4" />
+                                Download HTML
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="cursor-pointer text-emerald-600 focus:text-emerald-700"
+                                onSelect={() =>
+                                  handleUpdateInvoice(invoice.id, { payment_status: "paid", status: "paid" })
+                                }
+                              >
+                                <CheckCircle className="h-4 w-4" />
+                                Mark as paid
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DeleteConfirmDialog
+                                title="Delete Invoice"
+                                description={`Are you sure you want to delete invoice ${invoice.invoice_number}? This action cannot be undone.`}
+                                onConfirm={() => handleDeleteInvoice(invoice.id)}
+                              >
+                                <DropdownMenuItem className="cursor-pointer text-red-600 focus:text-red-700">
+                                  <Trash2 className="h-4 w-4" />
+                                  Delete invoice
+                                </DropdownMenuItem>
+                              </DeleteConfirmDialog>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -572,7 +693,8 @@ export default function BillingPage() {
             }}
           />
         </CardContent>
-      </Card>
+        </Card>
+      </div>
     </div>
   )
 }

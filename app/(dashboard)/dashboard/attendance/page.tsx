@@ -11,7 +11,8 @@ import {
   Printer,
   RefreshCw,
   Download,
-  FileSpreadsheet,
+  CheckCircle,
+  CalendarClock,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -36,22 +37,50 @@ import { attendanceApi, type AttendanceRecord, type AttendanceFilters } from "@/
 import { useToast } from "@/hooks/use-toast"
 import { Pagination } from "@/components/ui/pagination"
 
-const statusColors = {
-  present: "bg-green-100 text-green-700 border-green-200",
-  absent: "bg-red-100 text-red-700 border-red-200",
-  sick_leave: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  casual_leave: "bg-blue-100 text-blue-700 border-blue-200",
-  paid_leave: "bg-purple-100 text-purple-700 border-purple-200",
-  half_day: "bg-orange-100 text-orange-700 border-orange-200",
-}
+const statusStyles = {
+  present: {
+    badge: "bg-emerald-50 text-emerald-700 border border-emerald-100",
+    dot: "bg-emerald-500",
+  },
+  absent: {
+    badge: "bg-rose-50 text-rose-700 border border-rose-100",
+    dot: "bg-rose-500",
+  },
+  late: {
+    badge: "bg-amber-50 text-amber-700 border border-amber-100",
+    dot: "bg-amber-500",
+  },
+  half_day: {
+    badge: "bg-purple-50 text-purple-700 border border-purple-100",
+    dot: "bg-purple-500",
+  },
+  on_leave: {
+    badge: "bg-blue-50 text-blue-700 border border-blue-100",
+    dot: "bg-blue-500",
+  },
+  sick_leave: {
+    badge: "bg-blue-50 text-blue-700 border border-blue-100",
+    dot: "bg-blue-500",
+  },
+  casual_leave: {
+    badge: "bg-blue-50 text-blue-700 border border-blue-100",
+    dot: "bg-blue-500",
+  },
+  paid_leave: {
+    badge: "bg-blue-50 text-blue-700 border border-blue-100",
+    dot: "bg-blue-500",
+  },
+} as const
 
 const statusLabels = {
   present: "Present",
   absent: "Absent",
+  late: "Late",
+  half_day: "Half Day",
+  on_leave: "On Leave",
   sick_leave: "Sick Leave",
   casual_leave: "Casual Leave",
   paid_leave: "Paid Leave",
-  half_day: "Half Day",
 }
 
 export default function AttendancePage() {
@@ -278,6 +307,13 @@ export default function AttendancePage() {
     })
   }
 
+  const getInitials = (name?: string | null) => {
+    if (!name) return "NA"
+    const parts = name.trim().split(" ").filter(Boolean)
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+  }
+
   const handleExport = async () => {
     try {
       // Fetch all records with current filters (no pagination)
@@ -388,16 +424,23 @@ export default function AttendancePage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="min-h-screen bg-slate-50 p-6">
+      <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Staff Attendance</h1>
+          <h1 className="text-3xl font-bold tracking-tight font-jakarta">Staff Attendance</h1>
           <p className="text-muted-foreground">
             Track and manage daily staff attendance
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={handleRefresh} title="Refresh">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleRefresh}
+            title="Refresh"
+            className="h-10 w-10 rounded-lg border border-gray-200 bg-white text-gray-500 shadow-none hover:border-indigo-200 hover:text-indigo-600"
+          >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
           <Button 
@@ -406,18 +449,22 @@ export default function AttendancePage() {
             onClick={handleExport} 
             title="Export to CSV"
             disabled={loading || attendanceRecords.length === 0}
+            className="h-10 w-10 rounded-lg border border-gray-200 bg-white text-gray-500 shadow-none hover:border-indigo-200 hover:text-indigo-600"
           >
             <Download className="h-4 w-4" />
           </Button>
           <BulkAttendanceForm onSubmit={handleBulkAttendance}>
-            <Button variant="outline" className="gap-2">
+            <Button
+              variant="outline"
+              className="gap-2 rounded-lg border border-gray-300 bg-white text-gray-700 shadow-sm hover:bg-gray-50"
+            >
               <UsersIcon className="h-4 w-4" />
               Bulk Mark
             </Button>
           </BulkAttendanceForm>
           <AttendanceForm onSubmit={handleAddAttendance}>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
+            <Button className="gap-2 rounded-lg bg-indigo-600 text-white shadow-md hover:bg-indigo-700">
+              <CheckCircle className="h-4 w-4" />
               Mark Attendance
             </Button>
           </AttendanceForm>
@@ -433,8 +480,8 @@ export default function AttendancePage() {
       />
 
       {/* Attendance Records Table */}
-      <Card>
-        <CardHeader>
+      <Card className="rounded-xl border border-gray-200 bg-white shadow-sm">
+        <CardHeader className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Attendance Records</CardTitle>
@@ -520,16 +567,31 @@ export default function AttendancePage() {
           <div className="rounded-md border">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>DATE</TableHead>
-                  <TableHead>STAFF NAME</TableHead>
-                  <TableHead>EMPLOYEE ID</TableHead>
-                  <TableHead>ROLE</TableHead>
-                  <TableHead>STATUS</TableHead>
-                  <TableHead>CHECK-IN</TableHead>
-                  <TableHead>CHECK-OUT</TableHead>
-                  <TableHead>HOURS</TableHead>
-                  <TableHead>ACTION</TableHead>
+                <TableRow className="bg-gray-50 border-b">
+                  <TableHead className="text-left text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                    DATE
+                  </TableHead>
+                  <TableHead className="text-left text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                    EMPLOYEE
+                  </TableHead>
+                  <TableHead className="text-left text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                    ROLE
+                  </TableHead>
+                  <TableHead className="text-center text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                    STATUS
+                  </TableHead>
+                  <TableHead className="text-center text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                    CHECK-IN
+                  </TableHead>
+                  <TableHead className="text-center text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                    CHECK-OUT
+                  </TableHead>
+                  <TableHead className="text-right text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                    HOURS
+                  </TableHead>
+                  <TableHead className="text-left text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                    ACTION
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -541,8 +603,27 @@ export default function AttendancePage() {
                   </TableRow>
                 ) : attendanceRecords.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                      No attendance records found for this date
+                    <TableCell colSpan={9} className="p-0">
+                      <div className="min-h-[400px] w-full px-6 py-12 text-center">
+                        <div className="flex h-full flex-col items-center justify-center gap-5">
+                          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gray-100 text-gray-400">
+                            <CalendarClock className="h-10 w-10" />
+                          </div>
+                          <div className="space-y-2">
+                            <p className="text-lg font-medium text-gray-900">No Records for Today</p>
+                            <p className="text-sm text-gray-500">
+                              Nobody has checked in yet, or the date filter is empty.
+                            </p>
+                          </div>
+                          <AttendanceForm onSubmit={handleAddAttendance}>
+                            <Button
+                              className="rounded-lg bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-100"
+                            >
+                              Mark Attendance Now
+                            </Button>
+                          </AttendanceForm>
+                        </div>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -551,24 +632,41 @@ export default function AttendancePage() {
                       <TableCell className="text-sm">
                         {new Date(record.attendance_date).toLocaleDateString('en-GB')}
                       </TableCell>
-                      <TableCell className="font-medium">
-                        {record.employees?.full_name || 'N/A'}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {record.employees?.employee_id || '-'}
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-50 text-sm font-semibold text-indigo-600">
+                            {getInitials(record.employees?.full_name)}
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {record.employees?.full_name || 'N/A'}
+                            </div>
+                            <div className="font-mono text-xs text-gray-500">
+                              {record.employees?.employee_id || '-'}
+                            </div>
+                          </div>
+                        </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className="text-xs">
+                        <span className="rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-600">
                           {record.employees?.role || 'N/A'}
-                        </Badge>
+                        </span>
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={statusColors[record.status as keyof typeof statusColors]}
-                        >
-                          {statusLabels[record.status as keyof typeof statusLabels]}
-                        </Badge>
+                        {(() => {
+                          const statusKey = record.status as keyof typeof statusStyles
+                          const badgeClasses =
+                            statusStyles[statusKey]?.badge || "bg-slate-100 text-slate-700 border border-slate-200"
+                          const dotClasses = statusStyles[statusKey]?.dot || "bg-slate-400"
+                          return (
+                            <Badge
+                              className={`flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${badgeClasses}`}
+                            >
+                              <span className={`h-2 w-2 rounded-full ${dotClasses}`} />
+                              {statusLabels[statusKey] || record.status}
+                            </Badge>
+                          )
+                        })()}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
@@ -596,7 +694,17 @@ export default function AttendancePage() {
                       </TableCell>
                       <TableCell>
                         {record.working_hours && record.working_hours > 0 ? (
-                          <span className="font-semibold">{record.working_hours}h</span>
+                          <span
+                            className={`font-semibold ${
+                              record.working_hours < 8
+                                ? "text-amber-600"
+                                : record.working_hours > 9
+                                  ? "text-emerald-600"
+                                  : "text-gray-900"
+                            }`}
+                          >
+                            {record.working_hours}h
+                          </span>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
@@ -616,7 +724,12 @@ export default function AttendancePage() {
                             mode="edit"
                             onSubmit={handleUpdateAttendance}
                           >
-                            <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-full text-gray-500 hover:bg-blue-50 hover:text-blue-600"
+                              title="Edit"
+                            >
                               <Edit className="h-4 w-4" />
                             </Button>
                           </AttendanceForm>
@@ -641,7 +754,11 @@ export default function AttendancePage() {
                             description="Are you sure you want to delete this attendance record? This action cannot be undone."
                             onConfirm={() => handleDeleteAttendance(record.id)}
                           >
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-full text-gray-500 hover:bg-rose-50 hover:text-rose-600"
+                            >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </DeleteConfirmDialog>
@@ -666,6 +783,7 @@ export default function AttendancePage() {
           />
         </CardContent>
       </Card>
+    </div>
     </div>
   )
 }

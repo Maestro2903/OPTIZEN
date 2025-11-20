@@ -1,21 +1,7 @@
 "use client"
 
 import * as React from "react"
-import {
-  Plus,
-  Search,
-  Filter,
-  Pill,
-  Package,
-  AlertTriangle,
-  TrendingDown,
-  Eye,
-  Edit,
-  Trash2,
-  ShoppingCart,
-  Calendar,
-  Printer,
-} from "lucide-react"
+import { Search, Pill, Eye, Edit, Trash2, Printer, AlertTriangle, Calendar, Snowflake } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -87,13 +73,17 @@ const pharmacyItemSchema = z.object({
   image_url: z.string().optional(),
 })
 
-const categoryColors = {
-  antibiotics: "bg-red-100 text-red-700 border-red-200",
-  analgesics: "bg-blue-100 text-blue-700 border-blue-200",
-  antihistamines: "bg-green-100 text-green-700 border-green-200",
-  supplements: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  other: "bg-gray-100 text-gray-700 border-gray-200",
-}
+const categoryBadgeStyles = {
+  antibiotics: "bg-rose-50 text-rose-700 border border-rose-100",
+  analgesics: "bg-amber-50 text-amber-700 border border-amber-100",
+  antihistamines: "bg-purple-50 text-purple-700 border border-purple-100",
+  supplements: "bg-emerald-50 text-emerald-700 border border-emerald-100",
+  other: "bg-slate-50 text-slate-700 border border-slate-100",
+} as const
+
+const THREE_MONTHS_IN_MS = 1000 * 60 * 60 * 24 * 90
+const refrigerationCategories = ["antihistamines", "supplements"]
+const refrigerationKeywords = [/refrigerat/i, /cold storage/i, /keep chilled/i]
 
 export default function PharmacyPage() {
   const { toast } = useToast()
@@ -361,36 +351,40 @@ export default function PharmacyPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Pharmacy Inventory</h1>
-          <p className="text-muted-foreground">
-            Manage medical supplies and pharmacy stock
-          </p>
-        </div>
-        <Dialog open={isDialogOpen} onOpenChange={(open) => {
-          setIsDialogOpen(open)
-          if (!open) {
-            setEditingItem(null)
-            form.reset()
-          }
-        }}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add Item
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>{editingItem ? "Edit Item" : "Add New Item"}</DialogTitle>
-              <DialogDescription>
-                {editingItem ? "Update item information" : "Add a new item to the pharmacy inventory"}
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+    <div className="min-h-screen bg-slate-50 p-6">
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight font-jakarta">Pharmacy Inventory</h1>
+            <p className="text-muted-foreground">
+              Manage medical supplies and pharmacy stock
+            </p>
+          </div>
+          <Dialog
+            open={isDialogOpen}
+            onOpenChange={(open) => {
+              setIsDialogOpen(open)
+              if (!open) {
+                setEditingItem(null)
+                form.reset()
+              }
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button className="gap-2 rounded-lg bg-emerald-600 text-white shadow-md transition-colors hover:bg-emerald-700">
+                <Pill className="h-4 w-4" />
+                Add Item
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>{editingItem ? "Edit Item" : "Add New Item"}</DialogTitle>
+                <DialogDescription>
+                  {editingItem ? "Update item information" : "Add a new item to the pharmacy inventory"}
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -600,175 +594,265 @@ export default function PharmacyPage() {
           </DialogContent>
         </Dialog>
       </div>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Inventory Management</CardTitle>
-              <CardDescription>
-                View and manage all pharmacy items and stock levels
-              </CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search items..."
-                  className="pl-8 w-[300px]"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  disabled={loading}
+        <Card className="rounded-xl border border-slate-100 bg-white shadow-sm">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Inventory Management</CardTitle>
+                <CardDescription>
+                  View and manage all pharmacy items and stock levels
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    placeholder="Search items..."
+                    className="w-[300px] pl-8"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+                <ViewOptions
+                  config={viewOptionsConfig}
+                  currentView="list"
+                  appliedFilters={appliedFilters}
+                  currentSort={currentSort}
+                  sortDirection={sortDirection}
+                  onViewChange={() => {}}
+                  onFilterChange={handleFilterChange}
+                  onSortChange={handleSortChange}
+                  onExport={() => {}}
+                  onSettings={() => {}}
                 />
               </div>
-              <ViewOptions
-                config={viewOptionsConfig}
-                currentView="list"
-                appliedFilters={appliedFilters}
-                currentSort={currentSort}
-                sortDirection={sortDirection}
-                onViewChange={() => {}}
-                onFilterChange={handleFilterChange}
-                onSortChange={handleSortChange}
-                onExport={() => {}}
-                onSettings={() => {}}
-              />
             </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ITEM NAME</TableHead>
-                  <TableHead>CATEGORY</TableHead>
-                  <TableHead>STOCK</TableHead>
-                  <TableHead>UNIT PRICE</TableHead>
-                  <TableHead>MRP</TableHead>
-                  <TableHead>BATCH</TableHead>
-                  <TableHead>EXPIRY</TableHead>
-                  <TableHead>STATUS</TableHead>
-                  <TableHead>ACTIONS</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                      Loading inventory...
-                    </TableCell>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border bg-white">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50">
+                    <TableHead className="text-left text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                      ITEM NAME
+                    </TableHead>
+                    <TableHead className="text-left text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                      CATEGORY
+                    </TableHead>
+                    <TableHead className="text-right text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                      STOCK
+                    </TableHead>
+                    <TableHead className="text-right text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                      UNIT PRICE
+                    </TableHead>
+                    <TableHead className="text-right text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                      MRP
+                    </TableHead>
+                    <TableHead className="text-left text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                      BATCH
+                    </TableHead>
+                    <TableHead className="text-left text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                      EXPIRY
+                    </TableHead>
+                    <TableHead className="text-center text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                      STATUS
+                    </TableHead>
+                    <TableHead className="text-center text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                      ACTIONS
+                    </TableHead>
                   </TableRow>
-                ) : pharmacyItems.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                      No items found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  pharmacyItems.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-medium">
-                        <div>
-                          <div className="font-semibold">{item.name}</div>
-                          {item.generic_name && <div className="text-sm text-muted-foreground">{item.generic_name}</div>}
-                        </div>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
+                        Loading inventory...
                       </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className={`capitalize ${categoryColors[item.category as keyof typeof categoryColors] || ''}`}>
-                          {item.category}
-                        </Badge>
+                    </TableRow>
+                  ) : pharmacyItems.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
+                        No items found
                       </TableCell>
-                      <TableCell>
-                        <div className="font-medium">{item.stock_quantity}</div>
-                        <div className="text-sm text-muted-foreground">Reorder: {item.reorder_level}</div>
-                      </TableCell>
-                      <TableCell>₹{item.unit_price.toFixed(2)}</TableCell>
-                      <TableCell>₹{item.mrp.toFixed(2)}</TableCell>
-                      <TableCell>{item.batch_number || '-'}</TableCell>
-                      <TableCell>
-                        {item.expiry_date ? new Date(item.expiry_date).toLocaleDateString('en-GB') : '-'}
-                      </TableCell>
-                      <TableCell>
-                        {item.stock_quantity <= item.reorder_level ? (
-                          <Badge variant="destructive">Low Stock</Badge>
-                        ) : (
-                          <Badge variant="secondary">In Stock</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <PharmacyViewDialog item={item}>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </PharmacyViewDialog>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => handleEdit(item)}
+                    </TableRow>
+                  ) : (
+                    pharmacyItems.map((item) => {
+                      const isLowStock = item.stock_quantity < item.reorder_level
+                      const needsRefrigeration =
+                        refrigerationCategories.includes(item.category) ||
+                        (item.storage_instructions
+                          ? refrigerationKeywords.some((regex) => regex.test(item.storage_instructions!))
+                          : false)
+                      const expiryDate = item.expiry_date ? new Date(item.expiry_date) : null
+                      const timeToExpiry = expiryDate ? expiryDate.getTime() - Date.now() : null
+                      const isExpired = timeToExpiry !== null && timeToExpiry < 0
+                      const isExpiringSoon =
+                        timeToExpiry !== null && timeToExpiry >= 0 && timeToExpiry <= THREE_MONTHS_IN_MS
+                      const expiryTextClass = isExpired
+                        ? "text-red-600"
+                        : isExpiringSoon
+                        ? "text-amber-600"
+                        : "text-gray-700"
+                      const formattedExpiry = expiryDate
+                        ? expiryDate.toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "2-digit",
+                            year: "numeric",
+                          })
+                        : null
+                      return (
+                        <TableRow key={item.id}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50">
+                              <Pill className="h-5 w-5 text-blue-500" />
+                            </div>
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1">
+                                <span className="text-sm font-bold text-gray-900">{item.name}</span>
+                                {needsRefrigeration && <Snowflake className="h-3 w-3 text-sky-500" />}
+                              </div>
+                              {item.generic_name && (
+                                <div className="text-xs italic text-gray-500">{item.generic_name}</div>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="secondary"
+                            className={`capitalize rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                              categoryBadgeStyles[item.category as keyof typeof categoryBadgeStyles] ||
+                              "bg-gray-50 text-gray-700 border border-gray-100"
+                            }`}
                           >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <PharmacyPrint
-                            pharmacy={{
-                              id: item.id,
-                              patient_name: 'Stock Report',
-                              date: new Date().toISOString(),
-                              items: [{
-                                medicine_name: item.name,
-                                dosage: item.generic_name || 'Standard',
-                                quantity: item.stock_quantity,
-                                instructions: `Stock: ${item.stock_quantity} | Reorder: ${item.reorder_level}`,
-                                price: item.mrp
-                              }],
-                              total_amount: item.stock_quantity * item.mrp,
-                              pharmacy_location: 'Main Inventory',
-                              pharmacist_name: 'Inventory Manager',
-                              notes: `Batch: ${item.batch_number || 'N/A'} | Expiry: ${item.expiry_date ? new Date(item.expiry_date).toLocaleDateString('en-GB') : 'N/A'}`
-                            }}
-                          >
+                            {item.category}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex flex-col items-end">
+                            <div className="flex items-center gap-1">
+                              <span
+                                className={`text-sm font-bold ${isLowStock ? "text-red-600" : "text-emerald-600"}`}
+                              >
+                                {item.stock_quantity}
+                              </span>
+                              {isLowStock && <AlertTriangle className="h-4 w-4 text-red-500" />}
+                            </div>
+                            <div className="text-[10px] text-gray-400">Reorder: {item.reorder_level}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-mono tabular-nums text-gray-900">
+                          ₹{item.unit_price.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono tabular-nums text-gray-500 hover:line-through">
+                          ₹{item.mrp.toFixed(2)}
+                        </TableCell>
+                        <TableCell>
+                          {item.batch_number ? (
+                            <span className="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs text-gray-600">
+                              {item.batch_number}
+                            </span>
+                          ) : (
+                            "-"
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {formattedExpiry ? (
+                            <div className="flex items-center gap-1">
+                              <Calendar
+                                className={`h-4 w-4 ${
+                                  isExpired ? "text-red-500" : isExpiringSoon ? "text-amber-500" : "text-gray-400"
+                                }`}
+                              />
+                              <span className={`text-sm ${expiryTextClass}`}>{formattedExpiry}</span>
+                            </div>
+                          ) : (
+                            "-"
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {item.stock_quantity <= item.reorder_level ? (
+                            <Badge variant="destructive">Low Stock</Badge>
+                          ) : (
+                            <Badge variant="secondary">In Stock</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <PharmacyViewDialog item={item}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </PharmacyViewDialog>
                             <Button
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8"
-                              title="Print inventory record"
+                              onClick={() => handleEdit(item)}
                             >
-                              <Printer className="h-4 w-4" />
+                              <Edit className="h-4 w-4" />
                             </Button>
-                          </PharmacyPrint>
-                          <DeleteConfirmDialog
-                            title="Delete Item"
-                            description={`Are you sure you want to delete ${item.name}? This action cannot be undone.`}
-                            onConfirm={() => handleDeleteItem(item.id)}
-                          >
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </DeleteConfirmDialog>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-          <Pagination
-            currentPage={pagination?.page || 1}
-            totalPages={pagination?.totalPages || 0}
-            pageSize={pagination?.limit || 10}
-            totalItems={pagination?.total || 0}
-            onPageChange={setCurrentPage}
-            onPageSizeChange={(newSize) => {
-              setPageSize(newSize)
-              setCurrentPage(1)
-            }}
-          />
-        </CardContent>
-      </Card>
+                            <PharmacyPrint
+                              pharmacy={{
+                                id: item.id,
+                                patient_name: "Stock Report",
+                                date: new Date().toISOString(),
+                                items: [
+                                  {
+                                    medicine_name: item.name,
+                                    dosage: item.generic_name || "Standard",
+                                    quantity: item.stock_quantity,
+                                    instructions: `Stock: ${item.stock_quantity} | Reorder: ${item.reorder_level}`,
+                                    price: item.mrp,
+                                  },
+                                ],
+                                total_amount: item.stock_quantity * item.mrp,
+                                pharmacy_location: "Main Inventory",
+                                pharmacist_name: "Inventory Manager",
+                                notes: `Batch: ${item.batch_number || "N/A"} | Expiry: ${
+                                  item.expiry_date ? new Date(item.expiry_date).toLocaleDateString("en-GB") : "N/A"
+                                }`,
+                              }}
+                            >
+                              <Button variant="ghost" size="icon" className="h-8 w-8" title="Print inventory record">
+                                <Printer className="h-4 w-4" />
+                              </Button>
+                            </PharmacyPrint>
+                            <DeleteConfirmDialog
+                              title="Delete Item"
+                              description={`Are you sure you want to delete ${item.name}? This action cannot be undone.`}
+                              onConfirm={() => handleDeleteItem(item.id)}
+                            >
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </DeleteConfirmDialog>
+                          </div>
+                        </TableCell>
+                        </TableRow>
+                      )
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+            <Pagination
+              currentPage={pagination?.page || 1}
+              totalPages={pagination?.totalPages || 0}
+              pageSize={pagination?.limit || 10}
+              totalItems={pagination?.total || 0}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(newSize) => {
+                setPageSize(newSize)
+                setCurrentPage(1)
+              }}
+            />
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

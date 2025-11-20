@@ -380,7 +380,7 @@ export default function MasterDataPage() {
 
             <div className="flex-1">
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold">
+                <h1 className="text-2xl font-bold font-jakarta">
                   {currentCategoryConfig?.title || "Master Data"}
                 </h1>
                 {currentCategoryConfig?.count !== undefined && (

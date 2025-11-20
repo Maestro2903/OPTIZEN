@@ -12,9 +12,15 @@ import {
   Printer,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import {
   Table,
   TableBody,
@@ -373,12 +379,41 @@ export default function PatientsPage() {
     return age >= 0 ? age : null
   }
 
+  // Get initials from full name
+  const getInitials = (name: string): string => {
+    if (!name) return '??'
+    const parts = name.trim().split(' ').filter(Boolean)
+    if (parts.length === 0) return '??'
+    if (parts.length === 1) return parts[0][0].toUpperCase()
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase().slice(0, 2)
+  }
+
+  // Generate pastel color based on ID (deterministic)
+  const getPastelColor = (id: string): string => {
+    const pastelColors = [
+      'bg-pink-100 text-pink-800',
+      'bg-blue-100 text-blue-800',
+      'bg-green-100 text-green-800',
+      'bg-yellow-100 text-yellow-800',
+      'bg-purple-100 text-purple-800',
+      'bg-indigo-100 text-indigo-800',
+      'bg-orange-100 text-orange-800',
+      'bg-teal-100 text-teal-800',
+    ]
+    // Use hash of ID to select color consistently
+    let hash = 0
+    for (let i = 0; i < id.length; i++) {
+      hash = id.charCodeAt(i) + ((hash << 5) - hash)
+    }
+    return pastelColors[Math.abs(hash) % pastelColors.length]
+  }
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 bg-gray-50 -m-4 p-4 min-h-[calc(100vh-4rem)]">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Patients</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-bold text-gray-900 font-jakarta">Patients</h1>
+          <p className="text-gray-500">
             Manage patient records and information
           </p>
         </div>
@@ -394,7 +429,7 @@ export default function PatientsPage() {
           }
         }}>
           <DialogTrigger asChild>
-            <Button className="gap-2" onClick={() => {
+            <Button className="gap-2 bg-blue-600 hover:bg-blue-700 shadow-md" onClick={() => {
               setEditingPatient(null)
               const newPatientId = generatePatientId()
               form.reset({
@@ -634,57 +669,65 @@ export default function PatientsPage() {
         </Dialog>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+        {/* Toolbar Section */}
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            {/* Title */}
             <div>
-              <CardTitle>Patient Records</CardTitle>
-              <CardDescription>
-                View and manage all patient information
-              </CardDescription>
+              <h2 className="text-xl font-semibold text-gray-900">Patient Records</h2>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            
+            {/* Search and Filter Controls */}
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-2">
+              {/* Search Input */}
+              <div className="relative flex-1 md:flex-initial">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <Input
                   type="search"
                   placeholder="Search patients..."
-                  className="pl-8 w-[300px]"
+                  className="pl-10 w-full md:w-[300px] bg-gray-50 focus:bg-white border-gray-200 text-sm"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   disabled={loading}
                 />
               </div>
-              <ViewOptions
-                config={viewOptionsConfig}
-                currentView={currentView}
-                appliedFilters={appliedFilters}
-                currentSort={currentSort}
-                sortDirection={sortDirection}
-                onViewChange={handleViewChange}
-                onFilterChange={handleFilterChange}
-                onSortChange={handleSortChange}
-                onExport={handleExport}
-                onSettings={handleSettings}
-              />
+              
+              {/* Filter/Sort Controls */}
+              <div className="[&_button]:!bg-white [&_button]:!border-gray-300 [&_button]:!text-sm [&_button]:!rounded-lg [&_button]:!text-gray-700 [&_button:hover]:!bg-gray-50 [&_button]:!h-9 [&_button]:!px-3">
+                <ViewOptions
+                  config={viewOptionsConfig}
+                  currentView={currentView}
+                  appliedFilters={appliedFilters}
+                  currentSort={currentSort}
+                  sortDirection={sortDirection}
+                  onViewChange={handleViewChange}
+                  onFilterChange={handleFilterChange}
+                  onSortChange={handleSortChange}
+                  onExport={handleExport}
+                  onSettings={handleSettings}
+                />
+              </div>
             </div>
+          </div>
         </div>
-        </CardHeader>
-        <CardContent>
+        
+        {/* Table Content */}
+        <div className="p-6">
           <div className="rounded-md border">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>SR. NO.</TableHead>
-                  <TableHead>PATIENT ID</TableHead>
-                  <TableHead>NAME</TableHead>
-                  <TableHead>AGE</TableHead>
-                  <TableHead>EMAIL</TableHead>
-                  <TableHead>MOBILE</TableHead>
-                  <TableHead>GENDER</TableHead>
-                  <TableHead>STATE</TableHead>
-                  <TableHead>LAST VISIT</TableHead>
-                  <TableHead>ACTION</TableHead>
+                <TableRow className="bg-gray-50 border-b border-gray-200">
+                  <TableHead className="uppercase text-xs font-medium text-gray-500 tracking-wider">SR. NO.</TableHead>
+                  <TableHead className="uppercase text-xs font-medium text-gray-500 tracking-wider">PATIENT ID</TableHead>
+                  <TableHead className="uppercase text-xs font-medium text-gray-500 tracking-wider">NAME</TableHead>
+                  <TableHead className="uppercase text-xs font-medium text-gray-500 tracking-wider">AGE</TableHead>
+                  <TableHead className="uppercase text-xs font-medium text-gray-500 tracking-wider">EMAIL</TableHead>
+                  <TableHead className="uppercase text-xs font-medium text-gray-500 tracking-wider">MOBILE</TableHead>
+                  <TableHead className="uppercase text-xs font-medium text-gray-500 tracking-wider">GENDER</TableHead>
+                  <TableHead className="uppercase text-xs font-medium text-gray-500 tracking-wider">STATE</TableHead>
+                  <TableHead className="uppercase text-xs font-medium text-gray-500 tracking-wider">LAST VISIT</TableHead>
+                  <TableHead className="uppercase text-xs font-medium text-gray-500 tracking-wider text-right">ACTION</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -702,212 +745,264 @@ export default function PatientsPage() {
                   </TableRow>
                 ) : (
                   patients.map((patient, index) => (
-                  <TableRow key={patient.id}>
+                  <TableRow key={patient.id} className="hover:bg-gray-50/80 transition-colors">
                     <TableCell>{((pagination?.page || 1) - 1) * (pagination?.limit || 10) + index + 1}</TableCell>
-                    <TableCell className="font-mono text-sm font-semibold text-primary">{patient.patient_id}</TableCell>
-                    <TableCell className="font-medium uppercase">{patient.full_name}</TableCell>
-                    <TableCell>{calculateAge(patient.date_of_birth) ?? '-'}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">{patient.email || '-'}</TableCell>
-                    <TableCell>{patient.mobile}</TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="capitalize">{patient.gender}</Badge>
+                      <span className="font-mono text-xs text-blue-600">{patient.patient_id}</span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-8 w-8 shrink-0">
+                          <AvatarFallback className={getPastelColor(patient.id || patient.patient_id)}>
+                            {getInitials(patient.full_name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm font-medium text-gray-900">{patient.full_name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>{calculateAge(patient.date_of_birth) ?? '-'}</TableCell>
+                    <TableCell className="text-gray-500 text-sm">{patient.email || '-'}</TableCell>
+                    <TableCell className="text-gray-500 text-sm">{patient.mobile}</TableCell>
+                    <TableCell>
+                      <Badge 
+                        variant="secondary" 
+                        className={`capitalize rounded-full ${
+                          patient.gender === 'male' 
+                            ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' 
+                            : patient.gender === 'female'
+                            ? 'bg-purple-50 text-purple-700 hover:bg-purple-100'
+                            : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        {patient.gender}
+                      </Badge>
                     </TableCell>
                     <TableCell>{patient.state || '-'}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">{new Date(patient.created_at).toLocaleDateString('en-GB')}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <ViewEditDialog
-                          title={`Patient - ${patient.full_name}`}
-                          description={`Details for ${patient.full_name}`}
-                          data={patient}
-                          schema={patientFormSchema}
-                          renderViewAction={(data: any) => (
-                            <div className="space-y-4">
-                              <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                  <p className="text-sm text-muted-foreground">Patient ID</p>
-                                  <p className="font-mono text-sm font-semibold text-primary">{data?.patient_id}</p>
-                                </div>
-                                <div>
-                                  <p className="text-sm text-muted-foreground">Name</p>
-                                  <p className="font-semibold uppercase">{data?.full_name}</p>
-                                </div>
-                                <div>
-                                  <p className="text-sm text-muted-foreground">Age</p>
-                                  <p className="font-semibold">{calculateAge(data?.date_of_birth) ?? 'N/A'}</p>
-                                </div>
-                                <div>
-                                  <p className="text-sm text-muted-foreground">Gender</p>
-                                  <Badge variant="secondary">{data?.gender}</Badge>
-                                </div>
-                                <div>
-                                  <p className="text-sm text-muted-foreground">State</p>
-                                  <p className="font-semibold">{data?.state}</p>
-                                </div>
-                                <div className="col-span-2">
-                                  <p className="text-sm text-muted-foreground">Email</p>
-                                  <p className="text-sm text-muted-foreground">{data?.email || '-'}</p>
-                                </div>
-                                <div className="col-span-2">
-                                  <p className="text-sm text-muted-foreground">Mobile</p>
-                                  <p className="font-semibold">{data?.mobile}</p>
+                    <TableCell className="text-gray-500 text-sm">{new Date(patient.created_at).toLocaleDateString('en-GB')}</TableCell>
+                    <TableCell className="text-right">
+                      <TooltipProvider>
+                        <div className="flex items-center justify-end gap-1">
+                          <ViewEditDialog
+                            title={`Patient - ${patient.full_name}`}
+                            description={`Details for ${patient.full_name}`}
+                            data={patient}
+                            schema={patientFormSchema}
+                            renderViewAction={(data: any) => (
+                              <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">Patient ID</p>
+                                    <p className="font-mono text-sm font-semibold text-primary">{data?.patient_id}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">Name</p>
+                                    <p className="font-semibold uppercase">{data?.full_name}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">Age</p>
+                                    <p className="font-semibold">{calculateAge(data?.date_of_birth) ?? 'N/A'}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">Gender</p>
+                                    <Badge variant="secondary">{data?.gender}</Badge>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">State</p>
+                                    <p className="font-semibold">{data?.state}</p>
+                                  </div>
+                                  <div className="col-span-2">
+                                    <p className="text-sm text-muted-foreground">Email</p>
+                                    <p className="text-sm text-muted-foreground">{data?.email || '-'}</p>
+                                  </div>
+                                  <div className="col-span-2">
+                                    <p className="text-sm text-muted-foreground">Mobile</p>
+                                    <p className="font-semibold">{data?.mobile}</p>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          )}
-                          renderEditAction={(form: any) => (
-                            <Form {...form}>
-                              <div className="grid grid-cols-2 gap-4">
-                                <FormField
-                                  control={form.control}
-                                  name={"full_name"}
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Full Name *</FormLabel>
-                                      <FormControl>
-                                        <Input className="uppercase" {...field} />
-                                      </FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                                <FormField
-                                  control={form.control}
-                                  name={"date_of_birth"}
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Date of Birth</FormLabel>
-                                      <FormControl>
-                                        <Input type="date" {...field} />
-                                      </FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                                <FormField
-                                  control={form.control}
-                                  name={"gender"}
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Gender *</FormLabel>
-                                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            )}
+                            renderEditAction={(form: any) => (
+                              <Form {...form}>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <FormField
+                                    control={form.control}
+                                    name={"full_name"}
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Full Name *</FormLabel>
                                         <FormControl>
-                                          <SelectTrigger>
-                                            <SelectValue placeholder="Select gender" />
-                                          </SelectTrigger>
+                                          <Input className="uppercase" {...field} />
                                         </FormControl>
-                                        <SelectContent>
-                                          <SelectItem value="male">Male</SelectItem>
-                                          <SelectItem value="female">Female</SelectItem>
-                                          <SelectItem value="other">Other</SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                                <FormField
-                                  control={form.control}
-                                  name={"state"}
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>State *</FormLabel>
-                                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={form.control}
+                                    name={"date_of_birth"}
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Date of Birth</FormLabel>
                                         <FormControl>
-                                          <SelectTrigger>
-                                            <SelectValue placeholder="Select state" />
-                                          </SelectTrigger>
+                                          <Input type="date" {...field} />
                                         </FormControl>
-                                        <SelectContent>
-                                          <SelectItem value="Gujarat">Gujarat</SelectItem>
-                                          <SelectItem value="Maharashtra">Maharashtra</SelectItem>
-                                          <SelectItem value="Karnataka">Karnataka</SelectItem>
-                                          <SelectItem value="Tamil Nadu">Tamil Nadu</SelectItem>
-                                          <SelectItem value="Delhi">Delhi</SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                                <FormField
-                                  control={form.control}
-                                  name={"email"}
-                                  render={({ field }) => (
-                                    <FormItem className="col-span-2">
-                                      <FormLabel>Email</FormLabel>
-                                      <FormControl>
-                                        <Input type="email" {...field} />
-                                      </FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                                <FormField
-                                  control={form.control}
-                                  name={"mobile"}
-                                  render={({ field }) => (
-                                    <FormItem className="col-span-2">
-                                      <FormLabel>Mobile *</FormLabel>
-                                      <FormControl>
-                                        <Input {...field} />
-                                      </FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                              </div>
-                            </Form>
-                          )}
-                          onSaveAction={async (values: any) => {
-                            try {
-                              const result = await updatePatient(
-                                () => patientsApi.update(patient.id, values),
-                                {
-                                  successMessage: `${values.full_name} has been updated successfully.`,
-                                  onSuccess: (updatedPatient) => {
-                                    updateItem(patient.id, updatedPatient)
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={form.control}
+                                    name={"gender"}
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Gender *</FormLabel>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                          <FormControl>
+                                            <SelectTrigger>
+                                              <SelectValue placeholder="Select gender" />
+                                            </SelectTrigger>
+                                          </FormControl>
+                                          <SelectContent>
+                                            <SelectItem value="male">Male</SelectItem>
+                                            <SelectItem value="female">Female</SelectItem>
+                                            <SelectItem value="other">Other</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={form.control}
+                                    name={"state"}
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>State *</FormLabel>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                          <FormControl>
+                                            <SelectTrigger>
+                                              <SelectValue placeholder="Select state" />
+                                            </SelectTrigger>
+                                          </FormControl>
+                                          <SelectContent>
+                                            <SelectItem value="Gujarat">Gujarat</SelectItem>
+                                            <SelectItem value="Maharashtra">Maharashtra</SelectItem>
+                                            <SelectItem value="Karnataka">Karnataka</SelectItem>
+                                            <SelectItem value="Tamil Nadu">Tamil Nadu</SelectItem>
+                                            <SelectItem value="Delhi">Delhi</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={form.control}
+                                    name={"email"}
+                                    render={({ field }) => (
+                                      <FormItem className="col-span-2">
+                                        <FormLabel>Email</FormLabel>
+                                        <FormControl>
+                                          <Input type="email" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={form.control}
+                                    name={"mobile"}
+                                    render={({ field }) => (
+                                      <FormItem className="col-span-2">
+                                        <FormLabel>Mobile *</FormLabel>
+                                        <FormControl>
+                                          <Input {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                </div>
+                              </Form>
+                            )}
+                            onSaveAction={async (values: any) => {
+                              try {
+                                const result = await updatePatient(
+                                  () => patientsApi.update(patient.id, values),
+                                  {
+                                    successMessage: `${values.full_name} has been updated successfully.`,
+                                    onSuccess: (updatedPatient) => {
+                                      updateItem(patient.id, updatedPatient)
+                                    }
                                   }
-                                }
-                              )
-                            } catch (error) {
-                              console.error('Error updating patient:', error)
-                            }
-                          }}
-                        >
-                          <Button variant="ghost" size="icon" className="h-8 w-8" title="View">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </ViewEditDialog>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => handleEdit(patient)}
-                          title="Edit"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <PatientPrint patient={patient}>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            title="Print Patient Record"
+                                )
+                              } catch (error) {
+                                console.error('Error updating patient:', error)
+                              }
+                            }}
                           >
-                            <Printer className="h-4 w-4" />
-                          </Button>
-                        </PatientPrint>
-                        <DeleteConfirmDialog
-                          title="Delete Patient Permanently"
-                          description={`Are you sure you want to permanently delete ${patient.full_name}? This will delete ALL related data including appointments, cases, invoices, certificates, operations, and medical records. This action cannot be undone.`}
-                          onConfirm={() => handleDelete(patient.id)}
-                        >
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" title="Delete Permanently">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </DeleteConfirmDialog>
-                      </div>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-100 hover:text-gray-700 rounded-md transition-colors" title="View">
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>View Patient Details</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </ViewEditDialog>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 hover:bg-blue-50 hover:text-blue-600 rounded-md transition-colors"
+                                onClick={() => handleEdit(patient)}
+                                title="Edit"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Edit Patient</p>
+                            </TooltipContent>
+                          </Tooltip>
+                          <PatientPrint patient={patient}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 hover:bg-gray-100 hover:text-gray-700 rounded-md transition-colors"
+                                  title="Print Patient Record"
+                                >
+                                  <Printer className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Print Patient Record</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </PatientPrint>
+                          <DeleteConfirmDialog
+                            title="Delete Patient Permanently"
+                            description={`Are you sure you want to permanently delete ${patient.full_name}? This will delete ALL related data including appointments, cases, invoices, certificates, operations, and medical records. This action cannot be undone.`}
+                            onConfirm={() => handleDelete(patient.id)}
+                          >
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-red-50 hover:text-red-600 rounded-md transition-colors" title="Delete Permanently">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Delete Patient</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </DeleteConfirmDialog>
+                        </div>
+                      </TooltipProvider>
                     </TableCell>
                   </TableRow>
                 ))
@@ -915,19 +1010,21 @@ export default function PatientsPage() {
               </TableBody>
             </Table>
           </div>
-          <Pagination
-            currentPage={pagination?.page || 1}
-            totalPages={pagination?.totalPages || 0}
-            pageSize={pagination?.limit || 10}
-            totalItems={pagination?.total || 0}
-            onPageChange={setCurrentPage}
-            onPageSizeChange={(newSize) => {
-              setPageSize(newSize)
-              setCurrentPage(1)
-            }}
-          />
-        </CardContent>
-      </Card>
+          <div className="border-t border-gray-200">
+            <Pagination
+              currentPage={pagination?.page || 1}
+              totalPages={pagination?.totalPages || 0}
+              pageSize={pagination?.limit || 10}
+              totalItems={pagination?.total || 0}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(newSize) => {
+                setPageSize(newSize)
+                setCurrentPage(1)
+              }}
+            />
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

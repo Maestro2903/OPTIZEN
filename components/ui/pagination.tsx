@@ -51,21 +51,22 @@ export function Pagination({
   }
 
   return (
-    <div className={cn("flex items-center justify-between px-2 py-4", className)}>
-      <div className="flex items-center space-x-2">
-        <p className="text-sm text-muted-foreground">
-          Showing <span className="font-medium">{startItem}</span> to{" "}
-          <span className="font-medium">{endItem}</span> of{" "}
-          <span className="font-medium">{totalItems}</span> results
+    <div className={cn("flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-6 py-4", className)}>
+      {/* Left side - Showing text and Rows per page */}
+      <div className="flex flex-wrap items-center gap-4">
+        <p className="text-sm text-gray-600">
+          Showing <span className="font-medium text-gray-900">{startItem}</span> to{" "}
+          <span className="font-medium text-gray-900">{endItem}</span> of{" "}
+          <span className="font-medium text-gray-900">{totalItems}</span>
         </p>
         {onPageSizeChange && (
-          <div className="flex items-center space-x-2">
-            <p className="text-sm text-muted-foreground">Rows per page:</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-gray-600">Rows per page:</p>
             <Select
               value={String(pageSize)}
               onValueChange={(value) => onPageSizeChange(Number(value))}
             >
-              <SelectTrigger className="h-8 w-[70px]">
+              <SelectTrigger className="h-8 w-[70px] rounded-md border-gray-300 bg-white text-sm">
                 <SelectValue placeholder={String(pageSize)} />
               </SelectTrigger>
               <SelectContent side="top">
@@ -79,11 +80,13 @@ export function Pagination({
           </div>
         )}
       </div>
-      <div className="flex items-center space-x-2">
+      
+      {/* Right side - Pagination controls */}
+      <div className="flex items-center gap-2">
         <Button
           variant="outline"
           size="icon"
-          className="h-8 w-8"
+          className="h-8 w-8 bg-white border-gray-300 rounded-md hover:bg-gray-50"
           onClick={goToFirstPage}
           disabled={!canGoPrevious}
           title="First page"
@@ -93,22 +96,22 @@ export function Pagination({
         <Button
           variant="outline"
           size="icon"
-          className="h-8 w-8"
+          className="h-8 w-8 bg-white border-gray-300 rounded-md hover:bg-gray-50"
           onClick={goToPreviousPage}
           disabled={!canGoPrevious}
           title="Previous page"
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <div className="flex items-center gap-1">
-          <p className="text-sm font-medium">
+        <div className="flex items-center px-3">
+          <p className="text-sm font-medium text-gray-700">
             Page {currentPage} of {totalPages || 1}
           </p>
         </div>
         <Button
           variant="outline"
           size="icon"
-          className="h-8 w-8"
+          className="h-8 w-8 bg-white border-gray-300 rounded-md hover:bg-gray-50"
           onClick={goToNextPage}
           disabled={!canGoNext}
           title="Next page"
@@ -118,7 +121,7 @@ export function Pagination({
         <Button
           variant="outline"
           size="icon"
-          className="h-8 w-8"
+          className="h-8 w-8 bg-white border-gray-300 rounded-md hover:bg-gray-50"
           onClick={goToLastPage}
           disabled={!canGoNext}
           title="Last page"

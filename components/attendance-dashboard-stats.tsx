@@ -33,16 +33,18 @@ export function AttendanceDashboardStats({
       value: stats.total_staff,
       icon: Users,
       description: "Active employees",
-      color: "text-blue-600",
-      bgColor: "bg-blue-50",
+      iconColor: "text-blue-600",
+      iconBg: "bg-blue-100",
+      borderColor: "border-t-blue-500",
     },
     {
       title: "Present",
       value: stats.present,
       icon: UserCheck,
       description: `${stats.attendance_percentage.toFixed(1)}% attendance`,
-      color: "text-green-600",
-      bgColor: "bg-green-50",
+      iconColor: "text-emerald-600",
+      iconBg: "bg-emerald-100",
+      borderColor: "border-t-emerald-500",
       trend: stats.attendance_percentage >= 80 ? "up" : "down"
     },
     {
@@ -50,24 +52,27 @@ export function AttendanceDashboardStats({
       value: stats.absent,
       icon: UserX,
       description: `${stats.total_staff > 0 ? ((stats.absent / stats.total_staff) * 100).toFixed(1) : 0}% of staff`,
-      color: "text-red-600",
-      bgColor: "bg-red-50",
+      iconColor: "text-rose-600",
+      iconBg: "bg-rose-100",
+      borderColor: "border-t-rose-500",
     },
     {
       title: "On Leave",
       value: stats.on_leave,
       icon: Calendar,
       description: "Sick, Casual, Paid",
-      color: "text-yellow-600",
-      bgColor: "bg-yellow-50",
+      iconColor: "text-amber-600",
+      iconBg: "bg-amber-100",
+      borderColor: "border-t-amber-500",
     },
     {
       title: "Avg. Working Hours",
       value: stats.average_working_hours.toFixed(1),
       icon: Clock,
       description: "Hours per employee",
-      color: "text-purple-600",
-      bgColor: "bg-purple-50",
+      iconColor: "text-purple-600",
+      iconBg: "bg-purple-100",
+      borderColor: "border-t-purple-500",
       suffix: "hrs"
     },
   ]
@@ -122,22 +127,29 @@ export function AttendanceDashboardStats({
         {statCards.map((stat, index) => {
           const Icon = stat.icon
           return (
-            <Card key={index} className="hover:shadow-md transition-shadow">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+            <Card
+              key={index}
+              className={cn(
+                "rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md",
+                "border-t-4",
+                stat.borderColor
+              )}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 p-0 pb-3">
+                <CardTitle className="text-sm font-medium text-gray-500">
                   {stat.title}
                 </CardTitle>
-                <div className={cn("p-2 rounded-lg", stat.bgColor)}>
-                  <Icon className={cn("h-4 w-4", stat.color)} />
+                <div className={cn("flex h-10 w-10 items-center justify-center rounded-full", stat.iconBg)}>
+                  <Icon className={cn("h-5 w-5", stat.iconColor)} />
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-0">
                 <div className="flex items-baseline gap-1">
-                  <div className="text-2xl font-bold">
+                  <div className="text-3xl font-bold text-gray-800">
                     {stat.value}
                   </div>
                   {stat.suffix && (
-                    <span className="text-sm text-muted-foreground">{stat.suffix}</span>
+                    <span className="text-sm text-gray-500">{stat.suffix}</span>
                   )}
                   {stat.trend && (
                     <TrendingUp className={cn(
@@ -146,7 +158,7 @@ export function AttendanceDashboardStats({
                     )} />
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="mt-1 text-sm text-gray-500">
                   {stat.description}
                 </p>
               </CardContent>

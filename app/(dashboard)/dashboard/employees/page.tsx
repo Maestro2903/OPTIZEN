@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import {
-  Plus,
   Search,
   Filter,
   Users,
@@ -33,6 +32,8 @@ import { useApiList, useApiForm, useApiDelete } from "@/lib/hooks/useApi"
 import { employeesApi, type Employee, type EmployeeFilters } from "@/lib/services/api"
 import { useToast } from "@/hooks/use-toast"
 import { Pagination } from "@/components/ui/pagination"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 const statusColors = {
   active: "bg-green-100 text-green-700 border-green-200",
@@ -46,6 +47,34 @@ const roleColors = {
   receptionist: "bg-yellow-100 text-yellow-700 border-yellow-200",
   admin: "bg-red-100 text-red-700 border-red-200",
   other: "bg-gray-100 text-gray-700 border-gray-200",
+}
+
+// Helper function to convert ALL CAPS to Title Case
+const toTitleCase = (str: string): string => {
+  if (!str) return str
+  // If the string is already in a mixed case format, return as is
+  // Otherwise, convert from ALL CAPS to Title Case
+  return str
+    .toLowerCase()
+    .split(' ')
+    .map(word => {
+      // Handle special prefixes like "Dr.", "Mr.", "Mrs.", etc.
+      if (word.endsWith('.')) {
+        return word.charAt(0).toUpperCase() + word.slice(1)
+      }
+      return word.charAt(0).toUpperCase() + word.slice(1)
+    })
+    .join(' ')
+}
+
+// Helper function to get initials from a name
+const getInitials = (name: string): string => {
+  if (!name) return ''
+  const cleanedName = name.trim().replace(/^dr\.\s+/i, "")
+  const words = cleanedName.split(/\s+/).filter(Boolean)
+  if (words.length === 0) return ''
+  if (words.length === 1) return words[0].charAt(0).toUpperCase()
+  return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase()
 }
 
 export default function EmployeesPage() {
@@ -262,20 +291,20 @@ export default function EmployeesPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Employees</h1>
+          <h1 className="text-3xl font-bold tracking-tight font-jakarta">Employees</h1>
           <p className="text-muted-foreground">
             Manage staff members and employee records
           </p>
         </div>
         <EmployeeForm onSubmit={handleAddEmployee}>
-          <Button className="gap-2">
-            <Plus className="h-4 w-4" />
+          <Button className="gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50">
+            <UserPlus className="h-4 w-4" />
             Add Employee
           </Button>
         </EmployeeForm>
       </div>
 
-      <Card>
+      <Card className="bg-white rounded-xl shadow-sm border border-gray-200">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -315,27 +344,26 @@ export default function EmployeesPage() {
           <div className="rounded-md border">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>EMP ID</TableHead>
-                  <TableHead>NAME</TableHead>
-                  <TableHead>ROLE</TableHead>
-                  <TableHead>DEPARTMENT</TableHead>
-                  <TableHead>EMAIL</TableHead>
-                  <TableHead>PHONE</TableHead>
-                  <TableHead>STATUS</TableHead>
-                  <TableHead>ACTIONS</TableHead>
+                <TableRow className="bg-gray-50/50 border-b">
+                  <TableHead className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">EMP ID</TableHead>
+                  <TableHead className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">EMPLOYEE</TableHead>
+                  <TableHead className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">ROLE</TableHead>
+                  <TableHead className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">DEPARTMENT</TableHead>
+                  <TableHead className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">PHONE</TableHead>
+                  <TableHead className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">STATUS</TableHead>
+                  <TableHead className="text-[11px] font-bold text-gray-500 uppercase tracking-wide text-right">ACTIONS</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       Loading employees...
                     </TableCell>
                   </TableRow>
                 ) : employees.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       No employees found
                     </TableCell>
                   </TableRow>
@@ -343,48 +371,119 @@ export default function EmployeesPage() {
                   employees.map((employee) => {
                     // Convert is_active to status for display
                     const displayStatus = employee.is_active ? 'active' : 'inactive'
+                    const employeeId = employee.employee_id || '-'
+                    const initials = getInitials(employee.full_name)
+                    const displayName = toTitleCase(employee.full_name)
+                    const phoneNumber = employee.phone || ''
+                    const telLink = phoneNumber ? phoneNumber.replace(/\s+/g, '') : ''
+                    
                     return (
                     <TableRow key={employee.id}>
-                      <TableCell className="font-medium">{employee.employee_id || '-'}</TableCell>
-                      <TableCell className="font-medium uppercase">{employee.full_name}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className={`capitalize ${roleColors[employee.role as keyof typeof roleColors] || ''}`}>
-                          {employee.role}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{employee.department || '-'}</TableCell>
-                      <TableCell className="text-muted-foreground">{employee.email}</TableCell>
-                      <TableCell>{employee.phone}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className={`capitalize ${statusColors[displayStatus as keyof typeof statusColors] || ''}`}>
-                          {displayStatus}
-                        </Badge>
+                      <TableCell className="font-medium">
+                        {employeeId === '-' ? (
+                          <Badge variant="secondary" className="bg-gray-100 text-gray-500 border-gray-200">
+                            Pending
+                          </Badge>
+                        ) : (
+                          employeeId
+                        )}
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-1">
-                          <EmployeeForm
-                            employee={employee}
-                            onSubmit={(values) => handleUpdateEmployee(employee.id, values)}
-                          >
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              title="Edit employee"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          </EmployeeForm>
-                          <DeleteConfirmDialog
-                            title="Remove Employee"
-                            description={`Are you sure you want to remove ${employee.full_name} from the system? This action cannot be undone.`}
-                            onConfirm={() => handleDeleteEmployee(employee.id)}
-                          >
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </DeleteConfirmDialog>
+                        <div className="flex items-center gap-3">
+                          <Avatar className="w-10 h-10 rounded-full">
+                            {employee.avatar_url ? (
+                              <AvatarImage src={employee.avatar_url} alt={displayName} />
+                            ) : null}
+                            <AvatarFallback className="bg-purple-100 text-purple-600 font-medium">
+                              {initials}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-gray-900">{displayName}</span>
+                            <span className="text-xs text-gray-500">{employee.email}</span>
+                          </div>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="bg-blue-50 text-blue-700 border border-blue-100 rounded-full px-3 py-0.5 text-xs font-medium capitalize">
+                          {employee.role}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        {employee.department && employee.department !== '-' ? (
+                          <span className="text-gray-700">{employee.department}</span>
+                        ) : (
+                          <span className="text-gray-400 italic text-sm">Unassigned</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {phoneNumber ? (
+                          <a
+                            href={`tel:${telLink}`}
+                            className="text-sm text-gray-600 tabular-nums hover:text-indigo-600 hover:underline decoration-indigo-300 underline-offset-2"
+                          >
+                            {phoneNumber}
+                          </a>
+                        ) : (
+                          <span className="text-gray-400 italic text-sm">No contact</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`inline-flex items-center gap-2 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize border ${
+                            displayStatus === 'active'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                              : 'bg-gray-100 text-gray-600 border-gray-200'
+                          }`}
+                        >
+                          <span
+                            className={`h-2 w-2 rounded-full ${
+                              displayStatus === 'active' ? 'bg-emerald-500' : 'bg-gray-400'
+                            }`}
+                          />
+                          {displayStatus}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <TooltipProvider>
+                          <div className="flex items-center justify-end gap-2">
+                            <EmployeeForm
+                              employee={employee}
+                              onSubmit={(values) => handleUpdateEmployee(employee.id, values)}
+                            >
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 rounded-md text-gray-600 hover:bg-indigo-50 hover:text-indigo-600"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Edit employee</TooltipContent>
+                              </Tooltip>
+                            </EmployeeForm>
+                            <DeleteConfirmDialog
+                              title="Remove Employee"
+                              description={`Are you sure you want to remove ${employee.full_name} from the system? This action cannot be undone.`}
+                              onConfirm={() => handleDeleteEmployee(employee.id)}
+                            >
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 rounded-md text-gray-600 hover:bg-red-50 hover:text-red-600"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Delete employee</TooltipContent>
+                              </Tooltip>
+                            </DeleteConfirmDialog>
+                          </div>
+                        </TooltipProvider>
                       </TableCell>
                     </TableRow>
                   )})

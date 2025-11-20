@@ -32,6 +32,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import { CalendarIcon } from "lucide-react"
+import { format } from "date-fns"
+import { cn } from "@/lib/utils"
 import { patientsApi } from "@/lib/services/api"
 import { Loader2, FileText } from "lucide-react"
 
@@ -41,6 +46,7 @@ const certificateSchema = z.object({
   type: z.enum(["Fitness Certificate", "Medical Certificate", "Eye Test Certificate", "Sick Leave", "Custom"]),
   purpose: z.string().min(1, "Purpose is required"),
   content: z.string().min(10, "Certificate content must be at least 10 characters"),
+  issue_date: z.string().min(1, "Issue date is required"),
   hospital_name: z.string().optional(),
   hospital_address: z.string().optional(),
   doctor_name: z.string().optional(),
@@ -69,6 +75,7 @@ export function CertificateGeneratorForm({ children, onSuccess }: CertificateGen
       type: "Medical Certificate",
       purpose: "",
       content: "",
+      issue_date: new Date().toISOString().split('T')[0], // Default to today's date
       hospital_name: "EyeCare Medical Center",
       hospital_address: "123 Medical Plaza, Healthcare District",
       doctor_name: "",
@@ -340,7 +347,7 @@ This certificate is issued for the purpose of medical leave application.`,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...values,
-          issue_date: new Date().toISOString().split("T")[0],
+          issue_date: values.issue_date || new Date().toISOString().split("T")[0],
           status: "Issued",
         }),
       })
@@ -477,6 +484,53 @@ This certificate is issued for the purpose of medical leave application.`,
                 )}
               />
             </div>
+
+            {/* Issue Date */}
+            <FormField
+              control={form.control}
+              name="issue_date"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>Issue Date *</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full pl-3 text-left font-normal",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          {field.value ? (
+                            format(new Date(field.value), "PPP")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value ? new Date(field.value) : undefined}
+                        onSelect={(date) => {
+                          if (date) {
+                            field.onChange(date.toISOString().split('T')[0])
+                          }
+                        }}
+                        disabled={(date) =>
+                          date > new Date() || date < new Date("1900-01-01")
+                        }
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             {/* Certificate Content */}
             <FormField

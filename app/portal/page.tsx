@@ -26,7 +26,7 @@ export default function LoginPage() {
             <div className="relative w-20 h-20">
               <Image 
                 src="/logo.svg" 
-                alt="EyeZen Logo" 
+                alt="OptiZen Logo" 
                 width={80} 
                 height={80}
                 priority
@@ -35,7 +35,7 @@ export default function LoginPage() {
           </div>
           <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
           <CardDescription>
-            Sign in to your EyeZen account to continue
+            Sign in to your OptiZen account to continue
           </CardDescription>
             </CardHeader>
         <CardContent className="space-y-4">
@@ -46,7 +46,7 @@ export default function LoginPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="admin@eyezen.com"
+                placeholder="admin@optizen.com"
                 className="pl-10"
               />
                 </div>

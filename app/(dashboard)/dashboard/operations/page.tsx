@@ -3,7 +3,6 @@
 import * as React from "react"
 import {
   Stethoscope,
-  Plus,
   Search,
   Eye,
   Edit,
@@ -18,7 +17,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
 import {
   Table,
   TableBody,
@@ -44,29 +42,90 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
-const statusColors = {
-  scheduled: "bg-blue-100 text-blue-700 border-blue-200",
-  'in-progress': "bg-yellow-100 text-yellow-700 border-yellow-200",
-  completed: "bg-green-100 text-green-700 border-green-200",
-  cancelled: "bg-red-100 text-red-700 border-red-200",
-  unknown: "bg-gray-100 text-gray-700 border-gray-200", // fallback for unexpected status
+const statusStyles = {
+  scheduled: {
+    label: "Scheduled",
+    pill: "bg-blue-50 text-blue-700",
+    dot: "bg-blue-500",
+  },
+  'in-progress': {
+    label: "In Progress",
+    pill: "bg-amber-50 text-amber-700 border border-amber-100",
+    dot: "bg-amber-500",
+  },
+  completed: {
+    label: "Completed",
+    pill: "bg-green-50 text-green-700",
+    dot: "bg-green-500",
+  },
+  cancelled: {
+    label: "Cancelled",
+    pill: "bg-red-50 text-red-700",
+    dot: "bg-red-500",
+  },
+  unknown: {
+    label: "Unknown",
+    pill: "bg-gray-50 text-gray-600",
+    dot: "bg-gray-400",
+  },
 } as const
 
-const statusLabels = {
-  scheduled: "Scheduled",
-  'in-progress': "In Progress",
-  completed: "Completed",
-  cancelled: "Cancelled",
-  unknown: "Unknown", // fallback for unexpected status
-} as const
-
-// Helper to safely get status color/label
-const getStatusColor = (status: string): string => {
-  return statusColors[status as keyof typeof statusColors] ?? statusColors.unknown
+const getStatusStyle = (status: string) => {
+  return statusStyles[status as keyof typeof statusStyles] ?? statusStyles.unknown
 }
 
-const getStatusLabel = (status: string): string => {
-  return statusLabels[status as keyof typeof statusLabels] ?? statusLabels.unknown
+const tableHeaderBaseClass =
+  "text-[11px] font-semibold uppercase tracking-wider text-gray-500"
+
+const getPatientInitials = (name?: string | null) => {
+  if (!name) return "PT"
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase()
+  }
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
+const eyeBadgeStyles = {
+  left: {
+    label: "L",
+    className: "bg-blue-50 text-blue-700 border border-blue-100",
+  },
+  right: {
+    label: "R",
+    className: "bg-emerald-50 text-emerald-700 border border-emerald-100",
+  },
+  both: {
+    label: "B",
+    className: "bg-purple-50 text-purple-700 border border-purple-100",
+  },
+} as const
+
+const getEyeBadgeProps = (eye?: string | null) => {
+  if (!eye) return null
+  const normalized = eye.toLowerCase()
+  if (normalized.startsWith("left")) return eyeBadgeStyles.left
+  if (normalized.startsWith("right")) return eyeBadgeStyles.right
+  if (normalized.startsWith("both") || normalized.startsWith("bilateral")) return eyeBadgeStyles.both
+  return null
+}
+
+const formatOperationDate = (dateString?: string | null) => {
+  if (!dateString) return "-"
+  const date = new Date(dateString)
+  if (Number.isNaN(date.getTime())) return "-"
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })
+}
+
+const formatTimeDisplay = (time?: string | null) => {
+  if (!time) return null
+  const [hours, minutes] = time.split(":")
+  if (!hours || !minutes) return time
+  return `${hours}:${minutes}`
 }
 
 export default function OperationsPage() {
@@ -302,198 +361,261 @@ export default function OperationsPage() {
     .reduce((sum, o) => sum + (o.amount || 0), 0)
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Operations</h1>
-          <p className="text-muted-foreground">
-            Manage surgical operations and procedures
-          </p>
+    <div className="min-h-screen bg-slate-50 px-5 py-6">
+      <div className="mx-auto flex w-full flex-col gap-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight font-jakarta">Operations</h1>
+            <p className="text-muted-foreground">
+              Manage surgical operations and procedures
+            </p>
+          </div>
+          <OperationForm onSubmit={handleAddOperation}>
+            <Button className="gap-2 rounded-lg bg-blue-600 text-white shadow-sm hover:bg-blue-700">
+              <Activity className="h-4 w-4" />
+              Schedule Operation
+            </Button>
+          </OperationForm>
         </div>
-        <OperationForm onSubmit={handleAddOperation}>
-          <Button className="gap-2">
-            <Plus className="h-4 w-4" />
-            Schedule Operation
-          </Button>
-        </OperationForm>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Operation Schedule</CardTitle>
-              <CardDescription>
-                Manage and track all surgical procedures
-              </CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search operations..."
-                  className="pl-8 w-[300px]"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  disabled={loading}
+        <Card className="rounded-xl border border-gray-200 bg-white shadow-sm">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Operation Schedule</CardTitle>
+                <CardDescription>
+                  Manage and track all surgical procedures
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    placeholder="Search operations..."
+                    className="w-[300px] pl-8"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+                <ViewOptions
+                  config={viewOptionsConfig}
+                  currentView="list"
+                  appliedFilters={appliedFilters}
+                  currentSort={currentSort}
+                  sortDirection={sortDirection}
+                  onViewChange={() => {}}
+                  onFilterChange={handleFilterChange}
+                  onSortChange={handleSortChange}
+                  onExport={() => {
+                    toast({
+                      title: "Export feature",
+                      description: "Operations export functionality coming soon."
+                    })
+                  }}
+                  onSettings={() => {
+                    toast({
+                      title: "Settings",
+                      description: "Operations settings functionality coming soon."
+                    })
+                  }}
                 />
               </div>
-              <ViewOptions
-                config={viewOptionsConfig}
-                currentView="list"
-                appliedFilters={appliedFilters}
-                currentSort={currentSort}
-                sortDirection={sortDirection}
-                onViewChange={() => {}}
-                onFilterChange={handleFilterChange}
-                onSortChange={handleSortChange}
-                onExport={() => {
-                  toast({
-                    title: "Export feature",
-                    description: "Operations export functionality coming soon."
-                  })
-                }}
-                onSettings={() => {
-                  toast({
-                    title: "Settings",
-                    description: "Operations settings functionality coming soon."
-                  })
-                }}
-              />
             </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>DATE</TableHead>
-                  <TableHead>PATIENT ID</TableHead>
-                  <TableHead>PATIENT</TableHead>
-                  <TableHead>OPERATION</TableHead>
-                  <TableHead>EYE</TableHead>
-                  <TableHead>TIME</TableHead>
-                  <TableHead>STATUS</TableHead>
-                  <TableHead>AMOUNT</TableHead>
-                  <TableHead>ACTIONS</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                      Loading operations...
-                    </TableCell>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-b border-gray-200 bg-gray-50">
+                    <TableHead className={tableHeaderBaseClass}>DATE</TableHead>
+                    <TableHead className={tableHeaderBaseClass}>PATIENT</TableHead>
+                    <TableHead className={tableHeaderBaseClass}>OPERATION</TableHead>
+                    <TableHead className={tableHeaderBaseClass}>EYE</TableHead>
+                    <TableHead className={tableHeaderBaseClass}>TIME</TableHead>
+                    <TableHead className={tableHeaderBaseClass}>STATUS</TableHead>
+                    <TableHead className={`${tableHeaderBaseClass} text-right`}>AMOUNT</TableHead>
+                    <TableHead className={`${tableHeaderBaseClass} text-right`}>ACTIONS</TableHead>
                   </TableRow>
-                ) : error ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-destructive">
-                      Error loading operations: {error}
-                    </TableCell>
-                  </TableRow>
-                ) : operations.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                      No operations found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  operations.map((operation) => (
-                    <TableRow key={operation.id}>
-                      <TableCell className="text-sm">
-                        {new Date(operation.operation_date).toLocaleDateString('en-GB')}
-                      </TableCell>
-                      <TableCell className="font-mono text-sm font-semibold text-primary">
-                        {operation.patients?.patient_id || '-'}
-                      </TableCell>
-                      <TableCell className="font-medium uppercase">
-                        {operation.patients?.full_name || 'N/A'}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {operation.operation_name}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="capitalize">
-                          {'eye_name' in operation && typeof operation.eye_name === 'string' ? operation.eye_name : operation.eye || 'N/A'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-sm">
-                            {operation.begin_time} - {operation.end_time || 'Ongoing'}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={getStatusColor(operation.status)}
-                        >
-                          {getStatusLabel(operation.status)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {operation.amount ? `₹${operation.amount.toLocaleString()}` : '-'}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8" 
-                            title="View"
-                            onClick={() => handleViewOperation(operation)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8" 
-                            title="Edit"
-                            onClick={() => handleEditOperation(operation)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            title="Print Operation Report"
-                            onClick={() => handleOperationPrintClick(operation)}
-                          >
-                            <Printer className="h-4 w-4" />
-                          </Button>
-                          <DeleteConfirmDialog
-                            title="Cancel Operation"
-                            description={`Are you sure you want to cancel the operation "${operation.operation_name}"? This action cannot be undone.`}
-                            onConfirm={() => handleDeleteOperation(operation.id)}
-                          >
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </DeleteConfirmDialog>
-                        </div>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                        Loading operations...
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-          <Pagination
-            currentPage={pagination?.page || 1}
-            totalPages={pagination?.totalPages || 0}
-            pageSize={pagination?.limit || 10}
-            totalItems={pagination?.total || 0}
-            onPageChange={onPageChange}
-            onPageSizeChange={onPageSizeChange}
-          />
-        </CardContent>
-      </Card>
+                  ) : error ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="py-8 text-center text-destructive">
+                        Error loading operations: {error}
+                      </TableCell>
+                    </TableRow>
+                  ) : operations.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                        No operations found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    operations.map((operation) => (
+                      <TableRow key={operation.id}>
+                        <TableCell className="text-sm font-medium text-gray-900">
+                          {formatOperationDate(operation.operation_date)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-indigo-50 text-sm font-semibold text-indigo-600">
+                              {getPatientInitials(operation.patients?.full_name)}
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-sm font-medium text-gray-900">
+                                {operation.patients?.full_name || 'N/A'}
+                              </span>
+                              <span className="font-mono text-xs text-blue-600">
+                                {operation.patients?.patient_id || '-'}
+                              </span>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm font-semibold text-gray-800">
+                          {operation.operation_name}
+                        </TableCell>
+                        <TableCell>
+                          {(() => {
+                            const eyeValue =
+                              ('eye_name' in operation && typeof operation.eye_name === 'string'
+                                ? operation.eye_name
+                                : operation.eye) || null
+                            const badgeProps = getEyeBadgeProps(eyeValue || undefined)
+                            if (!badgeProps) {
+                              return <span className="text-base text-gray-300">•</span>
+                            }
+                            return (
+                              <span
+                                className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${badgeProps.className}`}
+                              >
+                                {badgeProps.label}
+                              </span>
+                            )
+                          })()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1 pr-2">
+                            <Clock className="h-3 w-3 text-muted-foreground" />
+                            {(() => {
+                              const formattedStart = formatTimeDisplay(operation.begin_time)
+                              const formattedEnd = formatTimeDisplay(operation.end_time)
+                              const isOngoing = operation.status === 'in-progress' || !formattedEnd
+
+                              if (!formattedStart && !formattedEnd) {
+                                return <span className="text-sm text-muted-foreground">—</span>
+                              }
+
+                              return (
+                                <>
+                                  <span className="tabular-nums text-sm text-gray-700">
+                                    {[formattedStart, !isOngoing && formattedEnd ? formattedEnd : null]
+                                      .filter(Boolean)
+                                      .join(" - ")}
+                                  </span>
+                                  {isOngoing && (
+                                    <span className="tabular-nums text-sm font-bold text-amber-600 animate-pulse">
+                                      {formattedStart ? " - Ongoing" : "Ongoing"}
+                                    </span>
+                                  )}
+                                </>
+                              )
+                            })()}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {(() => {
+                            const statusStyle = getStatusStyle(operation.status)
+                            return (
+                              <span
+                                className={`inline-flex items-center gap-2 rounded-full px-3 py-0.5 text-xs font-semibold ${statusStyle.pill}`}
+                              >
+                                <span className={`h-2 w-2 rounded-full ${statusStyle.dot}`} />
+                                {statusStyle.label}
+                              </span>
+                            )
+                          })()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {operation.amount ? (
+                            <span className="font-mono text-sm text-gray-700">
+                              ₹{operation.amount.toLocaleString()}
+                            </span>
+                          ) : (
+                            <span className="font-mono text-sm text-gray-300">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                              title="View Details"
+                              aria-label="View operation"
+                              onClick={() => handleViewOperation(operation)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-md p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600"
+                              title="Edit Operation"
+                              aria-label="Edit operation"
+                              onClick={() => handleEditOperation(operation)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-md p-1.5 text-gray-400 hover:bg-slate-100 hover:text-slate-700"
+                              title="Print Report"
+                              aria-label="Print operation report"
+                              onClick={() => handleOperationPrintClick(operation)}
+                            >
+                              <Printer className="h-4 w-4" />
+                            </Button>
+                            <DeleteConfirmDialog
+                              title="Cancel Operation"
+                              description={`Are you sure you want to cancel the operation "${operation.operation_name}"? This action cannot be undone.`}
+                              onConfirm={() => handleDeleteOperation(operation.id)}
+                            >
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 rounded-md p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                                title="Delete Operation"
+                                aria-label="Cancel operation"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </DeleteConfirmDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+            <Pagination
+              currentPage={pagination?.page || 1}
+              totalPages={pagination?.totalPages || 0}
+              pageSize={pagination?.limit || 10}
+              totalItems={pagination?.total || 0}
+              onPageChange={onPageChange}
+              onPageSizeChange={onPageSizeChange}
+            />
+          </CardContent>
+        </Card>
       {/* Print Dialog */}
       {selectedOperationForPrint && (
         <OperationPrint
@@ -533,9 +655,17 @@ export default function OperationsPage() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Status</p>
-                    <Badge className={getStatusColor(selectedOperation.status)}>
-                      {getStatusLabel(selectedOperation.status)}
-                    </Badge>
+                    {(() => {
+                      const statusStyle = getStatusStyle(selectedOperation.status)
+                      return (
+                        <span
+                          className={`inline-flex items-center gap-2 rounded-full px-3 py-0.5 text-xs font-semibold ${statusStyle.pill}`}
+                        >
+                          <span className={`h-2 w-2 rounded-full ${statusStyle.dot}`} />
+                          {statusStyle.label}
+                        </span>
+                      )
+                    })()}
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Eye</p>
@@ -761,6 +891,7 @@ export default function OperationsPage() {
           <div style={{ display: 'none' }} />
         </OperationForm>
       )}
+      </div>
     </div>
   )
 }

@@ -4,20 +4,18 @@ import * as React from "react"
 import {
   Plus,
   Search,
-  Filter,
   Bed,
-  CheckCircle,
-  AlertCircle,
-  Wrench,
-  TrendingUp,
   Eye,
   Trash2,
   Edit,
+  Wrench,
+  Sparkles,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   Table,
   TableBody,
@@ -41,6 +39,54 @@ import { BedForm } from "@/components/bed-form"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
 import { bedsApi, masterDataApi, type BedWithAssignment } from "@/lib/services/api"
 import { useToast } from "@/hooks/use-toast"
+import { cn } from "@/lib/utils"
+
+const bedStatusStyles = {
+  available: {
+    label: "Available",
+    pill: "bg-emerald-50 text-emerald-700 border border-emerald-100",
+    dot: "bg-emerald-500",
+  },
+  occupied: {
+    label: "Occupied",
+    pill: "bg-red-50 text-red-700 border border-red-100",
+    dot: "bg-red-500",
+  },
+  reserved: {
+    label: "Reserved",
+    pill: "bg-amber-50 text-amber-700 border border-amber-100",
+    dot: "bg-amber-500",
+  },
+  maintenance: {
+    label: "Maintenance",
+    pill: "bg-slate-50 text-slate-600 border border-slate-200",
+    dot: "bg-slate-400",
+    icon: Wrench,
+  },
+  cleaning: {
+    label: "Cleaning",
+    pill: "bg-sky-50 text-sky-700 border border-sky-100",
+    dot: "bg-sky-400",
+    icon: Sparkles,
+  },
+  default: {
+    label: "Unknown",
+    pill: "bg-gray-50 text-gray-600 border border-gray-200",
+    dot: "bg-gray-400",
+  },
+} as const
+
+const getBedStatusStyle = (status: string) =>
+  bedStatusStyles[status as keyof typeof bedStatusStyles] ?? bedStatusStyles.default
+
+const getNameInitials = (name?: string | null) => {
+  if (!name) return "PT"
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase()
+  }
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
 
 export default function BedsPage() {
   const { toast } = useToast()
@@ -211,8 +257,8 @@ export default function BedsPage() {
   const totalBeds = beds.length
   const occupiedBeds = beds.filter(b => b.bed.status === 'occupied').length
   const availableBeds = beds.filter(b => b.bed.status === 'available').length
+  const reservedBeds = beds.filter(b => b.bed.status === 'reserved').length
   const maintenanceBeds = beds.filter(b => b.bed.status === 'maintenance').length
-  const occupancyRate = totalBeds > 0 ? ((occupiedBeds / totalBeds) * 100).toFixed(1) : "0.0"
   const bedsWithSurgeryToday = beds.filter(b => {
     if (!b.assignment?.surgery_scheduled_time) return false
     const surgeryDate = new Date(b.assignment.surgery_scheduled_time).toDateString()
@@ -378,96 +424,93 @@ export default function BedsPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Bed Management</h1>
+          <h1 className="text-3xl font-bold tracking-tight font-jakarta">Bed Management</h1>
           <p className="text-muted-foreground">
             Manage bed availability and patient assignments
           </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <BedForm onSuccess={fetchBeds}>
-            <Button variant="outline" className="gap-2">
-              <Bed className="h-4 w-4" />
-              Add New Bed
-            </Button>
-          </BedForm>
-          <BedAssignmentForm onSuccess={fetchBeds}>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              Assign Bed
-            </Button>
-          </BedAssignmentForm>
         </div>
       </div>
 
       {/* Statistics Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+        <Card className="h-full border border-gray-200 bg-white">
+          <CardContent className="flex h-full flex-col justify-center gap-1 p-4">
+            <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
               Total Beds
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalBeds}</div>
+            </span>
+            <span className="text-3xl font-bold text-gray-900">{totalBeds}</span>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Occupied
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{occupiedBeds}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+        <Card className="h-full border border-emerald-100 bg-emerald-50">
+          <CardContent className="flex h-full flex-col justify-center gap-1 p-4">
+            <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
               Available
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{availableBeds}</div>
+            </span>
+            <span className="text-3xl font-bold text-emerald-700">{availableBeds}</span>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+        <Card className="h-full border border-red-100 bg-red-50">
+          <CardContent className="flex h-full flex-col justify-center gap-1 p-4">
+            <span className="text-xs font-semibold uppercase tracking-wider text-red-700">
+              Occupied
+            </span>
+            <span className="text-3xl font-bold text-red-700">{occupiedBeds}</span>
+          </CardContent>
+        </Card>
+
+        <Card className="h-full border border-amber-100 bg-amber-50">
+          <CardContent className="flex h-full flex-col justify-center gap-1 p-4">
+            <span className="text-xs font-semibold uppercase tracking-wider text-amber-700">
+              Reserved
+            </span>
+            <span className="text-3xl font-bold text-amber-700">{reservedBeds}</span>
+          </CardContent>
+        </Card>
+
+        <Card className="h-full border border-gray-200 bg-gray-100">
+          <CardContent className="flex h-full flex-col justify-center gap-1 p-4">
+            <span className="text-xs font-semibold uppercase tracking-wider text-gray-600">
               Maintenance
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-600">{maintenanceBeds}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Occupancy Rate
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{occupancyRate}%</div>
+            </span>
+            <span className="text-3xl font-bold text-gray-600">{maintenanceBeds}</span>
           </CardContent>
         </Card>
       </div>
 
       <Tabs defaultValue="kanban" className="space-y-4">
-        <div className="flex items-center justify-between">
-          <TabsList>
-            <TabsTrigger value="kanban">Kanban View</TabsTrigger>
-            <TabsTrigger value="table">Table View</TabsTrigger>
+        <div className="flex flex-wrap items-center gap-4 justify-between">
+          <TabsList className="bg-gray-100 p-1 rounded-lg gap-1">
+            <TabsTrigger
+              value="kanban"
+              className="rounded-md px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-gray-900"
+            >
+              Kanban View
+            </TabsTrigger>
+            <TabsTrigger
+              value="table"
+              className="rounded-md px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-gray-900"
+            >
+              Table View
+            </TabsTrigger>
           </TabsList>
 
-          {/* Filters */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <BedAssignmentForm onSuccess={fetchBeds}>
+              <Button className="gap-2 rounded-lg bg-blue-600 text-white shadow-md hover:bg-blue-700">
+                <Plus className="h-4 w-4" />
+                Assign Bed
+              </Button>
+            </BedAssignmentForm>
+            <BedForm onSuccess={fetchBeds}>
+              <Button className="gap-2 rounded-lg border border-gray-300 bg-white text-gray-700 shadow-sm hover:bg-gray-50">
+                <Bed className="h-4 w-4" />
+                Add New Bed
+              </Button>
+            </BedForm>
             <Select value={wardFilter} onValueChange={setWardFilter}>
-              <SelectTrigger className="w-[130px]">
+              <SelectTrigger className="w-[130px] rounded-lg border border-gray-300 bg-white text-gray-700">
                 <SelectValue placeholder="Ward" />
               </SelectTrigger>
               <SelectContent>
@@ -479,7 +522,7 @@ export default function BedsPage() {
               </SelectContent>
             </Select>
             <Select value={floorFilter} onValueChange={setFloorFilter}>
-              <SelectTrigger className="w-[110px]">
+              <SelectTrigger className="w-[110px] rounded-lg border border-gray-300 bg-white text-gray-700">
                 <SelectValue placeholder="Floor" />
               </SelectTrigger>
               <SelectContent>
@@ -494,7 +537,7 @@ export default function BedsPage() {
               <Input
                 type="search"
                 placeholder="Search..."
-                className="pl-8 w-[180px]"
+                className="w-[180px] rounded-lg border border-gray-300 bg-white pl-8 text-gray-700"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -512,7 +555,7 @@ export default function BedsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Available Column */}
             <Card 
-              className={`bg-green-50/50 transition-all ${dragOverColumn === 'available' ? 'ring-2 ring-green-500 shadow-lg' : ''}`}
+              className={`rounded-xl border border-gray-100 bg-gray-50/50 transition-all ${dragOverColumn === 'available' ? 'ring-2 ring-green-500 shadow-lg' : ''}`}
               onDragOver={(e) => handleDragOver(e, 'available')}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, 'available')}
@@ -524,7 +567,7 @@ export default function BedsPage() {
                     <CardTitle className="text-base">Available</CardTitle>
                   </div>
                   <Badge variant="secondary" className="bg-green-100 text-green-700">
-                    {filteredBeds.filter(b => b.bed.status === 'available').length}
+                    {filteredBeds.filter(b => b.bed.status === 'available').length} Beds
                   </Badge>
                 </div>
                 <CardDescription className="text-xs">
@@ -554,7 +597,7 @@ export default function BedsPage() {
 
             {/* Occupied Column */}
             <Card 
-              className={`bg-red-50/50 transition-all ${dragOverColumn === 'occupied' ? 'ring-2 ring-red-500 shadow-lg' : ''}`}
+              className={`rounded-xl border border-gray-100 bg-gray-50/50 transition-all ${dragOverColumn === 'occupied' ? 'ring-2 ring-red-500 shadow-lg' : ''}`}
               onDragOver={(e) => handleDragOver(e, 'occupied')}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, 'occupied')}
@@ -566,7 +609,7 @@ export default function BedsPage() {
                     <CardTitle className="text-base">Occupied</CardTitle>
                   </div>
                   <Badge variant="secondary" className="bg-red-100 text-red-700">
-                    {filteredBeds.filter(b => b.bed.status === 'occupied').length}
+                    {filteredBeds.filter(b => b.bed.status === 'occupied').length} Beds
                   </Badge>
                 </div>
                 <CardDescription className="text-xs">
@@ -596,7 +639,7 @@ export default function BedsPage() {
 
             {/* Reserved Column */}
             <Card 
-              className={`bg-yellow-50/50 transition-all ${dragOverColumn === 'reserved' ? 'ring-2 ring-yellow-500 shadow-lg' : ''}`}
+              className={`rounded-xl border border-gray-100 bg-gray-50/50 transition-all ${dragOverColumn === 'reserved' ? 'ring-2 ring-yellow-500 shadow-lg' : ''}`}
               onDragOver={(e) => handleDragOver(e, 'reserved')}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, 'reserved')}
@@ -608,7 +651,7 @@ export default function BedsPage() {
                     <CardTitle className="text-base">Reserved</CardTitle>
                   </div>
                   <Badge variant="secondary" className="bg-yellow-100 text-yellow-700">
-                    {filteredBeds.filter(b => b.bed.status === 'reserved').length}
+                    {filteredBeds.filter(b => b.bed.status === 'reserved').length} Beds
                   </Badge>
                 </div>
                 <CardDescription className="text-xs">
@@ -638,7 +681,7 @@ export default function BedsPage() {
 
             {/* Maintenance Column */}
             <Card 
-              className={`bg-gray-50/50 transition-all ${dragOverColumn === 'maintenance' ? 'ring-2 ring-gray-500 shadow-lg' : ''}`}
+              className={`rounded-xl border border-gray-100 bg-gray-50/50 transition-all ${dragOverColumn === 'maintenance' ? 'ring-2 ring-gray-500 shadow-lg' : ''}`}
               onDragOver={(e) => handleDragOver(e, 'maintenance')}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, 'maintenance')}
@@ -650,7 +693,7 @@ export default function BedsPage() {
                     <CardTitle className="text-base">Maintenance</CardTitle>
                   </div>
                   <Badge variant="secondary" className="bg-gray-100 text-gray-700">
-                    {filteredBeds.filter(b => b.bed.status === 'maintenance').length}
+                    {filteredBeds.filter(b => b.bed.status === 'maintenance').length} Beds
                   </Badge>
                 </div>
                 <CardDescription className="text-xs">
@@ -728,7 +771,7 @@ export default function BedsPage() {
                       <TableHead className="w-[180px]">Surgery Info</TableHead>
                       <TableHead className="w-[140px]">Doctor</TableHead>
                       <TableHead className="w-[100px] text-right">Rate/Day</TableHead>
-                      <TableHead className="w-[120px] text-center">Actions</TableHead>
+                      <TableHead className="w-[120px] text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -739,48 +782,53 @@ export default function BedsPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredBeds.map(({ bed, assignment }) => (
+                      filteredBeds.map(({ bed, assignment }) => {
+                        const statusStyle = getBedStatusStyle(bed.status)
+                        const StatusIcon = statusStyle.icon
+                        const isOutOfService = bed.status === 'maintenance' || bed.status === 'cleaning'
+
+                        return (
                         <TableRow 
                           key={bed.id} 
-                          className="hover:bg-muted/50 transition-colors"
+                          className={cn(
+                            "hover:bg-muted/50 transition-colors",
+                            isOutOfService && "bg-slate-50/80 border-l-4 border-dashed border-slate-200 [&>td]:opacity-75"
+                          )}
                         >
                           <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Bed className="h-4 w-4 text-muted-foreground" />
-                              <span className="font-mono font-semibold text-base">
-                                {bed.bed_number}
+                            <div className="flex items-center gap-3">
+                              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                                <Bed className="h-4 w-4" />
                               </span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="space-y-1">
-                              <div className="font-medium capitalize text-sm">{bed.ward_name}</div>
-                              <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                <Badge variant="outline" className="text-xs h-5">
-                                  {bed.ward_type}
-                                </Badge>
-                                Floor {bed.floor_number}
+                              <div className="space-y-0.5">
+                                <div className="text-sm font-bold text-gray-900">
+                                  {bed.bed_number}
+                                </div>
+                                <div className="text-xs font-medium text-muted-foreground">
+                                  {bed.bed_type || "Standard"}
+                                </div>
                               </div>
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge
-                              variant="outline"
-                              className={`font-medium ${
-                                bed.status === 'available' 
-                                  ? 'bg-green-50 text-green-700 border-green-300' 
-                                  : bed.status === 'occupied' 
-                                  ? 'bg-red-50 text-red-700 border-red-300' 
-                                  : bed.status === 'maintenance' 
-                                  ? 'bg-gray-50 text-gray-700 border-gray-300' 
-                                  : 'bg-yellow-50 text-yellow-700 border-yellow-300'
-                              }`}
+                            <div className="space-y-0.5">
+                              <div className="text-sm font-medium text-gray-900 capitalize">
+                                {bed.ward_name}
+                              </div>
+                              <div className="text-xs text-gray-600">
+                                Floor {bed.floor_number}
+                                {bed.room_number ? ` • Room ${bed.room_number}` : ""}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span
+                              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${statusStyle.pill}`}
                             >
-                              {bed.status === 'available' && <CheckCircle className="h-3 w-3 mr-1" />}
-                              {bed.status === 'occupied' && <AlertCircle className="h-3 w-3 mr-1" />}
-                              {bed.status === 'maintenance' && <Wrench className="h-3 w-3 mr-1" />}
-                              {bed.status}
-                            </Badge>
+                              <span className={`h-2 w-2 rounded-full ${statusStyle.dot}`} />
+                              {StatusIcon && <StatusIcon className="h-3.5 w-3.5" />}
+                              {statusStyle.label}
+                            </span>
                           </TableCell>
                           <TableCell>
                             {assignment ? (
@@ -793,21 +841,32 @@ export default function BedsPage() {
                           </TableCell>
                           <TableCell>
                             {assignment ? (
-                              <div className="space-y-1">
-                                <div className="font-medium text-sm">{assignment.patient_name}</div>
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="secondary" className="text-xs h-5">
-                                    {assignment.patient_mrn}
-                                  </Badge>
-                                  {assignment.patient_age && (
-                                    <span className="text-xs text-muted-foreground">
-                                      {assignment.patient_age}y
-                                    </span>
-                                  )}
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-9 w-9 border border-gray-100 bg-white shadow-sm">
+                                  <AvatarFallback className="text-xs font-semibold text-gray-600 bg-slate-100">
+                                    {getNameInitials(assignment.patient_name)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="space-y-0.5">
+                                  <div className="text-sm font-semibold text-gray-900">
+                                    {assignment.patient_name || "Patient"}
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                    {assignment.patient_mrn && (
+                                      <span className="font-mono uppercase text-[11px] tracking-wide text-gray-500">
+                                        {assignment.patient_mrn}
+                                      </span>
+                                    )}
+                                    {assignment.patient_age && (
+                                      <span>{assignment.patient_age}y</span>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             ) : (
-                              <span className="text-sm text-muted-foreground">Not assigned</span>
+                              <span className="inline-flex items-center rounded-full border border-dashed border-gray-200 px-3 py-1 text-xs font-medium text-gray-500">
+                                Vacant
+                              </span>
                             )}
                           </TableCell>
                           <TableCell>
@@ -874,16 +933,16 @@ export default function BedsPage() {
                             )}
                           </TableCell>
                           <TableCell className="text-right">
-                            <span className="font-semibold text-sm">
+                            <span className="font-mono text-sm font-semibold text-gray-900 tabular-nums">
                               ₹{bed.daily_rate.toLocaleString()}
                             </span>
                           </TableCell>
-                          <TableCell>
-                            <div className="flex items-center justify-center gap-1">
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1.5">
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 hover:bg-blue-50 hover:text-blue-600"
+                                className="h-8 w-8 rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-900"
                                 onClick={() => handleBedClick({ bed, assignment })}
                                 title="View details"
                               >
@@ -897,7 +956,7 @@ export default function BedsPage() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-8 w-8 hover:bg-green-50 hover:text-green-600"
+                                  className="h-8 w-8 rounded-md text-gray-500 hover:bg-emerald-50 hover:text-emerald-700"
                                   title="Edit bed"
                                 >
                                   <Edit className="h-4 w-4" />
@@ -906,7 +965,7 @@ export default function BedsPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 hover:bg-red-50 hover:text-red-600"
+                                className="h-8 w-8 rounded-md text-gray-500 hover:bg-red-50 hover:text-red-600"
                                 onClick={() => setDeletingBed({ id: bed.id, name: bed.bed_number })}
                                 title="Delete bed"
                                 disabled={bed.status === 'occupied'}
@@ -916,7 +975,7 @@ export default function BedsPage() {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))
+                      )})
                     )}
                   </TableBody>
                 </Table>

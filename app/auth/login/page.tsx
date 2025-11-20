@@ -21,20 +21,35 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Validate inputs
+    if (!email || !password) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter both email and password",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsLoading(true)
 
     try {
       const supabase = createClient()
       
+      // Trim email to remove any whitespace
+      const trimmedEmail = email.trim().toLowerCase()
+      
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: trimmedEmail,
         password,
       })
 
       if (error) {
+        console.error('Login error:', error)
         toast({
           title: "Login Failed",
-          description: error.message,
+          description: error.message || "Invalid email or password. Please check your credentials and try again.",
           variant: "destructive",
         })
         return
@@ -47,11 +62,18 @@ export default function LoginPage() {
         })
         router.push("/dashboard/cases")
         router.refresh()
+      } else {
+        toast({
+          title: "Login Failed",
+          description: "No session was created. Please try again.",
+          variant: "destructive",
+        })
       }
     } catch (error: any) {
+      console.error('Unexpected login error:', error)
       toast({
         title: "Error",
-        description: error.message || "An unexpected error occurred",
+        description: error.message || "An unexpected error occurred. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -67,13 +89,13 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center w-20 h-20 mb-4">
             <Image 
               src="/logo.svg" 
-              alt="EyeZen Logo" 
+              alt="OptiZen Logo" 
               width={80} 
               height={80}
               priority
             />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">EyeZen</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">OptiZen</h1>
           <p className="text-sm text-muted-foreground mt-1">Hospital Management System</p>
         </div>
 
@@ -93,7 +115,7 @@ export default function LoginPage() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="admin@eyezen.com"
+                  placeholder="admin@optizen.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required

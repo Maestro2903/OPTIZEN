@@ -20,7 +20,7 @@ interface PrintLayoutProps {
 export function PrintLayout({
   documentType,
   documentTitle,
-  clinicName = "EyeZen Medical Center",
+  clinicName = "OptiZen Medical Center",
   clinicAddress = "123 Medical Plaza, Healthcare District, City - 123456",
   clinicPhone = "+91 98765 43210",
   children,

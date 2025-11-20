@@ -2,21 +2,19 @@
 
 import * as React from "react"
 import {
-  Plus,
+  FolderPlus,
+  Copy,
+  Phone,
   Search,
   Filter,
-  FolderOpen,
   Eye,
   Edit,
   Trash2,
   Printer,
-  ArrowUpDown,
   MoreHorizontal,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
 import {
   Table,
   TableBody,
@@ -25,14 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { CaseForm } from "@/components/case-form"
 import { CaseViewDialog } from "@/components/case-view-dialog"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
@@ -43,11 +34,19 @@ import { useApiList, useApiForm, useApiDelete } from "@/lib/hooks/useApi"
 import { casesApi, patientsApi, type Case, type CaseFilters } from "@/lib/services/api"
 
 
-const statusColors = {
-  active: "bg-blue-100 text-blue-700 border-blue-200",
-  completed: "bg-green-100 text-green-700 border-green-200",
-  cancelled: "bg-red-100 text-red-700 border-red-200",
-  pending: "bg-yellow-100 text-yellow-700 border-yellow-200",
+const statusStyles = {
+  active: {
+    container: "border-emerald-100 bg-emerald-50 text-emerald-700",
+    dot: "bg-emerald-500",
+  },
+  closed: {
+    container: "border-gray-200 bg-gray-100 text-gray-600",
+    dot: "bg-gray-500",
+  },
+  default: {
+    container: "border-blue-100 bg-blue-50 text-blue-700",
+    dot: "bg-blue-500",
+  },
 }
 
 // Helper function to calculate age from date of birth
@@ -109,6 +108,27 @@ export default function CasesPage() {
   const { submitForm: createCase, loading: createLoading } = useApiForm<Case>()
   const { submitForm: updateCase, loading: updateLoading } = useApiForm<Case>()
   const { deleteItem, loading: deleteLoading } = useApiDelete()
+
+  const handleCopyCaseNumber = React.useCallback((caseNumber: string) => {
+    if (!caseNumber || typeof navigator === "undefined" || !navigator.clipboard) {
+      return
+    }
+    navigator.clipboard
+      .writeText(caseNumber)
+      .then(() => {
+        toast({
+          title: "Copied",
+          description: "Case number copied to clipboard.",
+        })
+      })
+      .catch(() => {
+        toast({
+          variant: "destructive",
+          title: "Copy failed",
+          description: "Unable to copy the case number. Please try again.",
+        })
+      })
+  }, [toast])
 
   const handleAddCase = async (caseData: any) => {
     try {
@@ -215,135 +235,159 @@ export default function CasesPage() {
     return () => clearTimeout(timeoutId)
   }, [searchTerm, search])
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Cases</h1>
-          <p className="text-muted-foreground">
-            Manage patient cases and medical records
-          </p>
+    <div className="min-h-screen bg-slate-50 px-5 py-6">
+      <div className="mx-auto flex w-full flex-col gap-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight font-jakarta">Cases</h1>
+            <p className="text-muted-foreground">
+              Manage patient cases and medical records
+            </p>
+          </div>
+          <CaseForm onSubmit={handleAddCase}>
+            <Button className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition-colors hover:bg-blue-700">
+              <FolderPlus className="h-4 w-4" />
+              Add Case
+            </Button>
+          </CaseForm>
         </div>
-        <CaseForm onSubmit={handleAddCase}>
-          <Button className="gap-2">
-            <Plus className="h-4 w-4" />
-            Add Case
-          </Button>
-        </CaseForm>
-      </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="flex flex-col gap-4 border-b border-gray-100 p-6 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <CardTitle>Case List</CardTitle>
-              <CardDescription>
+              <h2 className="text-xl font-semibold">Case List</h2>
+              <p className="text-sm text-muted-foreground">
                 Browse and manage all patient cases
-              </CardDescription>
+              </p>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+              <div className="relative w-full sm:w-[300px]">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   type="search"
                   placeholder="Search cases..."
-                  className="pl-8 w-[300px]"
+                  className="w-full pl-9"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   disabled={loading}
                 />
               </div>
-              <Button variant="outline" size="icon">
+              <Button variant="outline" size="icon" className="h-10 w-10">
                 <Filter className="h-4 w-4" />
               </Button>
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border overflow-x-auto">
+          <div className="p-6">
+            <div className="overflow-x-auto rounded-md border lg:overflow-x-visible">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead className="min-w-[60px]">SR. NO.</TableHead>
-                  <TableHead className="min-w-[120px]">PATIENT ID</TableHead>
-                  <TableHead className="min-w-[120px]">CASE NO</TableHead>
-                  <TableHead className="min-w-[100px]">DATE</TableHead>
-                  <TableHead className="min-w-[150px]">PATIENT NAME</TableHead>
-                  <TableHead className="min-w-[60px]">AGE</TableHead>
-                  <TableHead className="min-w-[100px]">EMAIL</TableHead>
-                  <TableHead className="min-w-[100px]">MOBILE</TableHead>
-                  <TableHead className="min-w-[80px]">GENDER</TableHead>
-                  <TableHead className="min-w-[100px]">STATE</TableHead>
-                  <TableHead className="min-w-[100px]">VISIT TYPE</TableHead>
-                  <TableHead className="min-w-[80px]">STATUS</TableHead>
-                  <TableHead className="min-w-[150px]">CHIEF COMPLAINT</TableHead>
-                  <TableHead className="min-w-[150px]">DIAGNOSIS</TableHead>
-                  <TableHead className="min-w-[120px]">ACTION</TableHead>
+                <TableRow className="bg-gray-50 border-b">
+                  <TableHead className="min-w-[120px] border-b text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    CASE NO
+                  </TableHead>
+                  <TableHead className="min-w-[100px] border-b text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    DATE
+                  </TableHead>
+                  <TableHead className="min-w-[180px] border-b text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    PATIENT DETAILS
+                  </TableHead>
+                  <TableHead className="min-w-[120px] border-b text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    MOBILE
+                  </TableHead>
+                  <TableHead className="min-w-[80px] border-b text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    STATUS
+                  </TableHead>
+                  <TableHead className="min-w-[140px] border-b text-right text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    ACTION
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={15} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
                       Loading cases...
                     </TableCell>
                   </TableRow>
                 ) : cases.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={15} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
                       No cases found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  cases.map((caseItem, index) => {
+                  cases.map((caseItem) => {
                     const age = calculateAge(caseItem.patients?.date_of_birth)
-                    const formattedDate = caseItem.encounter_date ? new Date(caseItem.encounter_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '-'
+                    const formattedDate = caseItem.encounter_date
+                      ? new Date(caseItem.encounter_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+                      : '-'
                     return (
                   <TableRow key={caseItem.id}>
-                    <TableCell className="font-medium">{((pagination?.page || 1) - 1) * (pagination?.limit || 10) + index + 1}</TableCell>
-                    <TableCell className="font-mono text-sm font-semibold text-primary">{caseItem.patients?.patient_id || '-'}</TableCell>
-                    <TableCell className="font-medium">{caseItem.case_no}</TableCell>
-                    <TableCell className="text-muted-foreground">{formattedDate}</TableCell>
-                    <TableCell className="font-medium uppercase">{caseItem.patients?.full_name || '-'}</TableCell>
-                    <TableCell>{age !== null ? `${age} yrs` : '-'}</TableCell>
-                    <TableCell className="text-muted-foreground">{caseItem.patients?.email || '-'}</TableCell>
-                    <TableCell>{caseItem.patients?.mobile || '-'}</TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="text-xs capitalize">
-                        {caseItem.patients?.gender || '-'}
-                      </Badge>
+                      <div className="group flex items-center gap-2">
+                        <span className="max-w-[150px] truncate font-mono text-xs text-gray-700">
+                          {caseItem.case_no || '-'}
+                        </span>
+                        {caseItem.case_no && (
+                          <button
+                            type="button"
+                            onClick={() => handleCopyCaseNumber(caseItem.case_no!)}
+                            className="invisible rounded-full p-1 text-gray-400 transition-all hover:text-gray-700 group-hover:visible"
+                            aria-label="Copy case number"
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </TableCell>
-                    <TableCell>{caseItem.patients?.state || '-'}</TableCell>
+                    <TableCell className="text-sm text-gray-600">{formattedDate}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="text-xs">
-                        {caseItem.visit_type || '-'}
-                      </Badge>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-gray-900">
+                          {caseItem.patients?.full_name || '-'}
+                        </span>
+                        <span className="text-xs font-mono text-blue-600">
+                          {caseItem.patients?.patient_id || '-'}
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell>
-                      <Badge 
-                        className={`text-xs ${
-                          caseItem.status === 'active' ? statusColors.active :
-                          caseItem.status === 'completed' ? statusColors.completed :
-                          caseItem.status === 'cancelled' ? statusColors.cancelled :
-                          statusColors.pending
-                        }`}
-                      >
-                        {caseItem.status || 'active'}
-                      </Badge>
+                      {caseItem.patients?.mobile ? (
+                        <a
+                          href={`tel:${caseItem.patients.mobile}`}
+                          className="flex items-center gap-2 text-sm font-medium text-gray-900 hover:text-blue-600"
+                        >
+                          <Phone className="h-4 w-4 text-gray-400" />
+                          {caseItem.patients.mobile}
+                        </a>
+                      ) : (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Phone className="h-4 w-4 text-gray-300" />
+                          -
+                        </div>
+                      )}
                     </TableCell>
-                    <TableCell 
-                      className="text-muted-foreground max-w-[150px] truncate" 
-                      title={caseItem.chief_complaint || '-'}
-                    >
-                      {truncateText(caseItem.chief_complaint, 30)}
+                    <TableCell>
+                      {(() => {
+                        const statusValue = caseItem.status?.toLowerCase() || "active"
+                        const style =
+                          statusValue === "active"
+                            ? statusStyles.active
+                            : statusValue === "closed"
+                              ? statusStyles.closed
+                              : statusStyles.default
+                        return (
+                          <span
+                            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium ${style.container}`}
+                          >
+                            <span className={`h-2 w-2 rounded-full ${style.dot}`} />
+                            <span className="capitalize">{caseItem.status || "Active"}</span>
+                          </span>
+                        )
+                      })()}
                     </TableCell>
-                    <TableCell 
-                      className="text-muted-foreground max-w-[150px] truncate" 
-                      title={formatDiagnosis(caseItem.diagnosis)}
-                    >
-                      {truncateText(formatDiagnosis(caseItem.diagnosis), 30)}
-                    </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center gap-1">
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-2">
                         <CaseViewDialog
                           caseData={{
                             // Basic info
@@ -389,12 +433,24 @@ export default function CasesPage() {
                             past_medications: caseItem.past_medications || [],
                           }}
                         >
-                          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" title="View Case">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-md transition-colors hover:bg-gray-100 hover:text-gray-900"
+                            title="View Case"
+                          >
                             <Eye className="h-4 w-4" />
                           </Button>
                         </CaseViewDialog>
                         <CaseForm caseData={caseItem} mode="edit" onSubmit={(data) => handleUpdateCase(caseItem.id, data)}>
-                          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" title="Edit Case">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-md transition-colors hover:bg-blue-50 hover:text-blue-600"
+                            title="Edit Case"
+                          >
                             <Edit className="h-4 w-4" />
                           </Button>
                         </CaseForm>
@@ -422,7 +478,7 @@ export default function CasesPage() {
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8"
+                            className="h-8 w-8 rounded-md transition-colors hover:bg-gray-100 hover:text-gray-900"
                             title="Print Case Record"
                           >
                             <Printer className="h-4 w-4" />
@@ -433,10 +489,65 @@ export default function CasesPage() {
                           description={`Are you sure you want to delete case ${caseItem.case_no}? This action cannot be undone.`}
                           onConfirm={() => handleDeleteCase(caseItem.id)}
                         >
-                          <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive" title="Delete Case">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-md text-destructive transition-colors hover:bg-red-50 hover:text-red-600"
+                            title="Delete Case"
+                          >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </DeleteConfirmDialog>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-md transition-colors hover:bg-gray-100 hover:text-gray-900"
+                              title="More details"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="end"
+                            className="z-50 w-80 rounded-lg border border-gray-200 bg-white p-0 shadow-xl ring-0"
+                          >
+                            <div className="flex flex-col gap-4 p-4">
+                              <div className="border-b border-gray-100 pb-3">
+                                <p className="text-sm font-semibold text-gray-900">Patient Snapshot</p>
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <p className="text-[10px] font-semibold uppercase text-gray-500">Age</p>
+                                  <p className="text-sm font-medium text-gray-800">
+                                    {age !== null ? `${age} yrs` : '-'}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-[10px] font-semibold uppercase text-gray-500">Email</p>
+                                  <p className="truncate text-sm font-medium text-gray-800">
+                                    {caseItem.patients?.email || '-'}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-[10px] font-semibold uppercase text-gray-500">Gender</p>
+                                  <p className="text-sm font-medium text-gray-800 capitalize">
+                                    {caseItem.patients?.gender || '-'}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-[10px] font-semibold uppercase text-gray-500">State</p>
+                                  <p className="text-sm font-medium text-gray-800">
+                                    {caseItem.patients?.state || '-'}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -457,8 +568,9 @@ export default function CasesPage() {
               setCurrentPage(1)
             }}
           />
-        </CardContent>
-      </Card>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

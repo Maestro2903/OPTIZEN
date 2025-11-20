@@ -278,5 +278,23 @@ html {
   }
 }
 
+/* Ensure dialogs and overlays are always above sidebar */
+[data-radix-dialog-overlay],
+[data-radix-dialog-content],
+[data-radix-sheet-overlay],
+[data-radix-sheet-content] {
+  z-index: 50 !important;
+}
+
+/* Ensure sidebar doesn't interfere with overlays when collapsed */
+[data-state="collapsed"] [data-sidebar="sidebar"] {
+  z-index: 1 !important;
+}
+
+[data-sidebar="rail"] {
+  z-index: 2 !important;
+  pointer-events: auto;
+}
+
 /* Import print styles */
 @import url('../styles/print.css');

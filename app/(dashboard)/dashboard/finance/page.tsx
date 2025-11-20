@@ -81,6 +81,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { useMasterData } from "@/hooks/use-master-data"
 import { SearchableSelect } from "@/components/ui/searchable-select"
+import { cn } from "@/lib/utils"
 
 // Expense form schema
 const expenseSchema = z.object({
@@ -130,6 +131,12 @@ const expenseCategoryColors: Record<string, string> = {
 export default function FinancePage() {
   const { toast } = useToast()
   const masterData = useMasterData()
+  const expenseCategoryMap = React.useMemo(() => {
+    return masterData.data.expenseCategories.reduce<Record<string, string>>((acc, option) => {
+      acc[option.value] = option.label
+      return acc
+    }, {})
+  }, [masterData.data.expenseCategories])
   const [activeTab, setActiveTab] = React.useState("dashboard")
   
   // Dashboard state
@@ -405,11 +412,165 @@ export default function FinancePage() {
     return `${sign}${value.toFixed(1)}%`
   }
 
+  const looksLikeUUID = (value: string) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(value)
+
+  const formatExpenseCategoryLabel = React.useCallback((categoryKey?: string | null) => {
+    if (!categoryKey) return "Uncategorized"
+    const directMatch = expenseCategoryMap[categoryKey]
+    if (directMatch) return directMatch
+
+    // Try matching by label in case value already holds the label text
+    const normalized = categoryKey.trim().toLowerCase()
+    const labelMatch = masterData.data.expenseCategories.find(
+      (option) => option.label.trim().toLowerCase() === normalized
+    )
+    if (labelMatch) return labelMatch.label
+
+    if (looksLikeUUID(categoryKey)) return "Uncategorized"
+    const cleaned = categoryKey.replace(/[_-]+/g, " ").toLowerCase()
+    return cleaned.replace(/\b\w/g, (char) => char.toUpperCase())
+  }, [expenseCategoryMap, masterData.data.expenseCategories])
+
+  const TrendBadge = ({ value, label = "vs last month" }: { value: number; label?: string }) => {
+    const isPositive = value >= 0
+    const icon = isPositive ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />
+    return (
+      <Badge
+        variant="outline"
+        className={cn(
+          "flex w-fit items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium",
+          isPositive ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-700"
+        )}
+      >
+        {icon}
+        <span>{formatPercentage(value)}</span>
+        <span className="text-[11px] font-normal text-muted-foreground">{label}</span>
+      </Badge>
+    )
+  }
+
+  const humanizeLabel = (value?: string) => {
+    if (!value) return "-"
+    return value
+      .replace(/[_-]+/g, " ")
+      .toLowerCase()
+      .replace(/\b\w/g, (char) => char.toUpperCase())
+  }
+
+  const TypeBadge = ({ value }: { value?: string }) => (
+    <span className="inline-flex rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
+      {humanizeLabel(value)}
+    </span>
+  )
+
+  const MoneyValue = ({
+    amount,
+    bold,
+    dashIfZero,
+  }: {
+    amount?: number | null
+    bold?: boolean
+    dashIfZero?: boolean
+  }) => {
+    const safeAmount = Number(amount || 0)
+    if (dashIfZero && safeAmount === 0) {
+      return <span className="font-mono tabular-nums text-sm text-gray-400">-</span>
+    }
+    return (
+      <span
+        className={cn(
+          "font-mono tabular-nums text-sm",
+          bold ? "font-bold text-gray-900" : "text-gray-700"
+        )}
+      >
+        {formatCurrency(safeAmount)}
+      </span>
+    )
+  }
+
+  const financialHeaderClass = "text-xs font-semibold uppercase tracking-wider text-gray-500"
+
+  const StatusBadge = ({ status }: { status: string }) => {
+    const normalized = status?.toLowerCase()
+    const statusConfigs: Record<
+      string,
+      { className: string; label: string }
+    > = {
+      pending: {
+        className: "border-amber-100 bg-amber-50 text-amber-700",
+        label: "Pending",
+      },
+      received: {
+        className: "border-emerald-100 bg-emerald-50 text-emerald-700",
+        label: "Paid",
+      },
+      paid: {
+        className: "border-emerald-100 bg-emerald-50 text-emerald-700",
+        label: "Paid",
+      },
+      cleared: {
+        className: "border-emerald-100 bg-emerald-50 text-emerald-700",
+        label: "Cleared",
+      },
+      cancelled: {
+        className: "border border-dashed border-gray-200 bg-gray-100 text-gray-500 line-through",
+        label: "Cancelled",
+      },
+      partial: {
+        className: "border-amber-100 bg-amber-50 text-amber-700",
+        label: "Partial",
+      },
+    }
+    const config = statusConfigs[normalized] || {
+      className: "border-slate-200 bg-slate-100 text-slate-600",
+      label: status,
+    }
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium",
+          config.className
+        )}
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-current" />
+        {config.label}
+      </span>
+    )
+  }
+
+  const formatDisplayDate = (dateString: string) => {
+    if (!dateString) return "-"
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(new Date(dateString))
+  }
+
+  const invoiceStatusBreakdown = React.useMemo(() => {
+    if (!dashboardData) return []
+    const total = dashboardData.invoiceStats.total || 0
+    return [
+      { key: "paid", label: "Paid", value: dashboardData.invoiceStats.paid, color: "bg-emerald-500" },
+      { key: "unpaid", label: "Unpaid", value: dashboardData.invoiceStats.unpaid, color: "bg-rose-500" },
+      { key: "partial", label: "Partial", value: dashboardData.invoiceStats.partial, color: "bg-amber-500" },
+    ].map((item) => ({
+      ...item,
+      percentage: total ? Math.round((item.value / total) * 100) : 0,
+    }))
+  }, [dashboardData])
+
+  const expenseCategoryEntries = React.useMemo(() => {
+    if (!dashboardData) return []
+    return Object.entries(dashboardData.expenseStats.byCategory)
+      .sort(([, amountA], [, amountB]) => Number(amountB) - Number(amountA))
+  }, [dashboardData])
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Finance & Revenue</h1>
+          <h1 className="text-3xl font-bold tracking-tight font-jakarta">Finance & Revenue</h1>
           <p className="text-muted-foreground">
             Comprehensive financial management and analytics
           </p>
@@ -417,16 +578,25 @@ export default function FinancePage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="dashboard" className="gap-2">
+        <TabsList className="flex w-fit items-center gap-1 rounded-lg bg-gray-100 p-1">
+          <TabsTrigger
+            value="dashboard"
+            className="gap-2 rounded-md px-4 py-2 text-sm font-medium text-gray-500 transition hover:text-gray-700 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm"
+          >
             <TrendingUp className="h-4 w-4" />
             Dashboard
           </TabsTrigger>
-          <TabsTrigger value="revenue" className="gap-2">
+          <TabsTrigger
+            value="revenue"
+            className="gap-2 rounded-md px-4 py-2 text-sm font-medium text-gray-500 transition hover:text-gray-700 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm"
+          >
             <TrendingUp className="h-4 w-4" />
             Revenue
           </TabsTrigger>
-          <TabsTrigger value="expenses" className="gap-2">
+          <TabsTrigger
+            value="expenses"
+            className="gap-2 rounded-md px-4 py-2 text-sm font-medium text-gray-500 transition hover:text-gray-700 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm"
+          >
             <DollarSign className="h-4 w-4" />
             Expenses
           </TabsTrigger>
@@ -442,153 +612,146 @@ export default function FinancePage() {
             <>
               {/* Metric Cards */}
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card>
+                <Card className="border-t-4 border-emerald-500 bg-gradient-to-br from-emerald-50 via-white to-white shadow-sm">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-emerald-600/80">Revenue</p>
+                      <CardTitle className="text-sm font-medium text-gray-900">Total Revenue</CardTitle>
+                    </div>
+                    <TrendingUp className="h-5 w-5 text-emerald-500" />
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
+                  <CardContent className="space-y-4">
+                    <div className="text-3xl font-bold tracking-tight text-gray-900">
                       {formatCurrency(dashboardData.summary.totalRevenue)}
                     </div>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                      {dashboardData.comparison.revenueChange > 0 ? (
-                        <>
-                          <ArrowUpRight className="h-3 w-3 text-green-500" />
-                          <span className="text-green-500">
-                            {formatPercentage(dashboardData.comparison.revenueChange)}
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <ArrowDownRight className="h-3 w-3 text-red-500" />
-                          <span className="text-red-500">
-                            {formatPercentage(dashboardData.comparison.revenueChange)}
-                          </span>
-                        </>
-                      )}
-                      <span>from last month</span>
-                    </p>
+                    <TrendBadge value={dashboardData.comparison.revenueChange} />
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="border-t-4 border-rose-500 bg-gradient-to-br from-rose-50 via-white to-white shadow-sm">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-                    <TrendingDown className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-rose-600/80">Expenses</p>
+                      <CardTitle className="text-sm font-medium text-gray-900">Total Expenses</CardTitle>
+                    </div>
+                    <TrendingDown className="h-5 w-5 text-rose-500" />
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
+                  <CardContent className="space-y-4">
+                    <div className="text-3xl font-bold tracking-tight text-gray-900">
                       {formatCurrency(dashboardData.summary.totalExpenses)}
                     </div>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                      {dashboardData.comparison.expenseChange > 0 ? (
-                        <>
-                          <ArrowUpRight className="h-3 w-3 text-red-500" />
-                          <span className="text-red-500">
-                            {formatPercentage(dashboardData.comparison.expenseChange)}
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <ArrowDownRight className="h-3 w-3 text-green-500" />
-                          <span className="text-green-500">
-                            {formatPercentage(dashboardData.comparison.expenseChange)}
-                          </span>
-                        </>
-                      )}
-                      <span>from last month</span>
-                    </p>
+                    <TrendBadge value={dashboardData.comparison.expenseChange} />
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="border-t-4 border-blue-500 bg-gradient-to-br from-blue-50 via-white to-white shadow-sm">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-blue-600/80">Profit</p>
+                      <CardTitle className="text-sm font-medium text-gray-900">Net Profit</CardTitle>
+                    </div>
+                    <DollarSign className="h-5 w-5 text-blue-500" />
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
+                  <CardContent className="space-y-4">
+                    <div className="text-3xl font-bold tracking-tight text-gray-900">
                       {formatCurrency(dashboardData.summary.netProfit)}
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Margin: {dashboardData.summary.profitMargin}%
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <TrendBadge value={dashboardData.comparison.profitChange} />
+                      <Badge variant="secondary" className="rounded-full bg-white text-xs font-medium text-blue-600">
+                        Margin {dashboardData.summary.profitMargin}%
+                      </Badge>
+                    </div>
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="border-t-4 border-slate-400 bg-gradient-to-br from-slate-50 via-white to-white shadow-sm">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Outstanding</CardTitle>
-                    <Receipt className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-slate-500">Outstanding</p>
+                      <CardTitle className="text-sm font-medium text-gray-900">Total Outstanding</CardTitle>
+                    </div>
+                    <Receipt className="h-5 w-5 text-slate-500" />
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
+                  <CardContent className="space-y-4">
+                    <div className="text-3xl font-bold tracking-tight text-gray-900">
                       {formatCurrency(dashboardData.summary.totalOutstanding)}
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {dashboardData.invoiceStats.unpaid} unpaid invoices
-                    </p>
+                    <Badge variant="outline" className="w-fit rounded-full border-slate-200 bg-slate-50 text-xs font-medium text-slate-700">
+                      {dashboardData.invoiceStats.unpaid} invoices due
+                    </Badge>
                   </CardContent>
                 </Card>
               </div>
 
               {/* Quick Stats */}
-              <div className="grid gap-4 md:grid-cols-2">
-                <Card>
-                  <CardHeader>
+              <div className="grid gap-4 md:grid-cols-2 auto-rows-fr">
+                <Card className="h-full flex flex-col">
+                  <CardHeader className="pb-4">
                     <CardTitle>Invoice Status</CardTitle>
-                    <CardDescription>Breakdown of invoice statuses</CardDescription>
+                    <CardDescription>Track payment momentum at a glance</CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">Paid</span>
-                        <Badge variant="secondary" className={paymentStatusColors.paid}>
-                          {dashboardData.invoiceStats.paid}
-                        </Badge>
+                  <CardContent className="flex-1">
+                    {invoiceStatusBreakdown.length ? (
+                      <div className="flex flex-col gap-4">
+                        {invoiceStatusBreakdown.map((status) => (
+                          <div key={status.key} className="rounded-xl border border-border/60 bg-muted/30 p-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-medium text-foreground">{status.label}</p>
+                                <p className="text-xs text-muted-foreground">{status.percentage}% of invoices</p>
+                              </div>
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "rounded-full text-xs font-semibold",
+                                  status.key === "paid" && "border-emerald-200 bg-emerald-50 text-emerald-700",
+                                  status.key === "unpaid" && "border-rose-200 bg-rose-50 text-rose-700",
+                                  status.key === "partial" && "border-amber-200 bg-amber-50 text-amber-700"
+                                )}
+                              >
+                                {status.value}
+                              </Badge>
+                            </div>
+                            <div className="mt-3 h-2 w-full rounded-full bg-slate-200">
+                              <div
+                                className={cn("h-2 rounded-full transition-all", status.color)}
+                                style={{ width: `${status.percentage}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">Unpaid</span>
-                        <Badge variant="secondary" className={paymentStatusColors.unpaid}>
-                          {dashboardData.invoiceStats.unpaid}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">Partial</span>
-                        <Badge variant="secondary" className={paymentStatusColors.partial}>
-                          {dashboardData.invoiceStats.partial}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center justify-between pt-2 border-t">
-                        <span className="text-sm font-semibold">Total Invoices</span>
-                        <span className="font-semibold">{dashboardData.invoiceStats.total}</span>
-                      </div>
-                    </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-6">No invoices for this range</p>
+                    )}
                   </CardContent>
                 </Card>
 
-                <Card>
-                  <CardHeader>
+                <Card className="h-full flex flex-col">
+                  <CardHeader className="pb-4">
                     <CardTitle>Expense Breakdown</CardTitle>
-                    <CardDescription>Expenses by category</CardDescription>
+                    <CardDescription>Top spending categories</CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {Object.entries(dashboardData.expenseStats.byCategory).map(([category, amount]) => (
-                        <div key={category} className="flex items-center justify-between">
-                          <Badge variant="secondary" className={expenseCategoryColors[category.toLowerCase()] || expenseCategoryColors.other}>
-                            {category}
-                          </Badge>
-                          <span className="text-sm font-medium">{formatCurrency(amount as number)}</span>
-                        </div>
-                      ))}
-                      {Object.keys(dashboardData.expenseStats.byCategory).length === 0 && (
-                        <p className="text-sm text-muted-foreground text-center py-4">
-                          No expenses recorded yet
-                        </p>
-                      )}
-                    </div>
+                  <CardContent className="flex-1">
+                    {expenseCategoryEntries.length ? (
+                      <div className="flex flex-col divide-y divide-border/70">
+                        {expenseCategoryEntries.map(([categoryKey, amount]) => {
+                          const label = formatExpenseCategoryLabel(categoryKey)
+                          return (
+                            <div key={categoryKey} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
+                              <div className="flex flex-col">
+                                <span className="text-sm font-medium text-gray-900">{label}</span>
+                                <span className="text-xs uppercase tracking-wide text-muted-foreground">Category</span>
+                              </div>
+                              <span className="text-sm font-semibold text-gray-900">{formatCurrency(amount as number)}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-6">No expenses recorded yet</p>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -682,14 +845,14 @@ export default function FinancePage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>DATE</TableHead>
-                      <TableHead>TYPE</TableHead>
-                      <TableHead>DESCRIPTION</TableHead>
-                      <TableHead>AMOUNT</TableHead>
-                      <TableHead>PAID</TableHead>
-                      <TableHead>PAYMENT</TableHead>
-                      <TableHead>STATUS</TableHead>
-                      <TableHead>ACTIONS</TableHead>
+                      <TableHead className={financialHeaderClass}>DATE</TableHead>
+                      <TableHead className={financialHeaderClass}>TYPE</TableHead>
+                      <TableHead className={financialHeaderClass}>DESCRIPTION</TableHead>
+                      <TableHead className={cn(financialHeaderClass, "text-right")}>AMOUNT</TableHead>
+                      <TableHead className={cn(financialHeaderClass, "text-right")}>PAID</TableHead>
+                      <TableHead className={financialHeaderClass}>PAYMENT</TableHead>
+                      <TableHead className={financialHeaderClass}>STATUS</TableHead>
+                      <TableHead className={financialHeaderClass}>ACTIONS</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -708,36 +871,29 @@ export default function FinancePage() {
                     ) : (
                       revenues.map((revenue) => (
                         <TableRow key={revenue.id}>
-                          <TableCell>{new Date(revenue.entry_date).toLocaleDateString('en-GB')}</TableCell>
+                          <TableCell className="text-sm text-gray-500">{formatDisplayDate(revenue.entry_date)}</TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="capitalize">
-                              {revenue.revenue_type}
-                            </Badge>
+                            <TypeBadge value={revenue.revenue_type} />
                           </TableCell>
-                          <TableCell className="max-w-xs truncate">{revenue.description}</TableCell>
-                          <TableCell>{formatCurrency(revenue.amount || 0)}</TableCell>
-                          <TableCell>{formatCurrency(revenue.paid_amount || 0)}</TableCell>
-                          <TableCell className="capitalize text-sm text-muted-foreground">
-                            {revenue.payment_method?.replace('_', ' ')}
+                          <TableCell className="max-w-xs truncate text-sm text-gray-700">{revenue.description}</TableCell>
+                          <TableCell className="text-right">
+                            <MoneyValue amount={revenue.amount} bold />
                           </TableCell>
-                          <TableCell>
-                            <Badge 
-                              variant="secondary" 
-                              className={
-                                revenue.payment_status === 'received' ? 'bg-green-100 text-green-700' :
-                                revenue.payment_status === 'pending' ? 'bg-red-100 text-red-700' :
-                                'bg-yellow-100 text-yellow-700'
-                              }
-                            >
-                              {revenue.payment_status}
-                            </Badge>
+                          <TableCell className="text-right">
+                            <MoneyValue amount={revenue.paid_amount} dashIfZero />
+                          </TableCell>
+                          <TableCell className="text-sm capitalize text-gray-500">
+                            {humanizeLabel(revenue.payment_method)}
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-1">
+                            <StatusBadge status={revenue.payment_status} />
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
-                                className="h-8 w-8"
+                                className="h-8 w-8 rounded-full text-gray-600 transition hover:bg-gray-100 hover:text-gray-700"
                                 onClick={() => {
                                   toast({
                                     title: "Revenue Details",
@@ -752,7 +908,11 @@ export default function FinancePage() {
                                 description={`Are you sure you want to delete this revenue entry?`}
                                 onConfirm={() => handleDeleteRevenue(revenue.id)}
                               >
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 rounded-full text-red-500 transition hover:bg-red-50 hover:text-red-600"
+                                >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               </DeleteConfirmDialog>
@@ -985,12 +1145,12 @@ export default function FinancePage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>DATE</TableHead>
-                      <TableHead>CATEGORY</TableHead>
-                      <TableHead>DESCRIPTION</TableHead>
-                      <TableHead>VENDOR</TableHead>
-                      <TableHead>AMOUNT</TableHead>
-                      <TableHead>ACTIONS</TableHead>
+                      <TableHead className={financialHeaderClass}>DATE</TableHead>
+                      <TableHead className={financialHeaderClass}>CATEGORY</TableHead>
+                      <TableHead className={financialHeaderClass}>DESCRIPTION</TableHead>
+                      <TableHead className={financialHeaderClass}>VENDOR</TableHead>
+                      <TableHead className={cn(financialHeaderClass, "text-right")}>AMOUNT</TableHead>
+                      <TableHead className={financialHeaderClass}>ACTIONS</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1009,18 +1169,25 @@ export default function FinancePage() {
                     ) : (
                       expenses.map((expense) => (
                         <TableRow key={expense.id}>
-                          <TableCell>{new Date(expense.expense_date).toLocaleDateString('en-GB')}</TableCell>
+                          <TableCell className="text-sm text-gray-500">{formatDisplayDate(expense.expense_date)}</TableCell>
                           <TableCell>
-                            <Badge variant="secondary" className={expenseCategoryColors[expense.category.toLowerCase()] || expenseCategoryColors.other}>
-                              {expense.category}
-                            </Badge>
+                            <span className="line-clamp-1 text-sm font-medium text-gray-900">
+                              {formatExpenseCategoryLabel(expense.category)}
+                            </span>
                           </TableCell>
-                          <TableCell className="max-w-[200px] truncate">{expense.description}</TableCell>
-                          <TableCell>{expense.vendor || '-'}</TableCell>
-                          <TableCell className="font-medium">{formatCurrency(expense.amount)}</TableCell>
+                          <TableCell className="max-w-[220px] truncate text-sm text-gray-700">{expense.description}</TableCell>
+                          <TableCell className="text-sm text-gray-500">{expense.vendor || '-'}</TableCell>
+                          <TableCell className="text-right">
+                            <MoneyValue amount={expense.amount} bold />
+                          </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditExpense(expense)}>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 rounded-full text-gray-600 transition hover:bg-gray-100 hover:text-gray-700"
+                                onClick={() => handleEditExpense(expense)}
+                              >
                                 <Edit className="h-4 w-4" />
                               </Button>
                               <DeleteConfirmDialog
@@ -1028,7 +1195,11 @@ export default function FinancePage() {
                                 description={`Are you sure you want to delete this expense?`}
                                 onConfirm={() => handleDeleteExpense(expense.id)}
                               >
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 rounded-full text-red-500 transition hover:bg-red-50 hover:text-red-600"
+                                >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               </DeleteConfirmDialog>

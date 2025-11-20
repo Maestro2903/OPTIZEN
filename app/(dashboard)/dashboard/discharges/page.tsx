@@ -1,16 +1,7 @@
 "use client"
 
 import * as React from "react"
-import {
-  Plus,
-  Search,
-  Filter,
-  FileText,
-  Eye,
-  Edit,
-  Trash2,
-  Printer,
-} from "lucide-react"
+import { Search, Filter, Eye, Edit, Trash2, Printer, LogOut, LogIn } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -184,6 +175,66 @@ export default function DischargesPage() {
     }
   }, [dischargeList])
 
+  const toTitleCase = React.useCallback((value?: string | null) => {
+    if (!value) return 'N/A'
+    return value
+      .toLowerCase()
+      .split(' ')
+      .filter(Boolean)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
+  }, [])
+
+  const getInitials = React.useCallback((value?: string | null) => {
+    if (!value) return 'NA'
+    const parts = value
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+    if (parts.length === 0) return 'NA'
+    const first = parts[0]?.[0] || ''
+    const last = parts.length > 1 ? parts[parts.length - 1]?.[0] : parts[0]?.[1] || ''
+    return (first + (last || '')).toUpperCase()
+  }, [])
+
+  const formatDiagnosisLabel = React.useCallback((value?: string | null) => {
+    if (!value) return ''
+    return value
+      .toLowerCase()
+      .replace(/\b\w/g, (char) => char.toUpperCase())
+  }, [])
+
+  const getDiagnosisDisplay = React.useCallback(
+    (diagnosis: any) => {
+      if (!diagnosis) return '-'
+      if (typeof diagnosis === 'string') {
+        const formatted = formatDiagnosisLabel(diagnosis)
+        return formatted || '-'
+      }
+      if (diagnosis.labels && Array.isArray(diagnosis.labels)) {
+        const formattedLabels = diagnosis.labels.map((label: string) => formatDiagnosisLabel(label)).filter(Boolean)
+        if (formattedLabels.length === 0) return '-'
+        return (
+          formattedLabels.slice(0, 2).join(', ') +
+          (formattedLabels.length > 2 ? ` +${formattedLabels.length - 2} more` : '')
+        )
+      }
+      return '-'
+    },
+    [formatDiagnosisLabel]
+  )
+
+  const formatDisplayDate = React.useCallback((dateString?: string | null) => {
+    if (!dateString) return '-'
+    const date = new Date(dateString)
+    if (Number.isNaN(date.getTime())) return dateString
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+  }, [])
+
   const filteredDischarges = React.useMemo(() => {
     if (!searchTerm.trim()) return dischargeList
     const q = searchTerm.trim().toLowerCase()
@@ -196,167 +247,210 @@ export default function DischargesPage() {
   }, [searchTerm, dischargeList])
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Discharges</h1>
-          <p className="text-muted-foreground">Manage patient discharge records</p>
-        </div>
-        <DischargeForm onSuccess={refreshDischarges}>
-          <Button className="gap-2">
-            <Plus className="h-4 w-4" />
-            Add Discharge
-          </Button>
-        </DischargeForm>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-slate-50 px-5 py-6 md:py-8">
+      <div className="mx-auto flex w-full flex-col gap-6">
+        <div className="rounded-xl border border-gray-200 bg-white px-6 py-5 shadow-sm transition-shadow">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle>Discharge Records</CardTitle>
-              <CardDescription>View and manage all patient discharges</CardDescription>
+              <h1 className="text-3xl font-bold tracking-tight text-slate-900 font-jakarta">Discharges</h1>
+              <p className="text-sm text-slate-500">Manage patient discharge records</p>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search discharges..."
-                  className="pl-8 w-[200px]"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <Button variant="outline" size="icon">
-                <Filter className="h-4 w-4" />
+            <DischargeForm onSuccess={refreshDischarges}>
+              <Button className="gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white shadow-md transition hover:bg-blue-700">
+                <LogOut className="h-4 w-4" />
+                Add Discharge
               </Button>
-            </div>
+            </DischargeForm>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>SR. NO.</TableHead>
-                  <TableHead>PATIENT ID</TableHead>
-                  <TableHead>DATE OF ADMISSION</TableHead>
-                  <TableHead>PATIENT NAME</TableHead>
-                  <TableHead>DIAGNOSIS</TableHead>
-                  <TableHead>DATE OF DISCHARGE</TableHead>
-                  <TableHead>ACTION</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                      Loading discharges...
-                    </TableCell>
-                  </TableRow>
-                ) : filteredDischarges.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                      No discharge records yet
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredDischarges.map((discharge, index) => {
-                    // Helper function to display diagnosis
-                    const getDiagnosisDisplay = (diagnosis: any) => {
-                      if (!diagnosis) return '-'
-                      if (typeof diagnosis === 'string') return diagnosis
-                      if (diagnosis.labels && Array.isArray(diagnosis.labels)) {
-                        return diagnosis.labels.slice(0, 2).join(', ') + 
-                               (diagnosis.labels.length > 2 ? ` +${diagnosis.labels.length - 2} more` : '')
-                      }
-                      return '-'
-                    }
+        </div>
 
-                    return (
-                    <TableRow key={discharge.id}>
-                      <TableCell>{index + 1}</TableCell>
-                      <TableCell className="font-mono text-sm font-semibold text-primary">{discharge.patients?.patient_id || '-'}</TableCell>
-                      <TableCell>{discharge.admission_date}</TableCell>
-                      <TableCell className="font-medium">{discharge.patients?.full_name || 'N/A'}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {getDiagnosisDisplay(discharge.final_diagnosis)}
-                      </TableCell>
-                      <TableCell>{discharge.discharge_date}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8" 
-                            title="View"
-                            onClick={() => handleViewDischarge(discharge)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <DischargeForm 
-                            mode="edit" 
-                            dischargeData={discharge}
-                            onSuccess={refreshDischarges}
-                          >
-                            <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          </DischargeForm>
-                          <DischargePrint discharge={{
-                            id: discharge.id,
-                            discharge_no: discharge.id.slice(0, 8).toUpperCase(),
-                            discharge_date: discharge.discharge_date,
-                            patient_name: discharge.patients?.full_name || 'N/A',
-                            patient_id: discharge.patients?.patient_id,
-                            admission_date: discharge.admission_date,
-                            case_no: discharge.cases?.case_no,
-                            primary_diagnosis: typeof discharge.final_diagnosis === 'string' 
-                              ? discharge.final_diagnosis 
-                              : discharge.final_diagnosis?.labels?.join(', '),
-                            discharge_summary: discharge.discharge_summary,
-                            discharge_medications: typeof discharge.medications === 'string'
-                              ? discharge.medications
-                              : (discharge.medications?.medicines?.labels?.join(', ') || ''),
-                            follow_up_instructions: discharge.instructions,
-                            follow_up_date: discharge.follow_up_date,
-                            final_condition: discharge.condition_on_discharge,
-                            vital_signs: discharge.vitals_at_discharge,
-                            procedures_performed: typeof discharge.treatment_given === 'string'
-                              ? discharge.treatment_given
-                              : discharge.treatment_given?.labels?.join(', '),
-                          }}>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" title="Print Discharge Summary">
-                              <Printer className="h-4 w-4" />
-                            </Button>
-                          </DischargePrint>
-                          <DeleteConfirmDialog
-                            title="Delete Discharge"
-                            description="Are you sure you want to delete this discharge record? This action cannot be undone."
-                            onConfirm={() => handleDelete(discharge.id)}
-                          >
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 text-destructive" 
-                              title="Delete"
-                              disabled={isFetching}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </DeleteConfirmDialog>
-                        </div>
+        <Card className="rounded-xl border border-gray-200 bg-white shadow-sm">
+          <CardHeader className="border-b border-slate-100 px-6 py-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <CardTitle className="text-xl text-slate-900">Discharge Records</CardTitle>
+                <CardDescription>View and manage all patient discharges</CardDescription>
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    type="search"
+                    placeholder="Search discharges..."
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-700 focus-visible:ring-blue-500 sm:w-64"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-10 w-10 rounded-lg border-slate-200 text-slate-500 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+                >
+                  <Filter className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="px-6 pb-6 pt-4">
+            <div className="rounded-xl border border-slate-100">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-b border-gray-200 bg-gray-50">
+                    <TableHead className="uppercase text-xs font-semibold tracking-wider text-gray-500">
+                      Patient
+                    </TableHead>
+                    <TableHead className="uppercase text-xs font-semibold tracking-wider text-gray-500">
+                      Date of Admission
+                    </TableHead>
+                    <TableHead className="uppercase text-xs font-semibold tracking-wider text-gray-500">
+                      Diagnosis
+                    </TableHead>
+                    <TableHead className="uppercase text-xs font-semibold tracking-wider text-gray-500">
+                      Date of Discharge
+                    </TableHead>
+                    <TableHead className="text-right uppercase text-xs font-semibold tracking-wider text-gray-500">
+                      Action
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                        Loading discharges...
                       </TableCell>
                     </TableRow>
-                  )
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                  ) : filteredDischarges.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                        No discharge records yet
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredDischarges.map((discharge) => {
+                      const diagnosisText = getDiagnosisDisplay(discharge.final_diagnosis)
+                      return (
+                        <TableRow key={discharge.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-50 text-sm font-semibold text-orange-600">
+                                {getInitials(discharge.patients?.full_name)}
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-sm font-medium text-gray-900">
+                                  {toTitleCase(discharge.patients?.full_name)}
+                                </span>
+                                <span className="font-mono text-xs text-blue-600">
+                                  {discharge.patients?.patient_id || '-'}
+                                </span>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2 text-sm text-gray-600 tabular-nums">
+                              <LogIn className="h-4 w-4 text-emerald-500" />
+                              {formatDisplayDate(discharge.admission_date)}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span
+                              className="inline-block max-w-[250px] truncate text-sm text-gray-700"
+                              title={diagnosisText !== '-' ? diagnosisText : undefined}
+                            >
+                              {diagnosisText}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2 text-sm font-medium text-gray-900 tabular-nums">
+                              <LogOut className="h-4 w-4 text-rose-500" />
+                              {formatDisplayDate(discharge.discharge_date)}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                                title="View discharge"
+                                onClick={() => handleViewDischarge(discharge)}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <DischargeForm mode="edit" dischargeData={discharge} onSuccess={refreshDischarges}>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 rounded-md text-gray-400 hover:bg-blue-50 hover:text-blue-600"
+                                  title="Edit discharge"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              </DischargeForm>
+                              <DischargePrint
+                                discharge={{
+                                  id: discharge.id,
+                                  discharge_no: discharge.id.slice(0, 8).toUpperCase(),
+                                  discharge_date: discharge.discharge_date,
+                                  patient_name: discharge.patients?.full_name || 'N/A',
+                                  patient_id: discharge.patients?.patient_id,
+                                  admission_date: discharge.admission_date,
+                                  case_no: discharge.cases?.case_no,
+                                  primary_diagnosis:
+                                    typeof discharge.final_diagnosis === 'string'
+                                      ? discharge.final_diagnosis
+                                      : discharge.final_diagnosis?.labels?.join(', '),
+                                  discharge_summary: discharge.discharge_summary,
+                                  discharge_medications:
+                                    typeof discharge.medications === 'string'
+                                      ? discharge.medications
+                                      : discharge.medications?.medicines?.labels?.join(', ') || '',
+                                  follow_up_instructions: discharge.instructions,
+                                  follow_up_date: discharge.follow_up_date,
+                                  final_condition: discharge.condition_on_discharge,
+                                  vital_signs: discharge.vitals_at_discharge,
+                                  procedures_performed:
+                                    typeof discharge.treatment_given === 'string'
+                                      ? discharge.treatment_given
+                                      : discharge.treatment_given?.labels?.join(', '),
+                                }}
+                              >
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 rounded-md text-gray-400 hover:bg-slate-100 hover:text-slate-600"
+                                  title="Print discharge summary"
+                                >
+                                  <Printer className="h-4 w-4" />
+                                </Button>
+                              </DischargePrint>
+                              <DeleteConfirmDialog
+                                title="Delete Discharge"
+                                description="Are you sure you want to delete this discharge record? This action cannot be undone."
+                                onConfirm={() => handleDelete(discharge.id)}
+                              >
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 rounded-md text-gray-400 hover:bg-red-50 hover:text-red-600"
+                                  title="Delete discharge"
+                                  disabled={isFetching}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </DeleteConfirmDialog>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
 
       {/* View Dialog */}
       <Dialog open={viewDialogOpen} onOpenChange={handleViewDialogOpenChange}>
@@ -536,5 +630,6 @@ export default function DischargesPage() {
         </DialogContent>
       </Dialog>
     </div>
+  </div>
   )
 }

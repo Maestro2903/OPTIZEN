@@ -1,8 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Check, Wrench, User, Clock, Calendar, AlertCircle } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import { Bed as BedIcon, User, Circle, CircleDot, Wrench, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface BedCardProps {
@@ -22,6 +21,7 @@ interface BedCardProps {
     days_in_ward?: number
     surgery_scheduled_time?: string
     doctor_name?: string
+    patient_gender?: string
   } | null
   onClick?: () => void
 }
@@ -31,119 +31,120 @@ export function BedCard({ bed, assignment, onClick }: BedCardProps) {
     switch (status) {
       case 'available':
         return {
-          bg: 'bg-green-50 hover:bg-gray-100 border-green-200',
-          icon: Check,
-          iconColor: 'text-green-600',
           label: 'Available',
-          labelColor: 'text-green-700'
+          badge: 'bg-emerald-100 text-emerald-700',
+          accent: 'text-emerald-600'
         }
       case 'occupied':
         return {
-          bg: 'bg-red-50 hover:bg-gray-100 border-red-200',
-          icon: User,
-          iconColor: 'text-red-600',
           label: 'Occupied',
-          labelColor: 'text-red-700'
-        }
-      case 'maintenance':
-      case 'cleaning':
-        return {
-          bg: 'bg-gray-50 hover:bg-gray-100 border-gray-200',
-          icon: Wrench,
-          iconColor: 'text-gray-600',
-          label: 'Maintenance',
-          labelColor: 'text-gray-700'
+          badge: 'bg-red-100 text-red-700',
+          accent: 'text-red-600'
         }
       case 'reserved':
         return {
-          bg: 'bg-yellow-50 hover:bg-gray-100 border-yellow-200',
-          icon: AlertCircle,
-          iconColor: 'text-yellow-600',
           label: 'Reserved',
-          labelColor: 'text-yellow-700'
+          badge: 'bg-amber-100 text-amber-700',
+          accent: 'text-amber-600'
+        }
+      case 'maintenance':
+        return {
+          label: 'Maintenance',
+          badge: 'bg-slate-200 text-slate-700 border border-dashed border-slate-300',
+          accent: 'text-slate-600'
+        }
+      case 'cleaning':
+        return {
+          label: 'Cleaning',
+          badge: 'bg-sky-100 text-sky-700 border border-dashed border-sky-200',
+          accent: 'text-sky-600'
         }
       default:
         return {
-          bg: 'bg-gray-50 hover:bg-gray-100 border-gray-200',
-          icon: AlertCircle,
-          iconColor: 'text-gray-600',
           label: status,
-          labelColor: 'text-gray-700'
+          badge: 'bg-gray-200 text-gray-700',
+          accent: 'text-gray-600'
         }
     }
   }
 
+  const isOutOfService = bed.status === 'maintenance' || bed.status === 'cleaning'
   const config = getStatusConfig(bed.status)
-  const Icon = config.icon
+  const StatusIcon = bed.status === 'maintenance' ? Wrench : bed.status === 'cleaning' ? Sparkles : BedIcon
 
-  const formatTime = (dateTimeString: string) => {
-    const date = new Date(dateTimeString)
-    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  const getGenderIcon = (gender?: string | null) => {
+    if (!gender) return null
+    const normalized = gender.toLowerCase()
+    // Using CircleDot for male (Mars symbol alternative) and Circle for female (Venus symbol alternative)
+    if (normalized.startsWith('m')) return CircleDot
+    if (normalized.startsWith('f')) return Circle
+    return null
   }
+
+  const GenderIcon = getGenderIcon(assignment?.patient_gender)
+  const getWardGender = (wardName?: string | null) => {
+    if (!wardName) return null
+    const normalized = wardName.toLowerCase()
+    if (/(female|women|ladies|woman)/.test(normalized)) return "Female Ward"
+    if (/(male|men|gents|gentlemen)/.test(normalized)) return "Male Ward"
+    return null
+  }
+  const wardGenderLabel = getWardGender(bed.ward_name)
 
   return (
     <div
       className={cn(
-        "relative p-4 rounded-lg border-2 transition-all cursor-pointer min-h-[140px] flex flex-col justify-between",
-        config.bg,
-        onClick && "hover:shadow-md"
+        "flex min-h-[150px] flex-col rounded-lg border border-gray-200 p-4 shadow-sm transition-all",
+        isOutOfService
+          ? "border-dashed border-slate-200 bg-[repeating-linear-gradient(135deg,#f8fafc,#f8fafc_10px,#f1f5f9_10px,#f1f5f9_20px)]"
+          : "bg-white",
+        onClick ? "cursor-pointer hover:-translate-y-1 hover:shadow-md" : "cursor-default"
       )}
       onClick={onClick}
     >
-      {/* Bed Number and Ward */}
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex-1">
-          <div className="text-2xl font-bold text-gray-900">
-            {bed.bed_number}
-          </div>
-          <div className="text-xs text-muted-foreground capitalize">
-            {bed.ward_name}
-          </div>
-          <div className="text-xs font-semibold text-blue-600 mt-1">
-            ₹{bed.daily_rate.toLocaleString()}/day
+      <div className={cn("mb-3 flex items-start justify-between", isOutOfService && "opacity-75")}>
+        <div>
+          <div className="text-lg font-bold text-gray-800">{bed.bed_number}</div>
+          <div className="text-xs uppercase tracking-wide text-gray-500 flex items-center gap-2">
+            <span>{bed.ward_name}</span>
+            {wardGenderLabel && (
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">
+                {wardGenderLabel}
+              </span>
+            )}
           </div>
         </div>
-        <Icon className={cn("h-5 w-5", config.iconColor)} />
+        <StatusIcon className="h-5 w-5 text-gray-400" />
       </div>
 
-      {/* Content based on status */}
-      <div className="flex-1">
-        {bed.status === 'occupied' && assignment && assignment.patient_name ? (
+      <div className={cn("flex-1", isOutOfService && "opacity-75 text-slate-700")}>
+        {bed.status === 'available' ? (
+          <div className={cn("text-sm font-semibold", config.accent)}>
+            ₹{bed.daily_rate.toLocaleString()}/day
+          </div>
+        ) : bed.status === 'occupied' && assignment && assignment.patient_name ? (
           <div className="space-y-1">
-            <div className="flex items-center gap-1">
-              <User className="h-3 w-3 text-muted-foreground" />
-              <span className="font-semibold text-sm truncate">
-                {assignment.patient_name}
-              </span>
-              {assignment.patient_age && <span className="text-xs text-muted-foreground">({assignment.patient_age}y)</span>}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-gray-400" />
+                <span className="text-sm font-semibold text-gray-900 truncate">
+                  {assignment.patient_name}
+                </span>
+              </div>
+              {GenderIcon && <GenderIcon className="h-4 w-4 text-gray-500" />}
             </div>
-            {assignment.days_in_ward && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Calendar className="h-3 w-3" />
-                <span>{assignment.days_in_ward} {assignment.days_in_ward === 1 ? 'day' : 'days'}</span>
-              </div>
-            )}
-            {assignment.surgery_scheduled_time && (
-              <div className="flex items-center gap-1 text-xs font-medium text-orange-600">
-                <Clock className="h-3 w-3" />
-                <span>Surgery: {formatTime(assignment.surgery_scheduled_time)}</span>
-              </div>
-            )}
           </div>
         ) : (
-          <div className="flex items-center justify-center h-full">
-            <span className={cn("text-sm font-medium", config.labelColor)}>
-              {config.label}
-            </span>
-          </div>
+          <div className="text-sm font-medium text-gray-600">{config.label}</div>
         )}
       </div>
 
-      {/* Floor indicator */}
-      <div className="absolute bottom-2 right-2">
-        <Badge variant="outline" className="text-xs">
-          F{bed.floor_number}
-        </Badge>
+      <div className={cn("mt-4 flex items-center justify-between", isOutOfService && "opacity-75")}>
+        <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold", config.badge)}>
+          {isOutOfService && <StatusIcon className="h-3.5 w-3.5" />}
+          {config.label}
+        </span>
+        <span className="text-xs font-medium text-gray-500">Floor {bed.floor_number}</span>
       </div>
     </div>
   )

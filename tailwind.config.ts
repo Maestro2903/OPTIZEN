@@ -165,6 +165,7 @@ const config = {
       },
       fontFamily: {
         sans: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Display', 'SF Pro Text', 'Inter', 'system-ui', 'sans-serif'],
+        jakarta: ['var(--font-jakarta)', 'Plus Jakarta Sans', 'sans-serif'],
         mono: ['SF Mono', 'Menlo', 'Monaco', 'Courier New', 'monospace'],
       },
       fontSize: {

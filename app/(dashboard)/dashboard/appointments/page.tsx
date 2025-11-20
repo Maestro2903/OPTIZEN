@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import {
-  Plus,
   Search,
   Filter,
   Calendar as CalendarIcon,
@@ -14,6 +13,7 @@ import {
   UserCheck,
   AlertCircle,
   Printer,
+  CalendarPlus,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -27,6 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { AppointmentForm } from "@/components/appointment-form"
 import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
 import { ViewEditDialog } from "@/components/view-edit-dialog"
@@ -49,13 +50,34 @@ import { appointmentsApi, type Appointment, type AppointmentFilters } from "@/li
 import { useToast } from "@/hooks/use-toast"
 import { Pagination } from "@/components/ui/pagination"
 
-const statusColors = {
-  scheduled: "bg-blue-100 text-blue-700 border-blue-200",
-  "checked-in": "bg-yellow-100 text-yellow-700 border-yellow-200",
-  "in-progress": "bg-orange-100 text-orange-700 border-orange-200",
-  completed: "bg-green-100 text-green-700 border-green-200",
-  cancelled: "bg-red-100 text-red-700 border-red-200",
-  "no-show": "bg-gray-100 text-gray-700 border-gray-200",
+const statusStyles: Record<
+  string,
+  { container: string; dot: string }
+> = {
+  scheduled: {
+    container: "border border-blue-100 bg-blue-50 text-blue-700",
+    dot: "bg-blue-500",
+  },
+  completed: {
+    container: "border border-emerald-100 bg-emerald-50 text-emerald-700",
+    dot: "bg-emerald-500",
+  },
+  cancelled: {
+    container: "border border-red-100 bg-red-50 text-red-700",
+    dot: "bg-red-500",
+  },
+  "checked-in": {
+    container: "border border-amber-100 bg-amber-50 text-amber-700",
+    dot: "bg-amber-500",
+  },
+  "in-progress": {
+    container: "border border-orange-100 bg-orange-50 text-orange-700",
+    dot: "bg-orange-500",
+  },
+  "no-show": {
+    container: "border border-gray-200 bg-gray-50 text-gray-600",
+    dot: "bg-gray-400",
+  },
 }
 
 const typeColors = {
@@ -128,6 +150,29 @@ export default function AppointmentsPage() {
   React.useEffect(() => {
     changePageSize(pageSize)
   }, [pageSize, changePageSize])
+
+  const getInitials = (name?: string | null) => {
+    if (!name) return "PT"
+    const parts = name.split(" ").filter(Boolean)
+    const initials = parts.slice(0, 2).map((part) => part[0]?.toUpperCase()).join("")
+    return initials || "PT"
+  }
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "-"
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) return "-"
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    })
+  }
+
+  const formatTime = (time?: string | null) => {
+    if (!time) return "--:--"
+    return time.slice(0, 5)
+  }
 
   const handleAddAppointment = async (appointmentData: any) => {
     try {
@@ -250,23 +295,23 @@ export default function AppointmentsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 rounded-3xl bg-slate-50 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Appointments</h1>
+          <h1 className="text-3xl font-bold tracking-tight font-jakarta">Appointments</h1>
           <p className="text-muted-foreground">
             Manage patient appointments and scheduling
           </p>
         </div>
         <AppointmentForm onSubmit={handleAddAppointment}>
-          <Button className="gap-2">
-            <Plus className="h-4 w-4" />
+          <Button className="gap-2 rounded-lg bg-indigo-600 text-white shadow-md transition-colors hover:bg-indigo-700">
+            <CalendarPlus className="h-4 w-4" />
             Schedule Appointment
           </Button>
         </AppointmentForm>
       </div>
 
-      <Card>
+      <Card className="rounded-xl border border-gray-200 bg-white shadow-sm">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -316,16 +361,14 @@ export default function AppointmentsPage() {
           <div className="rounded-md border">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>SR. NO.</TableHead>
-                  <TableHead>PATIENT ID</TableHead>
-                  <TableHead>PATIENT</TableHead>
-                  <TableHead>DATE</TableHead>
-                  <TableHead>TIME</TableHead>
-                  <TableHead>TYPE</TableHead>
-                  <TableHead>DOCTOR</TableHead>
-                  <TableHead>STATUS</TableHead>
-                  <TableHead>ACTIONS</TableHead>
+                <TableRow className="border-b border-gray-200 bg-gray-50/80">
+                  <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Patient</TableHead>
+                  <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Date</TableHead>
+                  <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Time</TableHead>
+                  <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Type</TableHead>
+                  <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Doctor</TableHead>
+                  <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Status</TableHead>
+                  <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -344,28 +387,70 @@ export default function AppointmentsPage() {
                 ) : (
                   appointments.map((appointment, index) => (
                     <TableRow key={appointment.id}>
-                      <TableCell>{((pagination?.page || 1) - 1) * (pagination?.limit || 10) + index + 1}</TableCell>
-                      <TableCell className="font-mono text-sm font-semibold text-primary">{appointment.patients?.patient_id || '-'}</TableCell>
-                      <TableCell className="font-medium uppercase">{appointment.patients?.full_name || '-'}</TableCell>
-                      <TableCell>{new Date(appointment.appointment_date).toLocaleDateString('en-GB')}</TableCell>
-                      <TableCell>{appointment.start_time} - {appointment.end_time}</TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className="capitalize">
-                          {appointment.type}
-                        </Badge>
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-10 w-10 border border-blue-200 text-sm">
+                            <AvatarFallback className="h-full w-full rounded-full bg-blue-100 text-blue-700">
+                              {getInitials(appointment.patients?.full_name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-gray-900">
+                              {appointment.patients?.full_name || "-"}
+                            </span>
+                            <span className="font-mono text-xs text-gray-500">
+                              {appointment.patients?.patient_id || appointment.patient_id || "-"}
+                            </span>
+                          </div>
+                        </div>
                       </TableCell>
-                      <TableCell>{appointment.users?.full_name || '-'}</TableCell>
+                      <TableCell className="text-sm font-medium text-gray-700">
+                        {formatDate(appointment.appointment_date)}
+                      </TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className={`capitalize ${statusColors[appointment.status as keyof typeof statusColors] || ''}`}>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 px-3 py-1 text-xs font-medium text-gray-600 tabular-nums">
+                          <Clock className="h-3.5 w-3.5 text-gray-400" />
+                          {formatTime(appointment.start_time)} - {formatTime(appointment.end_time)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-medium capitalize text-gray-600">
+                          {appointment.type}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-8 w-8 border border-gray-200">
+                            <AvatarFallback className="h-full w-full rounded-full bg-gray-100 text-xs font-semibold text-gray-600">
+                              {getInitials(appointment.users?.full_name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-sm text-gray-900">
+                            {appointment.users?.full_name || "-"}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium capitalize ${
+                            statusStyles[appointment.status]?.container ||
+                            "border border-gray-200 bg-gray-50 text-gray-600"
+                          }`}
+                        >
+                          <span
+                            className={`h-2 w-2 rounded-full ${
+                              statusStyles[appointment.status]?.dot || "bg-gray-400"
+                            }`}
+                          />
                           {appointment.status}
-                        </Badge>
+                        </span>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Button 
                             variant="ghost" 
                             size="icon" 
-                            className="h-8 w-8"
+                            className="flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
                             onClick={() => handleViewAppointment(appointment)}
                             title="View appointment details"
                           >
@@ -374,7 +459,7 @@ export default function AppointmentsPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8"
+                            className="flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
                             onClick={() => handleEditAppointment(appointment)}
                             title="Edit appointment"
                           >
@@ -395,8 +480,8 @@ export default function AppointmentsPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8"
-                              title="Print Appointment"
+                              className="flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+                              title="Print appointment"
                             >
                               <Printer className="h-4 w-4" />
                             </Button>
@@ -404,7 +489,7 @@ export default function AppointmentsPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-destructive"
+                            className="flex h-8 w-8 items-center justify-center rounded-md text-red-500 transition-colors hover:bg-red-50 hover:text-red-600"
                             onClick={() => handleDeleteClick(appointment)}
                             title="Delete appointment"
                           >

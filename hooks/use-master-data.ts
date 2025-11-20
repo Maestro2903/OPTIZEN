@@ -48,6 +48,23 @@ export interface MasterDataCategories {
 
 type CategoryKey = keyof MasterDataCategories
 
+const SLUG_VALUE_CATEGORIES: CategoryKey[] = [
+  'paymentMethods',
+  'paymentStatuses',
+  'revenueTypes',
+  'expenseCategories',
+]
+
+const normalizeValue = (value: string): string => {
+  if (!value) return ''
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '')
+}
+
 // Mapping between frontend keys and API category names
 const CATEGORY_MAP: Record<CategoryKey, string> = {
   complaints: 'complaints',
@@ -149,10 +166,23 @@ export function useMasterData() {
 
       const result = await response.json()
       if (result.data) {
-        const options: MasterDataOption[] = result.data.map((item: any) => ({
-          value: item.id,     // Use ID (UUID) as value for proper foreign key relationships
-          label: item.name,   // Display name as label
-        }))
+        const shouldUseSlugValue = SLUG_VALUE_CATEGORIES.includes(category)
+        const options: MasterDataOption[] = result.data.map((item: any) => {
+          const metadataValue = typeof item?.metadata?.value === 'string'
+            ? item.metadata.value.trim()
+            : undefined
+          const metadataSlug = typeof item?.metadata?.slug === 'string'
+            ? item.metadata.slug.trim()
+            : undefined
+          const normalizedName = normalizeValue(item.name)
+
+          return {
+            value: shouldUseSlugValue
+              ? metadataValue || metadataSlug || normalizedName || item.id
+              : item.id,     // Use ID (UUID) as value for proper foreign key relationships
+            label: item.name,   // Display name as label
+          }
+        })
 
         setData(prev => ({ ...prev, [category]: options }))
       }

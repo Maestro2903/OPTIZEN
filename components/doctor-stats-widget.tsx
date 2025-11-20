@@ -30,6 +30,7 @@ export function DoctorStatsWidget({ stats }: DoctorStatsWidgetProps) {
       icon: Calendar,
       color: "text-blue-600",
       bgColor: "bg-blue-50",
+      borderColor: "border-blue-100",
     },
     {
       label: "Scheduled",
@@ -37,6 +38,7 @@ export function DoctorStatsWidget({ stats }: DoctorStatsWidgetProps) {
       icon: Clock,
       color: "text-yellow-600",
       bgColor: "bg-yellow-50",
+      borderColor: "border-yellow-100",
     },
     {
       label: "Completed",
@@ -44,6 +46,7 @@ export function DoctorStatsWidget({ stats }: DoctorStatsWidgetProps) {
       icon: CheckCircle,
       color: "text-green-600",
       bgColor: "bg-green-50",
+      borderColor: "border-green-100",
     },
     {
       label: "Cancelled",
@@ -51,6 +54,7 @@ export function DoctorStatsWidget({ stats }: DoctorStatsWidgetProps) {
       icon: XCircle,
       color: "text-red-600",
       bgColor: "bg-red-50",
+      borderColor: "border-red-100",
     },
     {
       label: "No Show",
@@ -58,6 +62,7 @@ export function DoctorStatsWidget({ stats }: DoctorStatsWidgetProps) {
       icon: UserX,
       color: "text-gray-600",
       bgColor: "bg-gray-50",
+      borderColor: "border-gray-100",
     },
     {
       label: "Reassigned",
@@ -65,6 +70,7 @@ export function DoctorStatsWidget({ stats }: DoctorStatsWidgetProps) {
       icon: ArrowRightLeft,
       color: "text-purple-600",
       bgColor: "bg-purple-50",
+      borderColor: "border-purple-100",
     },
   ]
 
@@ -73,16 +79,21 @@ export function DoctorStatsWidget({ stats }: DoctorStatsWidgetProps) {
       {statItems.map((item) => {
         const Icon = item.icon
         return (
-          <Card key={item.label}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between space-x-2">
-                <div className="space-y-1">
+          <Card
+            key={item.label}
+            className={`rounded-xl border ${item.borderColor} ${item.bgColor} shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-md`}
+          >
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between">
+                <div className="space-y-2">
                   <p className="text-sm font-medium text-muted-foreground">
                     {item.label}
                   </p>
-                  <p className="text-2xl font-bold">{item.value}</p>
+                  <p className="text-3xl font-bold text-gray-800">
+                    {item.value}
+                  </p>
                 </div>
-                <div className={`flex h-10 w-10 items-center justify-center rounded-full ${item.bgColor}`}>
+                <div className={`flex h-10 w-10 items-center justify-center rounded-full ${item.bgColor} ${item.borderColor} border`}>
                   <Icon className={`h-5 w-5 ${item.color}`} />
                 </div>
               </div>

@@ -1,0 +1,163 @@
+/**
+ * Script to reset superadmin password
+ * 
+ * Usage:
+ *   node scripts/reset-superadmin-password.js
+ * 
+ * Or with custom password:
+ *   PASSWORD=yourNewPassword node scripts/reset-superadmin-password.js
+ */
+
+require('dotenv').config({ path: '.env.local' })
+const { createClient } = require('@supabase/supabase-js')
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+if (!supabaseUrl || !serviceRoleKey) {
+  console.error('❌ Missing required environment variables:')
+  console.error('   NEXT_PUBLIC_SUPABASE_URL:', supabaseUrl ? '✓' : '✗')
+  console.error('   SUPABASE_SERVICE_ROLE_KEY:', serviceRoleKey ? '✓' : '✗')
+  process.exit(1)
+}
+
+// Create admin client with service role
+const supabase = createClient(supabaseUrl, serviceRoleKey, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+  },
+})
+
+async function resetSuperAdminPassword() {
+  const newPassword = process.env.PASSWORD || 'SuperAdmin@2024!'
+  const email = 'superadmin@eyecare.local'
+
+  console.log('🔐 Resetting superadmin password...')
+  console.log(`   Email: ${email}`)
+  console.log(`   New Password: ${newPassword}`)
+  console.log('')
+
+  try {
+    // Try to get user by email using SQL query first
+    let userId = null
+    
+    // Query auth.users table directly
+    const { data: authUser, error: queryError } = await supabase
+      .from('auth.users')
+      .select('id, email')
+      .eq('email', email)
+      .single()
+    
+    if (!queryError && authUser) {
+      userId = authUser.id
+      console.log(`✅ Found user with ID: ${userId}`)
+    } else {
+      // Fallback: Try to list users
+      console.log('⚠️  Direct query failed, trying listUsers...')
+      const { data: users, error: listError } = await supabase.auth.admin.listUsers()
+      
+      if (listError) {
+        console.error('❌ Error listing users:', listError.message)
+        // Try with known user ID
+        userId = 'ad420082-0897-438a-bdf8-93731c09b93f'
+        console.log(`💡 Using known user ID: ${userId}`)
+      } else {
+        const user = users.users.find(u => u.email === email)
+        if (user) {
+          userId = user.id
+        }
+      }
+    }
+
+    if (!userId) {
+      console.error(`❌ User with email ${email} not found`)
+      console.log('')
+      console.log('💡 Creating new superadmin user...')
+      
+      // Create new superadmin user
+      const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+        email,
+        password: newPassword,
+        email_confirm: true,
+        user_metadata: {
+          full_name: 'Super Admin',
+          role: 'super_admin'
+        }
+      })
+
+      if (createError) {
+        console.error('❌ Error creating user:', createError.message)
+        process.exit(1)
+      }
+
+      userId = newUser.user.id
+      console.log('✅ Created new superadmin user')
+      console.log(`   User ID: ${userId}`)
+
+      // Create user profile in public.users table
+      const { error: profileError } = await supabase
+        .from('users')
+        .insert({
+          id: userId,
+          email,
+          full_name: 'Super Admin',
+          role: 'super_admin',
+          is_active: true,
+        })
+
+      if (profileError) {
+        console.warn('⚠️  Warning: Could not create user profile:', profileError.message)
+        console.log('   You may need to create the profile manually in the database')
+      } else {
+        console.log('✅ Created user profile in public.users table')
+      }
+
+      console.log('')
+      console.log('🎉 Success! New superadmin credentials:')
+      console.log(`   Email: ${email}`)
+      console.log(`   Password: ${newPassword}`)
+      return
+    }
+
+    // Update existing user's password
+    console.log(`🔄 Updating password for user ID: ${userId}`)
+    const { data: updatedUser, error: updateError } = await supabase.auth.admin.updateUserById(
+      userId,
+      {
+        password: newPassword,
+      }
+    )
+
+    if (updateError) {
+      console.error('❌ Error updating password:', updateError.message)
+      process.exit(1)
+    }
+
+    console.log('✅ Password updated successfully!')
+    console.log(`   User ID: ${updatedUser.user.id}`)
+    console.log('')
+    console.log('🎉 Success! Updated superadmin credentials:')
+    console.log(`   Email: ${email}`)
+    console.log(`   Password: ${newPassword}`)
+    console.log('')
+    console.log('💡 You can now log in with these credentials')
+
+  } catch (error) {
+    console.error('❌ Unexpected error:', error)
+    process.exit(1)
+  }
+}
+
+// Run the script
+resetSuperAdminPassword()
+  .then(() => {
+    console.log('')
+    console.log('✨ Script completed successfully')
+    process.exit(0)
+  })
+  .catch((error) => {
+    console.error('❌ Script failed:', error)
+    process.exit(1)
+  })
+

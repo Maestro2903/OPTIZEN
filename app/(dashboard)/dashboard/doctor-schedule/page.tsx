@@ -327,13 +327,16 @@ export default function DoctorSchedulePage() {
     )
   }
 
+  const toolbarButtonClass =
+    "h-10 rounded-lg border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-gray-200"
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex min-h-screen flex-col gap-6 bg-slate-50 p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {isAdmin ? 'Doctor Schedules' : 'My Schedule'}
+          <h1 className="text-3xl font-bold tracking-tight font-jakarta">
+            {isAdmin ? 'My Schedules' : 'My Schedule'}
           </h1>
           <p className="text-muted-foreground">
             {isAdmin 
@@ -350,12 +353,12 @@ export default function DoctorSchedulePage() {
       
       {/* Admin: Doctor Selector */}
       {isAdmin && (
-        <Card>
-          <CardHeader>
+        <Card className="rounded-xl bg-white shadow-sm">
+          <CardHeader className="p-6 pb-4">
             <CardTitle>Select Doctor</CardTitle>
             <CardDescription>Choose a doctor to view their schedule</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-6 pt-0">
             <SearchableSelect
               options={availableDoctors}
               value={selectedDoctorId}
@@ -370,8 +373,8 @@ export default function DoctorSchedulePage() {
 
       {/* Doctor Info Card */}
       {scheduleData?.doctor && (
-        <Card>
-          <CardHeader className="pb-3">
+        <Card className={`rounded-xl bg-white shadow-sm ${isAdmin ? 'mt-2' : ''}`}>
+          <CardHeader className="p-6">
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
                 <User className="h-6 w-6 text-primary" />
@@ -397,18 +400,23 @@ export default function DoctorSchedulePage() {
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-4">
             {/* Date Navigation */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2 rounded-xl bg-gray-100/70 p-2 shadow-inner">
               <Button
-                variant="outline"
-                size="icon"
+                  variant="ghost"
+                  size="icon"
                 onClick={() => navigateDate('prev')}
+                  className={`${toolbarButtonClass} w-10 px-0`}
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
 
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="gap-2 min-w-[200px]">
+                    <Button
+                      variant="ghost"
+                      className={`${toolbarButtonClass} gap-2 min-w-[200px]`}
+                    >
                     <CalendarIcon className="h-4 w-4" />
                     {format(date, 'PPP')}
                   </Button>
@@ -424,33 +432,51 @@ export default function DoctorSchedulePage() {
               </Popover>
 
               <Button
-                variant="outline"
-                size="icon"
+                  variant="ghost"
+                  size="icon"
                 onClick={() => navigateDate('next')}
+                  className={`${toolbarButtonClass} w-10 px-0`}
               >
                 <ArrowRight className="h-4 w-4" />
               </Button>
 
               <Button
-                variant="outline"
+                  variant="ghost"
                 onClick={() => setDate(new Date())}
+                  className={toolbarButtonClass}
               >
                 Today
               </Button>
+              </div>
             </div>
 
             {/* View Mode */}
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)}>
-              <TabsList>
-                <TabsTrigger value="day">Day</TabsTrigger>
-                <TabsTrigger value="week">Week</TabsTrigger>
-                <TabsTrigger value="month">Month</TabsTrigger>
+              <TabsList className="rounded-2xl border border-gray-200 bg-gray-100 p-1 shadow-inner">
+                <TabsTrigger
+                  value="day"
+                  className="rounded-xl px-5 py-2 text-sm font-semibold text-gray-600 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm"
+                >
+                  Day
+                </TabsTrigger>
+                <TabsTrigger
+                  value="week"
+                  className="rounded-xl px-5 py-2 text-sm font-semibold text-gray-600 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm"
+                >
+                  Week
+                </TabsTrigger>
+                <TabsTrigger
+                  value="month"
+                  className="rounded-xl px-5 py-2 text-sm font-semibold text-gray-600 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm"
+                >
+                  Month
+                </TabsTrigger>
               </TabsList>
             </Tabs>
 
             {/* Status Filter */}
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className={`w-[180px] ${toolbarButtonClass} justify-between`}>
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
@@ -494,10 +520,10 @@ export default function DoctorSchedulePage() {
               </p>
             </div>
           ) : filteredAppointments.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="flex min-h-[300px] flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-gray-50/50 px-6 py-12 text-center">
               <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-lg font-medium">No appointments found</p>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-lg font-medium text-gray-800">No appointments found</p>
+              <p className="text-sm text-gray-500 mt-1">
                 {statusFilter !== 'all' 
                   ? 'Try changing the status filter'
                   : 'No appointments scheduled for this period'}

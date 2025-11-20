@@ -148,7 +148,7 @@ export default function RevenuePage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Revenue & Finance</h1>
+          <h1 className="text-3xl font-bold tracking-tight font-jakarta">Revenue & Finance</h1>
           <p className="text-muted-foreground">
             Financial overview, revenue tracking, and expense management
           </p>

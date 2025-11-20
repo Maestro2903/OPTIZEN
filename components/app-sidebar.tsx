@@ -19,6 +19,7 @@ import {
   CalendarClock,
 } from "lucide-react"
 import { Logo } from "@/components/logo"
+import { cn } from "@/lib/utils"
 
 import { NavMain } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
@@ -32,91 +33,106 @@ import {
 } from "@/components/ui/sidebar"
 import { useUser } from "@/contexts/user-context"
 
-// Map navigation items to their required permissions
-const navigationItems = [
+// Navigation groups
+const navigationGroups = [
   {
-    title: "Patients",
-    url: "/dashboard/patients",
-    icon: Users,
-    requiredPermission: "patients" as const,
+    header: "CLINICAL",
+    items: [
+      {
+        title: "Patients",
+        url: "/dashboard/patients",
+        icon: Users,
+        requiredPermission: "patients" as const,
+      },
+      {
+        title: "Appointments",
+        url: "/dashboard/appointments",
+        icon: Calendar,
+        requiredPermission: "appointments" as const,
+      },
+      {
+        title: "My Schedule",
+        url: "/dashboard/doctor-schedule",
+        icon: CalendarClock,
+        requiredPermission: "doctor_schedule" as const,
+      },
+      {
+        title: "Cases",
+        url: "/dashboard/cases",
+        icon: FolderOpen,
+        requiredPermission: "cases" as const,
+      },
+      {
+        title: "Operations",
+        url: "/dashboard/operations",
+        icon: Stethoscope,
+        requiredPermission: "operations" as const,
+      },
+      {
+        title: "Discharges",
+        url: "/dashboard/discharges",
+        icon: FileText,
+        requiredPermission: "discharges" as const,
+      },
+      {
+        title: "Beds",
+        url: "/dashboard/beds",
+        icon: Bed,
+        requiredPermission: "beds" as const,
+      },
+      {
+        title: "Certificates",
+        url: "/dashboard/certificates",
+        icon: Award,
+        requiredPermission: "certificates" as const,
+      },
+    ],
   },
   {
-    title: "Appointments",
-    url: "/dashboard/appointments",
-    icon: Calendar,
-    requiredPermission: "appointments" as const,
+    header: "ADMIN",
+    items: [
+      {
+        title: "Billing",
+        url: "/dashboard/billing",
+        icon: CreditCard,
+        requiredPermission: "invoices" as const,
+      },
+      {
+        title: "Finance",
+        url: "/dashboard/finance",
+        icon: TrendingUp,
+        requiredPermission: "finance" as const,
+      },
+      {
+        title: "Pharmacy",
+        url: "/dashboard/pharmacy",
+        icon: Package,
+        requiredPermission: "pharmacy" as const,
+      },
+      {
+        title: "Attendance",
+        url: "/dashboard/attendance",
+        icon: Clock,
+        requiredPermission: "attendance" as const,
+      },
+      {
+        title: "Employees",
+        url: "/dashboard/employees",
+        icon: UserCog,
+        requiredPermission: "employees" as const,
+      },
+    ],
   },
   {
-    title: "My Schedule",
-    url: "/dashboard/doctor-schedule",
-    icon: CalendarClock,
-    requiredPermission: "doctor_schedule" as const,
-  },
-  {
-    title: "Cases",
-    url: "/dashboard/cases",
-    icon: FolderOpen,
-    requiredPermission: "cases" as const,
-  },
-  {
-    title: "Operations",
-    url: "/dashboard/operations",
-    icon: Stethoscope,
-    requiredPermission: "operations" as const,
-  },
-  {
-    title: "Discharges",
-    url: "/dashboard/discharges",
-    icon: FileText,
-    requiredPermission: "discharges" as const,
-  },
-  {
-    title: "Billing",
-    url: "/dashboard/billing",
-    icon: CreditCard,
-    requiredPermission: "invoices" as const,
-  },
-  {
-    title: "Finance",
-    url: "/dashboard/finance",
-    icon: TrendingUp,
-    requiredPermission: "finance" as const,
-  },
-  {
-    title: "Pharmacy",
-    url: "/dashboard/pharmacy",
-    icon: Package,
-    requiredPermission: "pharmacy" as const,
-  },
-  {
-    title: "Beds",
-    url: "/dashboard/beds",
-    icon: Bed,
-    requiredPermission: "beds" as const,
-  },
-  {
-    title: "Certificates",
-    url: "/dashboard/certificates",
-    icon: Award,
-    requiredPermission: "certificates" as const,
-  },
-  {
-    title: "Attendance",
-    url: "/dashboard/attendance",
-    icon: Clock,
-    requiredPermission: "attendance" as const,
-  },
-  {
-    title: "Employees",
-    url: "/dashboard/employees",
-    icon: UserCog,
-    requiredPermission: "employees" as const,
-  },
-  {
-    title: "Master Data",
-    url: "/dashboard/master",
-    icon: Database,
-    requiredPermission: "master_data" as const,
+    header: "SYSTEM",
+    items: [
+      {
+        title: "Master Data",
+        url: "/dashboard/master",
+        icon: Database,
+        requiredPermission: "master_data" as const,
+      },
+    ],
   },
 ]
 
@@ -124,52 +140,89 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { hasModuleAccess, isSuperAdmin, loading } = useUser()
   const { state } = useSidebar()
 
-  // Filter navigation items based on user permissions
-  const filteredNavItems = React.useMemo(() => {
+  // Filter navigation groups based on user permissions
+  const filteredNavGroups = React.useMemo(() => {
     // During loading, show all items in disabled state
     if (loading) {
-      const allItems = navigationItems.map(item => ({ ...item, disabled: true }))
-      return allItems
+      return navigationGroups.map(group => ({
+        ...group,
+        items: group.items.map(item => ({ ...item, disabled: true })),
+      }))
     }
     
-    const items = navigationItems.filter(item => 
-      hasModuleAccess(item.requiredPermission)
-    )
+    const groups = navigationGroups.map(group => ({
+      ...group,
+      items: group.items.filter(item => 
+        hasModuleAccess(item.requiredPermission)
+      ),
+    })).filter(group => group.items.length > 0) // Remove empty groups
 
-    // Add Access Control for super admin
+    // Add Access Control to SYSTEM group for super admin
     if (isSuperAdmin()) {
-      items.push({
-        title: "Access Control",
-        url: "/dashboard/access-control",
-        icon: Shield,
-        requiredPermission: "roles" as any,
-      })
+      const systemGroup = groups.find(g => g.header === "SYSTEM")
+      if (systemGroup) {
+        systemGroup.items.push({
+          title: "Access Control",
+          url: "/dashboard/access-control",
+          icon: Shield,
+          requiredPermission: "roles" as any,
+        })
+      } else {
+        // If SYSTEM group doesn't exist, create it
+        groups.push({
+          header: "SYSTEM",
+          items: [{
+            title: "Access Control",
+            url: "/dashboard/access-control",
+            icon: Shield,
+            requiredPermission: "roles" as any,
+          }],
+        })
+      }
     }
 
-    return items
+    return groups
   }, [hasModuleAccess, isSuperAdmin, loading])
 
   return (
-    <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader>
+    <Sidebar 
+      collapsible="icon" 
+      className={cn(
+        "h-screen w-64 !bg-white border-r border-gray-200 [&_[data-sidebar=sidebar]]:!bg-white",
+        state === "collapsed" && "[&_[data-sidebar=sidebar]]:flex [&_[data-sidebar=sidebar]]:flex-col [&_[data-sidebar=sidebar]]:items-center"
+      )}
+      style={
+        state === "collapsed"
+          ? ({ "--sidebar-width-icon": "5rem" } as React.CSSProperties)
+          : undefined
+      }
+      {...props}
+    >
+      <SidebarHeader className={cn(
+        "flex items-center shrink-0",
+        state === "collapsed" ? "h-20 justify-center" : "h-16"
+      )}>
         {state === "collapsed" ? (
-          <div className="flex items-center justify-center py-4">
-            <Logo className="size-8" width={32} height={32} />
+          <div className="flex items-center justify-center w-full">
+            <Logo className="w-8 h-8" width={32} height={32} />
           </div>
         ) : (
-          <div className="flex items-center gap-3 px-3 py-4">
+          <div className="flex items-center gap-3 px-3 w-full">
             <Logo className="size-10 shrink-0" width={40} height={40} />
-            <div className="grid flex-1 text-left text-sm leading-tight">
-              <span className="truncate font-semibold text-base">EyeZen</span>
-              <span className="truncate text-xs text-muted-foreground">Hospital Management</span>
+            <div className="flex flex-col flex-1 text-left leading-tight">
+              <span className="truncate text-xl font-bold tracking-tight text-gray-900 font-jakarta">OptiZen</span>
+              <span className="truncate text-xs text-gray-500">Hospital Management</span>
             </div>
           </div>
         )}
       </SidebarHeader>
-      <SidebarContent>
-        <NavMain items={filteredNavItems} isLoading={loading} />
+      <SidebarContent className={cn(
+        "flex-1 overflow-y-auto min-h-0",
+        state === "collapsed" && "flex flex-col items-center"
+      )}>
+        <NavMain groups={filteredNavGroups} isLoading={loading} />
       </SidebarContent>
-      <SidebarFooter>
+      <SidebarFooter className="shrink-0">
         <NavUser />
       </SidebarFooter>
       <SidebarRail />
