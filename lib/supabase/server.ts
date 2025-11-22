@@ -1,13 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
-import type { cookies as CookiesType } from 'next/headers'
 import { Database } from './database.types'
-
-// Lazy import cookies to avoid build-time errors
-const getCookies = async () => {
-  const { cookies } = await import('next/headers')
-  return cookies
-}
 
 /**
  * Creates a Supabase client for server-side operations
@@ -68,11 +61,13 @@ export const createClient = () => {
     throw new Error('Missing Supabase environment variables')
   }
 
-  // During build time, cookies() cannot be called - fall back to service role if available
+  // Check if we have a service role key as fallback for build time
   if (serviceRoleKey) {
     try {
+      // Attempt to access cookies - this will fail during build time
+      const { cookies } = require('next/headers')
       const cookieStore = cookies()
-      
+
       return createServerClient<Database>(
         supabaseUrl,
         supabaseAnonKey,
@@ -95,8 +90,8 @@ export const createClient = () => {
           },
         }
       )
-    } catch {
-      // If cookies() fails (e.g., during build), use service role client
+    } catch (error) {
+      // If cookies() fails (e.g., during build time), use service role client
       return createSupabaseClient<Database>(
         supabaseUrl,
         serviceRoleKey,
@@ -108,39 +103,46 @@ export const createClient = () => {
         }
       )
     }
-  }
+  } else {
+    // No service role key, must use cookies - this will fail at build time
+    // We'll try anyway and let it fail with a clear message if not in request context
+    try {
+      // Access cookies - will throw error at build time
+      const { cookies } = require('next/headers')
+      const cookieStore = cookies()
 
-  // No service role key - must use cookies (will fail during build)
-  const cookieStore = cookies()
-  
-  return createServerClient<Database>(
-    supabaseUrl,
-    supabaseAnonKey,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
-          } catch {
-            // The `setAll` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
-          }
-        },
-      },
+      return createServerClient<Database>(
+        supabaseUrl,
+        supabaseAnonKey,
+        {
+          cookies: {
+            getAll() {
+              return cookieStore.getAll()
+            },
+            setAll(cookiesToSet) {
+              try {
+                cookiesToSet.forEach(({ name, value, options }) =>
+                  cookieStore.set(name, value, options)
+                )
+              } catch {
+                // The `setAll` method was called from a Server Component.
+                // This can be ignored if you have middleware refreshing
+                // user sessions.
+              }
+            },
+          },
+        }
+      )
+    } catch (error) {
+      throw new Error('Supabase client creation failed. Ensure you are calling this in a server context with access to headers/cookies.')
     }
-  )
+  }
 }
 
 /**
  * Creates an authenticated Supabase client that ALWAYS uses cookies
  * Use this for API routes that need to access user sessions (like /api/access-control)
- * 
+ *
  * This ensures proper session handling even in development mode
  */
 export const createAuthenticatedClient = async () => {
@@ -155,10 +157,10 @@ export const createAuthenticatedClient = async () => {
   // Try to get cookies, but fall back to service role if it fails (e.g., during build)
   let cookieStore
   try {
-    const cookies = await getCookies()
-    cookieStore = await cookies()
-  } catch (error: any) {
-    // If cookies() fails (e.g., during build or outside request context), use service role
+    const { cookies } = await import('next/headers')
+    cookieStore = cookies()
+  } catch (error) {
+    // If cookies() fails (e.g., during build or outside request context), use service role if available
     if (serviceRoleKey) {
       return createSupabaseClient<Database>(
         supabaseUrl,
@@ -173,7 +175,7 @@ export const createAuthenticatedClient = async () => {
     }
     throw error
   }
-  
+
   return createServerClient<Database>(
     supabaseUrl,
     supabaseAnonKey,
