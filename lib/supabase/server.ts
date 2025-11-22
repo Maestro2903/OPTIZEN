@@ -1,7 +1,13 @@
 import { createServerClient } from '@supabase/ssr'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
+import type { cookies as CookiesType } from 'next/headers'
 import { Database } from './database.types'
+
+// Lazy import cookies to avoid build-time errors
+const getCookies = async () => {
+  const { cookies } = await import('next/headers')
+  return cookies
+}
 
 /**
  * Creates a Supabase client for server-side operations
@@ -64,6 +70,7 @@ export const createClient = () => {
 
   // In production without service role, we need cookies - use createAuthenticatedClient()
   // This is a fallback that will work but may have cookie issues
+  // Note: This may fail during build - use createAuthenticatedClient() in API routes instead
   const cookieStore = cookies()
   
   return createServerClient<Database>(
@@ -108,10 +115,11 @@ export const createAuthenticatedClient = async () => {
   // Try to get cookies, but fall back to service role if it fails (e.g., during build)
   let cookieStore
   try {
+    const cookies = await getCookies()
     cookieStore = await cookies()
   } catch (error: any) {
     // If cookies() fails (e.g., during build or outside request context), use service role
-    if (serviceRoleKey && (error?.message?.includes('request scope') || error?.message?.includes('outside'))) {
+    if (serviceRoleKey) {
       return createSupabaseClient<Database>(
         supabaseUrl,
         serviceRoleKey,
