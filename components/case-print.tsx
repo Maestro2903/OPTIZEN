@@ -45,6 +45,9 @@ interface CasePrintProps {
     past_medical_history?: string
     examination_findings?: string
     diagnosis?: string | string[]
+    treatment_plan?: string
+    medications_prescribed?: string
+    follow_up_instructions?: string
     status?: string
     follow_up_date?: string
     notes?: string

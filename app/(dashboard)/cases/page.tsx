@@ -416,10 +416,8 @@ export default function CasesPage() {
                             
                             // Diagnosis and treatment
                             diagnosis: caseItem.diagnosis,
-                            treatment: caseItem.treatment_plan,
                             treatment_plan: caseItem.treatment_plan,
                             medications_prescribed: caseItem.medications_prescribed,
-                            prescription: caseItem.medications_prescribed,
                             follow_up_instructions: caseItem.follow_up_instructions,
                             notes: caseItem.follow_up_instructions,
                             
@@ -479,10 +477,8 @@ export default function CasesPage() {
                           
                           // Diagnosis and treatment
                           diagnosis: caseItem.diagnosis,
-                          treatment: caseItem.treatment_plan,
                           treatment_plan: caseItem.treatment_plan,
                           medications_prescribed: caseItem.medications_prescribed,
-                          prescription: caseItem.medications_prescribed,
                           follow_up_instructions: caseItem.follow_up_instructions,
                           notes: caseItem.follow_up_instructions,
                           advice_remarks: caseItem.advice_remarks,
