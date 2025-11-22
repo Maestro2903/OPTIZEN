@@ -25,10 +25,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { EmployeeForm } from "@/components/employee-form"
+import { EmployeeForm } from "@/components/forms/employee-form"
 import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
-import { ViewEditDialog } from "@/components/view-edit-dialog"
-import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
+import { ViewEditDialog } from "@/components/dialogs/view-edit-dialog"
+import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
 import {
   Dialog,
   DialogContent,

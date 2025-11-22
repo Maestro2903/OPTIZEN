@@ -28,11 +28,11 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { AppointmentForm } from "@/components/appointment-form"
+import { AppointmentForm } from "@/components/forms/appointment-form"
 import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
-import { ViewEditDialog } from "@/components/view-edit-dialog"
-import { AppointmentPrint } from "@/components/appointment-print"
-import { AppointmentViewDialog } from "@/components/appointment-view-dialog"
+import { ViewEditDialog } from "@/components/dialogs/view-edit-dialog"
+import { AppointmentPrint } from "@/components/print/appointment-print"
+import { AppointmentViewDialog } from "@/components/dialogs/appointment-view-dialog"
 import {
   AlertDialog,
   AlertDialogAction,

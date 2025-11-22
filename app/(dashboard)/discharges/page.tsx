@@ -13,9 +13,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { DischargeForm } from "@/components/discharge-form"
-import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
-import { DischargePrint } from "@/components/discharge-print"
+import { DischargeForm } from "@/components/forms/discharge-form"
+import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
+import { DischargePrint } from "@/components/print/discharge-print"
 import { Badge } from "@/components/ui/badge"
 import { type Discharge, dischargesApi } from "@/lib/services/api"
 import { useToast } from "@/hooks/use-toast"

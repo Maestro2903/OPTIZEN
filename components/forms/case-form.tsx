@@ -11,7 +11,7 @@ import { GroupedSearchableSelect, type GroupedOption } from "@/components/ui/gro
 import { MultiSelect, type MultiSelectOption } from "@/components/ui/multi-select"
 import { patientsApi, type Patient } from "@/lib/services/api"
 import { useToast } from "@/hooks/use-toast"
-import { PatientSelectorWithHistory } from "@/components/patient-selector-with-history"
+import { PatientSelectorWithHistory } from "@/components/features/patients/patient-selector-with-history"
 import { determineVisitType } from "@/lib/utils/visit-type"
 import {
   Dialog,

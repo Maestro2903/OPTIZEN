@@ -28,12 +28,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { InvoiceForm } from "@/components/invoice-form-new"
+import { InvoiceForm } from "@/components/forms/invoice-form-new"
 import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
-import { ViewEditDialog } from "@/components/view-edit-dialog"
-import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
-import { BillingPrint } from "@/components/billing-print"
-import { InvoiceViewDialog } from "@/components/invoice-view-dialog"
+import { ViewEditDialog } from "@/components/dialogs/view-edit-dialog"
+import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
+import { BillingPrint } from "@/components/print/billing-print"
+import { InvoiceViewDialog } from "@/components/dialogs/invoice-view-dialog"
 import { useApiList, useApiForm, useApiDelete } from "@/lib/hooks/useApi"
 import { invoicesApi, type Invoice, type InvoiceFilters, type InvoiceMetrics } from "@/lib/services/api"
 import { useToast } from "@/hooks/use-toast"

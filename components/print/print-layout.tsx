@@ -3,7 +3,7 @@
 import * as React from "react"
 import { Printer } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Logo } from "@/components/logo"
+import { Logo } from "@/components/shared/logo"
 import "@/styles/print.css"
 
 interface PrintLayoutProps {

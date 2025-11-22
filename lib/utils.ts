@@ -29,12 +29,6 @@ export function formatTime(date: Date | string): string {
   })
 }
 
-export function generateMRN(): string {
-  const timestamp = Date.now().toString().slice(-8)
-  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
-  return `MRN${timestamp}${random}`
-}
-
 export function calculateAge(birthDate: Date | string): number {
   const birth = typeof birthDate === 'string' ? new Date(birthDate) : birthDate
   const today = new Date()

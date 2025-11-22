@@ -27,13 +27,13 @@ npm run dev
 
 ## Deployment
 
-For detailed deployment instructions, see [VERCEL_DEPLOYMENT.md](./VERCEL_DEPLOYMENT.md).
+For detailed deployment instructions, see the [deployment documentation](./docs/deployment/vercel.md).
 
 ### Quick Deploy to Vercel
 
 1. Push your code to a Git repository
 2. Import the project in [Vercel](https://vercel.com)
-3. Add the required environment variables (see VERCEL_DEPLOYMENT.md)
+3. Add the required environment variables (see [deployment docs](./docs/deployment/vercel.md))
 4. Deploy!
 
 ## Environment Variables
@@ -51,6 +51,13 @@ This project includes MCP configuration to enable AI assistants to interact with
 
 Configuration is stored in `mcp_config.json` (not committed for security) and `mcp_config.example.json` (template).
 
-See [mcp_config.md](./mcp_config.md) for detailed information about MCP configuration.
+See [MCP configuration documentation](./docs/configuration/mcp-config.md) for detailed information about MCP configuration.
 
-See [VERCEL_DEPLOYMENT.md](./VERCEL_DEPLOYMENT.md) for detailed setup instructions.
+## Documentation
+
+- [Deployment Guide](./docs/deployment/vercel.md) - Vercel deployment instructions
+- [Deployment Steps](./docs/deployment/steps.md) - Step-by-step deployment process
+- [Error Report](./docs/development/errors.md) - Error analysis and status
+- [Unused Code Report](./docs/development/unused-code.md) - Unused code analysis
+- [Unused Files Report](./docs/development/unused-files.md) - Unused files analysis
+- [MCP Configuration](./docs/configuration/mcp-config.md) - Model Context Protocol setup

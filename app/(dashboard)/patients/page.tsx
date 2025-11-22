@@ -37,10 +37,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import * as z from "zod"
-import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
+import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
 import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
-import { PatientDetailModal } from "@/components/patient-detail-modal"
-import { PatientFormDialog } from "@/components/patient-form-dialog"
+import { PatientDetailModal } from "@/components/dialogs/patient-detail-modal"
+import { PatientFormDialog } from "@/components/dialogs/patient-form-dialog"
 import { Pagination } from "@/components/ui/pagination"
 import { useToast } from "@/hooks/use-toast"
 import { useApiList, useApiForm, useApiDelete } from "@/lib/hooks/useApi"

@@ -11,8 +11,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { BedForm } from "@/components/bed-form"
-import { BedAssignmentForm } from "@/components/bed-assignment-form"
+import { BedForm } from "@/components/forms/bed-form"
+import { BedAssignmentForm } from "@/components/forms/bed-assignment-form"
 import {
   User,
   Calendar,

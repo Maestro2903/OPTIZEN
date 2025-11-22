@@ -59,11 +59,11 @@ import {
 } from "@/components/ui/select"
 import { Pagination } from "@/components/ui/pagination"
 import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
-import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
-import { InvoiceViewDialog } from "@/components/invoice-view-dialog"
-import { BillingPrint } from "@/components/billing-print"
-import { ExpenseForm } from "@/components/expense-form"
-import { FinanceInvoiceDialog } from "@/components/finance-invoice-dialog"
+import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
+import { InvoiceViewDialog } from "@/components/dialogs/invoice-view-dialog"
+import { BillingPrint } from "@/components/print/billing-print"
+import { ExpenseForm } from "@/components/forms/expense-form"
+import { FinanceInvoiceDialog } from "@/components/dialogs/finance-invoice-dialog"
 import { useApiList, useApiForm, useApiDelete } from "@/lib/hooks/useApi"
 import { 
   invoicesApi, 

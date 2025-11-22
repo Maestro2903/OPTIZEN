@@ -12,7 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
+import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
 
 export interface DataGridColumn<T = any> {
   key: string

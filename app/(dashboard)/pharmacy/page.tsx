@@ -15,9 +15,9 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
-import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
-import { PharmacyPrint } from "@/components/pharmacy-print"
-import { PharmacyViewDialog } from "@/components/pharmacy-view-dialog"
+import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
+import { PharmacyPrint } from "@/components/print/pharmacy-print"
+import { PharmacyViewDialog } from "@/components/dialogs/pharmacy-view-dialog"
 import { useApiList, useApiForm, useApiDelete } from "@/lib/hooks/useApi"
 import { pharmacyApi, type PharmacyItem, type PharmacyFilters, type PharmacyMetrics } from "@/lib/services/api"
 import { useToast } from "@/hooks/use-toast"

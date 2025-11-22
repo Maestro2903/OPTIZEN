@@ -183,7 +183,7 @@ export function InvoiceForm({ children, invoiceData, mode = "add", onFormSubmitA
   const status = form.watch("status")
 
   // Ref to track previous status for detecting transitions
-  const prevStatusRef = React.useRef(undefined);
+  const prevStatusRef = React.useRef<"Draft" | "Paid" | "Pending" | undefined>(undefined);
   React.useEffect(() => {
     prevStatusRef.current = status;
   }, [status]);

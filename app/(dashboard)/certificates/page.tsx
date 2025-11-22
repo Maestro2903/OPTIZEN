@@ -15,9 +15,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { CertificateGeneratorForm } from "@/components/certificate-generator-form"
-import { CertificatePrintModal } from "@/components/certificate-print-modal"
-import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
+import { CertificateGeneratorForm } from "@/components/forms/certificate-generator-form"
+import { CertificatePrintModal } from "@/components/dialogs/certificate-print-modal"
+import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
 import {
   Select,
   SelectContent,

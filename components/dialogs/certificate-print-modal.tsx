@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { createPortal } from "react-dom"
-import { PrintHeader } from "./print-layout"
+import { PrintHeader } from "@/components/print/print-layout"
 import { Button } from "@/components/ui/button"
 import { Printer, X } from "lucide-react"
 import "@/styles/print.css"

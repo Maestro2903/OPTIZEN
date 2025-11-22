@@ -25,10 +25,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { AttendanceForm } from "@/components/attendance-form"
-import { AttendanceDashboardStats } from "@/components/attendance-dashboard-stats"
+import { AttendanceForm } from "@/components/forms/attendance-form"
+import { AttendanceDashboardStats } from "@/components/features/attendance/attendance-dashboard-stats"
 import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
-import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
+import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
 import { useApiList, useApiForm, useApiDelete } from "@/lib/hooks/useApi"
 import { attendanceApi, type AttendanceRecord, type AttendanceFilters } from "@/lib/services/api"
 import { useToast } from "@/hooks/use-toast"

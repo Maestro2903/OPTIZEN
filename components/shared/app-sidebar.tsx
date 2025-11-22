@@ -18,11 +18,11 @@ import {
   Shield,
   CalendarClock,
 } from "lucide-react"
-import { Logo } from "@/components/logo"
+import { Logo } from "@/components/shared/logo"
 import { cn } from "@/lib/utils"
 
-import { NavMain } from "@/components/nav-main"
-import { NavUser } from "@/components/nav-user"
+import { NavMain } from "@/components/shared/nav-main"
+import { NavUser } from "@/components/shared/nav-user"
 import {
   Sidebar,
   SidebarContent,
