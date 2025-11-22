@@ -7,6 +7,9 @@ import { validateSessionMiddleware } from '@/lib/services/session'
 import { applyRateLimit } from '@/lib/middleware/rateLimiter'
 import { createSecureResponse } from '@/lib/middleware/security'
 
+// Force dynamic rendering to prevent static analysis issues with cookies()
+export const dynamic = 'force-dynamic'
+
 // Validation schema for revenue transactions
 const revenueTransactionSchema = z.object({
   type: z.enum(['income', 'expense']),
