@@ -78,7 +78,7 @@ export function FinanceInvoiceDialog({
 
   const form = useForm<z.infer<typeof financeInvoiceSchema>>({
     resolver: zodResolver(financeInvoiceSchema),
-    defaultValues: revenueData || {
+    defaultValues: {
       entry_date: new Date().toISOString().split("T")[0],
       revenue_type: "consultation",
       description: "",
@@ -93,6 +93,28 @@ export function FinanceInvoiceDialog({
       notes: "",
     },
   })
+
+  // Populate form when revenueData is provided (edit mode)
+  React.useEffect(() => {
+    if (open && revenueData && mode === "edit") {
+      form.reset({
+        entry_date: revenueData.entry_date 
+          ? new Date(revenueData.entry_date).toISOString().split("T")[0]
+          : new Date().toISOString().split("T")[0],
+        revenue_type: revenueData.revenue_type || "consultation",
+        description: revenueData.description || "",
+        amount: (revenueData.amount || 0).toString(),
+        payment_method: revenueData.payment_method || "cash",
+        payment_status: revenueData.payment_status || "received",
+        paid_amount: (revenueData.paid_amount || 0).toString(),
+        patient_id: revenueData.patient_id || "",
+        patient_name: revenueData.patient_name || "",
+        invoice_reference: revenueData.invoice_reference || "",
+        category: revenueData.category || "",
+        notes: revenueData.notes || "",
+      })
+    }
+  }, [open, revenueData, mode, form])
 
   // Load patients and master data
   React.useEffect(() => {
@@ -153,6 +175,10 @@ export function FinanceInvoiceDialog({
         await onSubmitCallback(submitData)
         setOpen(false)
         form.reset()
+        // Reset form to default values
+        if (mode === "edit") {
+          // Form will be reset by parent component
+        }
       }
     } catch (error) {
       console.error("Error submitting form:", error)
@@ -166,16 +192,48 @@ export function FinanceInvoiceDialog({
 
   const handleOpenChange = (newOpen: boolean) => {
     setOpen(newOpen)
-    if (!newOpen) {
+    if (!newOpen && mode === "edit") {
+      // When edit dialog closes, reset form
       form.reset()
     }
   }
 
+  // Reset form when dialog closes in add mode
+  React.useEffect(() => {
+    if (!open && mode === "add") {
+      form.reset({
+        entry_date: new Date().toISOString().split("T")[0],
+        revenue_type: "consultation",
+        description: "",
+        amount: "",
+        payment_method: "cash",
+        payment_status: "received",
+        paid_amount: "",
+        patient_id: "",
+        patient_name: "",
+        invoice_reference: "",
+        category: "",
+        notes: "",
+      })
+    }
+  }, [open, mode, form])
+
+  // Auto-open dialog when revenueData is provided in edit mode
+  React.useEffect(() => {
+    if (revenueData && mode === "edit") {
+      setOpen(true)
+    } else if (!revenueData && mode === "edit") {
+      setOpen(false)
+    }
+  }, [revenueData, mode])
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
-        {children}
-      </DialogTrigger>
+      {mode === "add" && (
+        <DialogTrigger asChild>
+          {children}
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{mode === "add" ? "Add Revenue Entry" : "Edit Revenue Entry"}</DialogTitle>

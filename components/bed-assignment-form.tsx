@@ -254,7 +254,7 @@ export function BedAssignmentForm({ children, assignmentData, mode = "create", o
 
   async function onSubmit(values: z.infer<typeof bedAssignmentSchema>) {
     try {
-      // Create bed assignment via API (POST to /api/beds with assignment data)
+      // Create bed assignment via API (POST to /api/bed-assignments)
       const response = await fetch('/api/bed-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -263,17 +263,21 @@ export function BedAssignmentForm({ children, assignmentData, mode = "create", o
       
       const data = await response.json()
       
-      if (data.success) {
-        toast({
-          title: "Success",
-          description: "Bed assigned to patient successfully",
-        })
-        setIsOpen(false)
-        form.reset()
-        onSuccessAction?.() // Refresh beds list
-      } else {
-        throw new Error(data.error || "Failed to assign bed")
+      if (!response.ok || !data.success) {
+        // Show detailed error message if available
+        const errorMessage = data.details 
+          ? `${data.error || "Failed to assign bed"}: ${data.details}`
+          : data.error || "Failed to assign bed"
+        throw new Error(errorMessage)
       }
+      
+      toast({
+        title: "Success",
+        description: data.message || "Bed assigned to patient successfully",
+      })
+      setIsOpen(false)
+      form.reset()
+      onSuccessAction?.() // Refresh beds list
     } catch (error) {
       console.error("Error assigning bed:", error)
       toast({

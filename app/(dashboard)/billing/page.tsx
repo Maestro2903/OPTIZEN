@@ -222,8 +222,26 @@ export default function BillingPage() {
 
   const handleUpdateInvoice = async (invoiceId: string, values: any) => {
     try {
+      // Map form status to API status format
+      const statusMapping: Record<string, string> = {
+        'Draft': 'draft',
+        'Paid': 'paid',
+        'Pending': 'sent'
+      }
+      
+      const updateData = {
+        ...values,
+        status: statusMapping[values.status] || values.status?.toLowerCase() || 'draft',
+        // Ensure numeric fields are properly formatted
+        subtotal: typeof values.subtotal === 'number' ? values.subtotal : parseFloat(values.subtotal || 0),
+        discount_amount: typeof values.discount_amount === 'number' ? values.discount_amount : parseFloat(values.discount_amount || 0),
+        tax_amount: typeof values.tax_amount === 'number' ? values.tax_amount : parseFloat(values.tax_amount || 0),
+        total_amount: typeof values.total_amount === 'number' ? values.total_amount : parseFloat(values.total_amount || 0),
+        amount_paid: typeof values.amount_paid === 'number' ? values.amount_paid : parseFloat(values.amount_paid || 0),
+      }
+
       const result = await updateInvoice(
-        () => invoicesApi.update(invoiceId, values),
+        () => invoicesApi.update(invoiceId, updateData),
         {
           successMessage: "Invoice updated successfully.",
           onSuccess: (updatedInvoice) => {
@@ -234,6 +252,11 @@ export default function BillingPage() {
       )
     } catch (error) {
       console.error('Error updating invoice:', error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update invoice. Please try again."
+      })
     }
   }
 
@@ -314,7 +337,7 @@ export default function BillingPage() {
               Manage patient billing and invoice records
             </p>
           </div>
-          <InvoiceForm onSubmit={handleAddInvoice}>
+          <InvoiceForm onFormSubmitAction={handleAddInvoice}>
             <Button className="gap-2 rounded-lg bg-indigo-600 text-white shadow-md transition hover:bg-indigo-700">
               <Receipt className="h-4 w-4" />
               Create Invoice
@@ -488,7 +511,7 @@ export default function BillingPage() {
                           <InvoiceForm
                             mode="edit"
                             invoiceData={invoice}
-                            onSubmit={(data) => handleUpdateInvoice(invoice.id, data)}
+                            onFormSubmitAction={(data) => handleUpdateInvoice(invoice.id, data)}
                           >
                             <Button
                               variant="ghost"

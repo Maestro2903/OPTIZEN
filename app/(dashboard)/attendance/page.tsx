@@ -428,7 +428,7 @@ export default function AttendancePage() {
           >
             <Download className="h-4 w-4" />
           </Button>
-          <AttendanceForm onSubmit={handleAddAttendance}>
+          <AttendanceForm onFormSubmitAction={handleAddAttendance}>
             <Button className="gap-2 rounded-lg bg-indigo-600 text-white shadow-md hover:bg-indigo-700">
               <CheckCircle className="h-4 w-4" />
               Mark Attendance
@@ -581,7 +581,7 @@ export default function AttendancePage() {
                               Nobody has checked in yet, or the date filter is empty.
                             </p>
                           </div>
-                          <AttendanceForm onSubmit={handleAddAttendance}>
+                          <AttendanceForm onFormSubmitAction={handleAddAttendance}>
                             <Button
                               className="rounded-lg bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-100"
                             >
@@ -688,7 +688,7 @@ export default function AttendancePage() {
                               notes: record.notes
                             }}
                             mode="edit"
-                            onSubmit={handleUpdateAttendance}
+                            onFormSubmitAction={handleUpdateAttendance}
                           >
                             <Button
                               variant="ghost"

@@ -48,10 +48,10 @@ interface AttendanceFormProps {
   children: React.ReactNode
   attendanceData?: any
   mode?: "create" | "edit"
-  onSubmit?: (data: z.infer<typeof attendanceSchema>) => Promise<void>
+  onFormSubmitAction?: (data: z.infer<typeof attendanceSchema>) => Promise<void>
 }
 
-export function AttendanceForm({ children, attendanceData, mode = "create", onSubmit: onSubmitProp }: AttendanceFormProps) {
+export function AttendanceForm({ children, attendanceData, mode = "create", onFormSubmitAction: onSubmitProp }: AttendanceFormProps) {
   const { toast } = useToast()
   const [isOpen, setIsOpen] = React.useState(false)
   const [staffMembers, setStaffMembers] = React.useState<SearchableSelectOption[]>([])

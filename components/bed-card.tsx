@@ -16,6 +16,7 @@ interface BedCardProps {
   }
   assignment?: {
     patient_name?: string
+    patient_mrn?: string
     patient_age?: number
     admission_date?: string
     days_in_ward?: number
@@ -122,17 +123,30 @@ export function BedCard({ bed, assignment, onClickAction }: BedCardProps) {
           <div className={cn("text-sm font-semibold", config.accent)}>
             ₹{bed.daily_rate.toLocaleString()}/day
           </div>
-        ) : bed.status === 'occupied' && assignment && assignment.patient_name ? (
-          <div className="space-y-1">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-gray-400" />
-                <span className="text-sm font-semibold text-gray-900 truncate">
-                  {assignment.patient_name}
-                </span>
+        ) : bed.status === 'occupied' && assignment ? (
+          <div className="space-y-1.5">
+            {assignment.patient_name || assignment.patient_mrn ? (
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    {assignment.patient_name && (
+                      <div className="text-sm font-semibold text-gray-900 truncate">
+                        {assignment.patient_name}
+                      </div>
+                    )}
+                    {assignment.patient_mrn && (
+                      <div className="text-xs font-mono text-gray-500 truncate">
+                        ID: {assignment.patient_mrn}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {GenderIcon && <GenderIcon className="h-4 w-4 text-gray-500 flex-shrink-0" />}
               </div>
-              {GenderIcon && <GenderIcon className="h-4 w-4 text-gray-500" />}
-            </div>
+            ) : (
+              <div className="text-sm font-medium text-gray-600">Patient Assigned</div>
+            )}
           </div>
         ) : (
           <div className="text-sm font-medium text-gray-600">{config.label}</div>

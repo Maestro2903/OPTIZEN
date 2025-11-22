@@ -160,14 +160,20 @@ export async function PUT(
       created_at,
       created_by,
       patient_id, // Don't allow changing patient
+      invoice_number, // Don't allow changing invoice number
       ...updateData
     } = body
 
+    // Handle items if provided (stored as JSONB)
+    if (body.items !== undefined) {
+      updateData.items = body.items
+    }
+
     // Recalculate balance if amounts changed
-    if (updateData.total_amount !== undefined || updateData.amount_paid !== undefined) {
+    if (updateData.total_amount !== undefined || updateData.amount_paid !== undefined || updateData.items !== undefined) {
       const { data: currentInvoice, error: fetchError } = await supabase
         .from('invoices')
-        .select('total_amount, amount_paid')
+        .select('total_amount, amount_paid, subtotal, discount_amount, tax_amount')
         .eq('id', id)
         .single()
 
@@ -176,6 +182,29 @@ export async function PUT(
           return handleNotFoundError('Invoice', id)
         }
         return handleDatabaseError(fetchError, 'fetch', 'current invoice')
+      }
+
+      // If items are being updated, recalculate totals from items
+      if (updateData.items !== undefined && Array.isArray(updateData.items)) {
+        const subtotal = updateData.items.reduce((sum: number, item: any) => {
+          const qty = item.quantity || 0
+          const rate = item.rate || 0
+          return sum + (qty * rate)
+        }, 0)
+
+        const discountAmount = updateData.discount_amount !== undefined 
+          ? updateData.discount_amount 
+          : (currentInvoice.discount_amount || 0)
+        const afterDiscount = subtotal - discountAmount
+        const taxAmount = updateData.tax_amount !== undefined
+          ? updateData.tax_amount
+          : (currentInvoice.tax_amount || 0)
+        const totalAmount = afterDiscount + taxAmount
+
+        updateData.subtotal = subtotal
+        updateData.discount_amount = discountAmount
+        updateData.tax_amount = taxAmount
+        updateData.total_amount = totalAmount
       }
 
       // Use nullish coalescing to preserve zero values

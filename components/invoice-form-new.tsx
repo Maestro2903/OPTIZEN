@@ -82,7 +82,7 @@ const invoiceFormSchema = z.object({
   case_id: z.string().optional(),
   invoice_date: z.string().min(1, "Invoice date is required"),
   due_date: z.string().min(1, "Due date is required"),
-  status: z.enum(["Draft", "Paid", "Pending"]).default("Draft"),
+  status: z.enum(["Draft", "Paid", "Pending"]),
   items: z.array(invoiceItemSchema).min(1, "At least one item is required"),
   discount_percent: z.string().optional(),
   tax_percent: z.string().optional(),
@@ -141,10 +141,10 @@ interface InvoiceFormProps {
   children: React.ReactNode
   invoiceData?: any
   mode?: "add" | "edit"
-  onSubmit?: (data: any) => void
+  onFormSubmitAction?: (data: any) => void
 }
 
-export function InvoiceForm({ children, invoiceData, mode = "add", onSubmit: onSubmitCallback }: InvoiceFormProps) {
+export function InvoiceForm({ children, invoiceData, mode = "add", onFormSubmitAction: onSubmitCallback }: InvoiceFormProps) {
   const { toast } = useToast()
   const [open, setOpen] = React.useState(false)
   const [patients, setPatients] = React.useState<Array<{ value: string; label: string }>>([])
@@ -284,6 +284,66 @@ export function InvoiceForm({ children, invoiceData, mode = "add", onSubmit: onS
     }
   }, [status, form, totalAmount]); // Include totalAmount in dependencies to use latest value when status changes to "Paid"
 
+  // Populate form when invoiceData is provided (edit mode)
+  React.useEffect(() => {
+    if (open && invoiceData && mode === "edit") {
+      // Map invoice data to form structure
+      const items = invoiceData.items || []
+      const formItems = items.length > 0 
+        ? items.map((item: any) => ({
+            service: item.service || item.item_description || "",
+            description: item.description || "",
+            quantity: (item.quantity || 1).toString(),
+            rate: (item.rate || item.unit_price || 0).toString(),
+          }))
+        : [{ service: "", description: "", quantity: "1", rate: "" }]
+
+      // Calculate discount and tax percentages
+      const subtotal = invoiceData.subtotal || 0
+      const discountAmount = invoiceData.discount_amount || 0
+      const taxAmount = invoiceData.tax_amount || 0
+      
+      const discountPercent = subtotal > 0 
+        ? ((discountAmount / subtotal) * 100).toFixed(2)
+        : "0"
+      
+      const afterDiscount = subtotal - discountAmount
+      const taxPercent = afterDiscount > 0
+        ? ((taxAmount / afterDiscount) * 100).toFixed(2)
+        : "0"
+
+      // Map API status to form status
+      const statusMapping: Record<string, "Draft" | "Paid" | "Pending"> = {
+        'draft': 'Draft',
+        'paid': 'Paid',
+        'sent': 'Pending',
+        'overdue': 'Pending',
+        'cancelled': 'Draft'
+      }
+      const formStatus = invoiceData.status 
+        ? (statusMapping[invoiceData.status.toLowerCase()] || 'Draft')
+        : "Draft"
+
+      form.reset({
+        patient_id: invoiceData.patient_id || "",
+        case_id: invoiceData.case_id || "",
+        invoice_date: invoiceData.invoice_date 
+          ? new Date(invoiceData.invoice_date).toISOString().split("T")[0]
+          : new Date().toISOString().split("T")[0],
+        due_date: invoiceData.due_date
+          ? new Date(invoiceData.due_date).toISOString().split("T")[0]
+          : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+        status: formStatus,
+        items: formItems,
+        discount_percent: discountPercent,
+        tax_percent: taxPercent,
+        amount_paid: (invoiceData.amount_paid || 0).toString(),
+        payment_method: invoiceData.payment_method || "Cash",
+        notes: invoiceData.notes || "",
+      })
+    }
+  }, [open, invoiceData, mode, form])
+
   // Reset form when dialog closes
   React.useEffect(() => {
     if (!open) {
@@ -327,7 +387,7 @@ export function InvoiceForm({ children, invoiceData, mode = "add", onSubmit: onS
 
       toast({
         title: "Success",
-        description: "Invoice created successfully",
+        description: mode === "edit" ? "Invoice updated successfully" : "Invoice created successfully",
       })
 
       setOpen(false)

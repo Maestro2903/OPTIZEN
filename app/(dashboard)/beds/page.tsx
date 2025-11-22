@@ -10,6 +10,7 @@ import {
   Edit,
   Wrench,
   Sparkles,
+  LogOut,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -112,8 +113,8 @@ export default function BedsPage() {
         active_only: true 
       })
       
-      // Fetch bed assignments
-      const assignmentsResponse = await bedsApi.list({})
+      // Fetch bed assignments from beds API (which returns beds from beds table with assignments)
+      const assignmentsResponse = await bedsApi.list({ limit: 1000 })
 
       if (bedsResponse.success && bedsResponse.data) {
         // Transform master_data beds into the format expected by the UI
@@ -141,13 +142,92 @@ export default function BedsPage() {
           }
         })
 
-        // Match assignments to beds
+        // Match assignments to beds by bed_number (since beds are in master_data but assignments reference beds table)
         if (assignmentsResponse.success && assignmentsResponse.data) {
-          assignmentsResponse.data.forEach((assignment: any) => {
-            const bedIndex = masterBeds.findIndex((b: any) => b.bed.id === assignment.bed_id)
-            if (bedIndex !== -1) {
-              masterBeds[bedIndex].assignment = assignment
-              masterBeds[bedIndex].bed.status = 'occupied'
+          // Create a map of bed_number to assignment for faster lookup
+          const assignmentMap = new Map<string, any>()
+          
+          assignmentsResponse.data.forEach((assignmentItem: any) => {
+            // assignmentItem has structure: { bed: {...}, assignment: {...} }
+            // The bed here is from the beds table, assignment has patient data
+            const bedFromBedsTable = assignmentItem.bed
+            const assignment = assignmentItem.assignment
+            
+            // Only process if we have both bed and assignment, and assignment is active
+            if (!bedFromBedsTable || !assignment || assignment.status !== 'active') return
+            
+            const bedNumber = bedFromBedsTable.bed_number
+            const wardName = bedFromBedsTable.ward_name
+            
+            if (bedNumber) {
+              // Store assignment keyed by bed_number (normalized)
+              const normalizedBedNumber = bedNumber.toString().trim().toLowerCase()
+              assignmentMap.set(normalizedBedNumber, {
+                bed: bedFromBedsTable,
+                assignment: assignment
+              })
+              
+              // Also store by ward_name as fallback (since master_data might use name as bed_number)
+              if (wardName) {
+                const normalizedWardName = wardName.toString().trim().toLowerCase()
+                if (!assignmentMap.has(normalizedWardName)) {
+                  assignmentMap.set(normalizedWardName, {
+                    bed: bedFromBedsTable,
+                    assignment: assignment
+                  })
+                }
+              }
+            }
+          })
+          
+          // Now match assignments to master_data beds
+          masterBeds.forEach((masterBed: any) => {
+            const masterBedNumber = masterBed.bed.bed_number
+            const masterBedWardName = masterBed.bed.ward_name
+            const masterBedFloor = masterBed.bed.floor_number
+            
+            // Try to find assignment by bed_number first
+            let assignmentData = null
+            if (masterBedNumber) {
+              const normalizedMasterBedNumber = masterBedNumber.toString().trim().toLowerCase()
+              assignmentData = assignmentMap.get(normalizedMasterBedNumber)
+            }
+            
+            // If not found by bed_number, try by ward_name (since master_data might use name as bed_number)
+            if (!assignmentData && masterBedWardName) {
+              const normalizedWardName = masterBedWardName.toString().trim().toLowerCase()
+              assignmentData = assignmentMap.get(normalizedWardName)
+            }
+            
+            // If still not found, try to find by iterating through all assignments
+            // and matching by ward_name and floor_number (fallback)
+            if (!assignmentData) {
+              for (const [key, data] of assignmentMap.entries()) {
+                const bedFromBedsTable = data.bed
+                if (bedFromBedsTable.ward_name === masterBedWardName && 
+                    bedFromBedsTable.floor_number === masterBedFloor) {
+                  assignmentData = data
+                  break
+                }
+              }
+            }
+              
+            if (assignmentData && assignmentData.assignment) {
+              const assignment = assignmentData.assignment
+              // Use the assignment from the API response which already has patient_name, patient_mrn, etc.
+              masterBed.assignment = {
+                ...assignment,
+                patient_name: assignment.patient_name || assignment.patients?.full_name,
+                patient_mrn: assignment.patient_mrn || assignment.patients?.patient_id,
+                patient_age: assignment.patient_age,
+                patient_gender: assignment.patients?.gender || assignment.patient_gender,
+                admission_date: assignment.admission_date,
+                days_in_ward: assignment.days_in_ward,
+                surgery_scheduled_time: assignment.surgery_scheduled_time,
+                surgery_type: assignment.surgery_type,
+                doctor_name: assignment.doctor_name,
+              }
+              masterBed.bed.status = 'occupied'
             }
           })
         }
@@ -193,36 +273,31 @@ export default function BedsPage() {
     fetchBeds()
   }, [fetchBeds])
 
-  // Function to handle bed deletion/discharge
-  const handleDischarge = async (bedId: string) => {
+  // Function to handle bed assignment discharge
+  const handleDischarge = async (assignmentId: string) => {
     try {
-      // Fetch current bed data to get existing metadata
-      const currentBedResponse = await masterDataApi.getById(bedId)
-      if (!currentBedResponse.success || !currentBedResponse.data) {
-        throw new Error('Failed to fetch current bed data')
+      const response = await fetch(`/api/bed-assignments/${assignmentId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'discharge' }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to discharge bed assignment')
       }
 
-      const currentBed = currentBedResponse.data
-      const updatedMetadata = {
-        ...(currentBed.metadata || {}),
-        status: 'available'
-      }
-
-      // Update bed status to available in master_data metadata
-      const response = await masterDataApi.update(bedId, { metadata: updatedMetadata })
-      
-      if (response.success) {
-        toast({
-          title: "Success",
-          description: "Bed discharged successfully",
-        })
-        fetchBeds() // Refresh the list
-      }
+      toast({
+        title: "Success",
+        description: data.message || "Bed discharged successfully",
+      })
+      fetchBeds() // Refresh the list
     } catch (error) {
       console.error("Error discharging bed:", error)
       toast({
         title: "Error",
-        description: "Failed to discharge bed",
+        description: error instanceof Error ? error.message : "Failed to discharge bed",
         variant: "destructive",
       })
     }
@@ -231,18 +306,35 @@ export default function BedsPage() {
   // Function to handle bed deletion from master_data
   const handleDelete = async (bedId: string) => {
     try {
-      const response = await masterDataApi.delete(bedId)
-      
-      if (response.success) {
-        toast({
-          title: "Success",
-          description: "Bed deleted successfully",
-        })
-        setDeletingBed(null)
-        fetchBeds() // Refresh the list
-      } else {
-        throw new Error(response.error || "Failed to delete bed")
+      // First, check if bed has active assignments
+      const bedToDelete = beds.find(b => b.bed.id === bedId)
+      if (bedToDelete?.assignment) {
+        // Check if assignment exists (assignment being present means it's active, since we filter for active assignments)
+        throw new Error('Cannot delete bed with active patient assignment. Please discharge the patient first.')
       }
+
+      // Perform hard delete for beds (permanently remove)
+      const response = await masterDataApi.delete(bedId, true)
+      
+      // Handle response - fetchApi returns data directly on success, or { success: false, error: ... } on catch
+      if (response && typeof response === 'object') {
+        if (response.success === false) {
+          // Error case from catch block
+          throw new Error(response.error || "Failed to delete bed")
+        } else if (response.success === true || response.data) {
+          // Success case
+          toast({
+            title: "Success",
+            description: response.message || "Bed deleted successfully",
+          })
+          setDeletingBed(null)
+          fetchBeds() // Refresh the list
+          return
+        }
+      }
+      
+      // If we get here, response format is unexpected
+      throw new Error("Unexpected response format from delete API")
     } catch (error) {
       console.error("Error deleting bed:", error)
       toast({
@@ -250,6 +342,8 @@ export default function BedsPage() {
         description: error instanceof Error ? error.message : "Failed to delete bed",
         variant: "destructive",
       })
+      // Re-throw to keep dialog open on error
+      throw error
     }
   }
 
@@ -833,7 +927,7 @@ export default function BedsPage() {
                           <TableCell>
                             {assignment ? (
                               <div className="font-mono text-sm font-semibold text-primary">
-                                {(assignment as any).patients?.patient_id || '-'}
+                                {assignment.patient_mrn || (assignment as any).patients?.patient_id || '-'}
                               </div>
                             ) : (
                               <span className="text-muted-foreground">-</span>
@@ -948,6 +1042,17 @@ export default function BedsPage() {
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
+                              {assignment && assignment.id && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 rounded-md text-gray-500 hover:bg-orange-50 hover:text-orange-600"
+                                  onClick={() => handleDischarge(assignment.id)}
+                                  title="Discharge patient"
+                                >
+                                  <LogOut className="h-4 w-4" />
+                                </Button>
+                              )}
                               <BedForm
                                 bedData={bed}
                                 mode="edit"
@@ -993,8 +1098,8 @@ export default function BedsPage() {
         bedData={selectedBed?.bed || null}
         assignmentData={selectedBed?.assignment || null}
         onDischarge={() => {
-          if (selectedBed?.bed?.id) {
-            handleDischarge(selectedBed.bed.id)
+          if (selectedBed?.assignment?.id) {
+            handleDischarge(selectedBed.assignment.id)
           }
           setIsSheetOpen(false)
         }}

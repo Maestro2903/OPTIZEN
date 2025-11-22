@@ -212,7 +212,54 @@ export async function DELETE(
     const hardDelete = searchParams.get('hard') === 'true'
 
     if (hardDelete) {
-      // Hard delete - completely remove the item
+      // For beds category, also delete from beds table if it exists
+      if (targetItem.category === 'beds') {
+        // Get bed_number from master_data to find corresponding bed in beds table
+        const { data: masterBedData } = await supabase
+          .from('master_data')
+          .select('bed_number, name, metadata')
+          .eq('id', id)
+          .single()
+
+        if (masterBedData) {
+          const bedNumber = masterBedData.bed_number || masterBedData.name
+          
+          // Find bed in beds table by bed_number
+          const { data: bedInBedsTable } = await supabase
+            .from('beds')
+            .select('id')
+            .eq('bed_number', bedNumber)
+            .single()
+
+          // Check for active assignments before deleting
+          if (bedInBedsTable) {
+            const { data: activeAssignments } = await supabase
+              .from('bed_assignments')
+              .select('id')
+              .eq('bed_id', bedInBedsTable.id)
+              .eq('status', 'active')
+
+            if (activeAssignments && activeAssignments.length > 0) {
+              return NextResponse.json({
+                error: 'Cannot delete bed with active patient assignments. Please discharge the patient first.'
+              }, { status: 400 })
+            }
+
+            // Delete from beds table first (this will cascade delete assignments)
+            const { error: bedDeleteError } = await supabase
+              .from('beds')
+              .delete()
+              .eq('id', bedInBedsTable.id)
+
+            if (bedDeleteError) {
+              console.error('Error deleting bed from beds table:', bedDeleteError)
+              // Continue with master_data deletion even if beds table deletion fails
+            }
+          }
+        }
+      }
+
+      // Hard delete - completely remove the item from master_data
       const { error } = await supabase
         .from('master_data')
         .delete()

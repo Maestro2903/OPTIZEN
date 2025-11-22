@@ -11,6 +11,7 @@ import {
   Edit,
   Trash2,
   MapPin,
+  Eye,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -28,6 +29,14 @@ import { EmployeeForm } from "@/components/employee-form"
 import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
 import { ViewEditDialog } from "@/components/view-edit-dialog"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { useApiList, useApiForm, useApiDelete } from "@/lib/hooks/useApi"
 import { employeesApi, type Employee, type EmployeeFilters } from "@/lib/services/api"
 import { useToast } from "@/hooks/use-toast"
@@ -85,6 +94,7 @@ export default function EmployeesPage() {
   const [appliedFilters, setAppliedFilters] = React.useState<string[]>([])
   const [currentSort, setCurrentSort] = React.useState("full_name")
   const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('asc')
+  const [viewingEmployee, setViewingEmployee] = React.useState<Employee | null>(null)
 
   // API hooks
   const {
@@ -449,6 +459,20 @@ export default function EmployeesPage() {
                           <div className="flex items-center justify-end gap-2">
                             <Tooltip>
                               <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                                  onClick={() => setViewingEmployee(employee)}
+                                  title="View employee"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>View employee</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
                                 <EmployeeForm
                                   employee={employee}
                                   onSubmit={(values) => handleUpdateEmployee(employee.id, values)}
@@ -469,18 +493,14 @@ export default function EmployeesPage() {
                               description={`Are you sure you want to remove ${employee.full_name} from the system? This action cannot be undone.`}
                               onConfirm={() => handleDeleteEmployee(employee.id)}
                             >
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 rounded-md text-gray-600 hover:bg-red-50 hover:text-red-600"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Delete employee</TooltipContent>
-                              </Tooltip>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 rounded-md text-gray-600 hover:bg-red-50 hover:text-red-600"
+                                title="Delete employee"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </DeleteConfirmDialog>
                           </div>
                         </TooltipProvider>
@@ -504,6 +524,175 @@ export default function EmployeesPage() {
           />
         </CardContent>
       </Card>
+
+      {/* Employee View Dialog */}
+      <Dialog open={!!viewingEmployee} onOpenChange={(open) => !open && setViewingEmployee(null)}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Employee Information</DialogTitle>
+            <DialogDescription>View complete employee details</DialogDescription>
+          </DialogHeader>
+          {viewingEmployee && (
+            <div className="space-y-6">
+              {/* Basic Information */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Basic Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Full Name</label>
+                    <p className="text-sm text-gray-900 mt-1">{toTitleCase(viewingEmployee.full_name)}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Employee ID</label>
+                    <p className="text-sm text-gray-900 font-mono mt-1">{viewingEmployee.employee_id || '-'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Role</label>
+                    <p className="text-sm text-gray-900 capitalize mt-1">{viewingEmployee.role || '-'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Position/Title</label>
+                    <p className="text-sm text-gray-900 mt-1">{viewingEmployee.position || '-'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Department</label>
+                    <p className="text-sm text-gray-900 mt-1">{viewingEmployee.department || '-'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Hire Date</label>
+                    <p className="text-sm text-gray-900 mt-1">
+                      {viewingEmployee.hire_date 
+                        ? new Date(viewingEmployee.hire_date).toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
+                          })
+                        : '-'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contact Information */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Contact Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Email</label>
+                    <p className="text-sm text-gray-900 mt-1">{viewingEmployee.email || '-'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Phone</label>
+                    <p className="text-sm text-gray-900 mt-1">{viewingEmployee.phone || '-'}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-sm font-medium text-gray-500">Address</label>
+                    <p className="text-sm text-gray-900 mt-1 whitespace-pre-wrap">{viewingEmployee.address || '-'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Employment Details */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Employment Details</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Salary (Monthly)</label>
+                    <p className="text-sm text-gray-900 mt-1">
+                      {viewingEmployee.salary 
+                        ? `₹${viewingEmployee.salary.toLocaleString('en-IN')}`
+                        : '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">License Number</label>
+                    <p className="text-sm text-gray-900 font-mono mt-1">{viewingEmployee.license_number || '-'}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-sm font-medium text-gray-500">Qualifications</label>
+                    <p className="text-sm text-gray-900 mt-1 whitespace-pre-wrap">{viewingEmployee.qualifications || '-'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Emergency Contact */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Emergency Contact</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Emergency Contact Name</label>
+                    <p className="text-sm text-gray-900 mt-1">{viewingEmployee.emergency_contact || '-'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Emergency Phone</label>
+                    <p className="text-sm text-gray-900 mt-1">{viewingEmployee.emergency_phone || '-'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Personal Information */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Personal Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Date of Birth</label>
+                    <p className="text-sm text-gray-900 mt-1">
+                      {viewingEmployee.date_of_birth 
+                        ? new Date(viewingEmployee.date_of_birth).toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
+                          })
+                        : '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Gender</label>
+                    <p className="text-sm text-gray-900 capitalize mt-1">{viewingEmployee.gender || '-'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Blood Group</label>
+                    <p className="text-sm text-gray-900 mt-1">{viewingEmployee.blood_group || '-'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Marital Status</label>
+                    <p className="text-sm text-gray-900 capitalize mt-1">{viewingEmployee.marital_status || '-'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Status</h3>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Status</label>
+                  <p className="mt-1">
+                    <span
+                      className={`inline-flex items-center gap-2 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize border ${
+                        viewingEmployee.is_active
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                          : 'bg-gray-100 text-gray-600 border-gray-200'
+                      }`}
+                    >
+                      <span
+                        className={`h-2 w-2 rounded-full ${
+                          viewingEmployee.is_active ? 'bg-emerald-500' : 'bg-gray-400'
+                        }`}
+                      />
+                      {viewingEmployee.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewingEmployee(null)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

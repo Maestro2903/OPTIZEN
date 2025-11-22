@@ -162,6 +162,7 @@ export default function FinancePage() {
   const [expenseSortDir, setExpenseSortDir] = React.useState<'asc' | 'desc'>('desc')
   const [isExpenseDialogOpen, setIsExpenseDialogOpen] = React.useState(false)
   const [editingExpense, setEditingExpense] = React.useState<Expense | null>(null)
+  const [viewingExpense, setViewingExpense] = React.useState<Expense | null>(null)
 
   // API hooks for revenue (replaces invoices)
   const {
@@ -352,6 +353,32 @@ export default function FinancePage() {
     }
   }
 
+  const handleUpdateRevenue = async (revenueId: string, values: any) => {
+    try {
+      const response = await financeRevenueApi.update(revenueId, values)
+      if (response.success && response.data) {
+        updateRevenueItem(revenueId, response.data)
+        toast({
+          title: "Success",
+          description: "Revenue entry updated successfully.",
+        })
+        loadDashboardData() // Refresh dashboard
+        setEditingRevenue(null)
+        return response.data
+      } else {
+        throw new Error(response.error || "Failed to update revenue entry")
+      }
+    } catch (error) {
+      console.error("Error updating revenue:", error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update revenue entry",
+      })
+      throw error
+    }
+  }
+
   const handleDeleteRevenue = async (revenueId: string) => {
     try {
       const response = await financeRevenueApi.delete(revenueId)
@@ -372,6 +399,12 @@ export default function FinancePage() {
       })
     }
   }
+
+  const handleEditRevenue = (revenue: FinanceRevenue) => {
+    setEditingRevenue(revenue)
+  }
+
+  const [viewingRevenue, setViewingRevenue] = React.useState<FinanceRevenue | null>(null)
 
   const handleEditExpense = (expense: Expense) => {
     setEditingExpense(expense)
@@ -837,6 +870,18 @@ export default function FinancePage() {
                       Add Revenue
                     </Button>
                   </FinanceInvoiceDialog>
+                  <FinanceInvoiceDialog
+                    mode="edit"
+                    revenueData={editingRevenue || undefined}
+                    onSubmit={async (data) => {
+                      if (editingRevenue) {
+                        await handleUpdateRevenue(editingRevenue.id, data)
+                        setEditingRevenue(null)
+                      }
+                    }}
+                  >
+                    <div style={{ display: 'none' }} />
+                  </FinanceInvoiceDialog>
                 </div>
               </div>
             </CardHeader>
@@ -894,14 +939,19 @@ export default function FinancePage() {
                                 variant="ghost" 
                                 size="icon" 
                                 className="h-8 w-8 rounded-full text-gray-600 transition hover:bg-gray-100 hover:text-gray-700"
-                                onClick={() => {
-                                  toast({
-                                    title: "Revenue Details",
-                                    description: `${revenue.description} - ${formatCurrency(revenue.amount)}`,
-                                  })
-                                }}
+                                onClick={() => setViewingRevenue(revenue)}
+                                title="View details"
                               >
                                 <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 rounded-full text-gray-600 transition hover:bg-gray-100 hover:text-gray-700"
+                                onClick={() => handleEditRevenue(revenue)}
+                                title="Edit revenue"
+                              >
+                                <Edit className="h-4 w-4" />
                               </Button>
                               <DeleteConfirmDialog
                                 title="Delete Revenue Entry"
@@ -912,6 +962,7 @@ export default function FinancePage() {
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8 rounded-full text-red-500 transition hover:bg-red-50 hover:text-red-600"
+                                  title="Delete revenue"
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -1186,7 +1237,17 @@ export default function FinancePage() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 rounded-full text-gray-600 transition hover:bg-gray-100 hover:text-gray-700"
+                                onClick={() => setViewingExpense(expense)}
+                                title="View details"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 rounded-full text-gray-600 transition hover:bg-gray-100 hover:text-gray-700"
                                 onClick={() => handleEditExpense(expense)}
+                                title="Edit expense"
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
@@ -1199,6 +1260,7 @@ export default function FinancePage() {
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8 rounded-full text-red-500 transition hover:bg-red-50 hover:text-red-600"
+                                  title="Delete expense"
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -1228,6 +1290,174 @@ export default function FinancePage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Revenue View Dialog */}
+      <Dialog open={!!viewingRevenue} onOpenChange={(open) => !open && setViewingRevenue(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Revenue Entry Details</DialogTitle>
+            <DialogDescription>View complete information for this revenue entry</DialogDescription>
+          </DialogHeader>
+          {viewingRevenue && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Entry Date</label>
+                  <p className="text-sm text-gray-900">{formatDisplayDate(viewingRevenue.entry_date)}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Revenue Type</label>
+                  <p className="text-sm text-gray-900">
+                    <TypeBadge value={viewingRevenue.revenue_type} />
+                  </p>
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500">Description</label>
+                <p className="text-sm text-gray-900">{viewingRevenue.description}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Amount</label>
+                  <p className="text-sm font-semibold text-gray-900">
+                    <MoneyValue amount={viewingRevenue.amount} bold />
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Paid Amount</label>
+                  <p className="text-sm text-gray-900">
+                    <MoneyValue amount={viewingRevenue.paid_amount} dashIfZero />
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Payment Method</label>
+                  <p className="text-sm text-gray-900 capitalize">
+                    {humanizeLabel(viewingRevenue.payment_method)}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Payment Status</label>
+                  <p className="text-sm text-gray-900">
+                    <StatusBadge status={viewingRevenue.payment_status} />
+                  </p>
+                </div>
+              </div>
+              {viewingRevenue.patient_name && (
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Patient</label>
+                  <p className="text-sm text-gray-900">{viewingRevenue.patient_name}</p>
+                </div>
+              )}
+              {viewingRevenue.invoice_reference && (
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Invoice Reference</label>
+                  <p className="text-sm text-gray-900 font-mono">{viewingRevenue.invoice_reference}</p>
+                </div>
+              )}
+              {viewingRevenue.category && (
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Category</label>
+                  <p className="text-sm text-gray-900">{viewingRevenue.category}</p>
+                </div>
+              )}
+              {viewingRevenue.notes && (
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Notes</label>
+                  <p className="text-sm text-gray-900 whitespace-pre-wrap">{viewingRevenue.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewingRevenue(null)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Expense View Dialog */}
+      <Dialog open={!!viewingExpense} onOpenChange={(open) => !open && setViewingExpense(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Expense Details</DialogTitle>
+            <DialogDescription>View complete information for this expense</DialogDescription>
+          </DialogHeader>
+          {viewingExpense && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Expense Date</label>
+                  <p className="text-sm text-gray-900">{formatDisplayDate(viewingExpense.expense_date)}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Category</label>
+                  <p className="text-sm text-gray-900">
+                    {formatExpenseCategoryLabel(viewingExpense.category)}
+                  </p>
+                </div>
+              </div>
+              {viewingExpense.sub_category && (
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Sub Category</label>
+                  <p className="text-sm text-gray-900">{viewingExpense.sub_category}</p>
+                </div>
+              )}
+              <div>
+                <label className="text-sm font-medium text-gray-500">Description</label>
+                <p className="text-sm text-gray-900">{viewingExpense.description}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Amount</label>
+                  <p className="text-sm font-semibold text-gray-900">
+                    <MoneyValue amount={viewingExpense.amount} bold />
+                  </p>
+                </div>
+                {viewingExpense.vendor && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Vendor</label>
+                    <p className="text-sm text-gray-900">{viewingExpense.vendor}</p>
+                  </div>
+                )}
+              </div>
+              {viewingExpense.payment_method && (
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Payment Method</label>
+                  <p className="text-sm text-gray-900 capitalize">
+                    {humanizeLabel(viewingExpense.payment_method)}
+                  </p>
+                </div>
+              )}
+              {viewingExpense.bill_number && (
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Bill Number</label>
+                  <p className="text-sm text-gray-900 font-mono">{viewingExpense.bill_number}</p>
+                </div>
+              )}
+              {viewingExpense.approved_by && (
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Approved By</label>
+                  <p className="text-sm text-gray-900">{viewingExpense.approved_by}</p>
+                </div>
+              )}
+              {viewingExpense.notes && (
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Notes</label>
+                  <p className="text-sm text-gray-900 whitespace-pre-wrap">{viewingExpense.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewingExpense(null)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
