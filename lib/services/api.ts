@@ -932,7 +932,7 @@ export interface Bed {
   ward_type: 'general' | 'icu' | 'private' | 'semi_private'
   floor_number: number
   room_number?: string
-  status: 'available' | 'occupied' | 'maintenance' | 'reserved'
+  status: 'available' | 'occupied' | 'maintenance' | 'reserved' | 'cleaning'
   daily_rate: number
   description?: string
   created_at: string
