@@ -930,6 +930,7 @@ export interface Bed {
   bed_number: string
   ward_name: string
   ward_type: 'general' | 'icu' | 'private' | 'semi_private'
+  bed_type: string
   floor_number: number
   room_number?: string
   status: 'available' | 'occupied' | 'maintenance' | 'reserved' | 'cleaning'
