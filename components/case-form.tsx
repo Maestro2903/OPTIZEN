@@ -1377,7 +1377,7 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
       default:
         // For other steps, validate only the fields relevant to the current step
         // Determine fields to validate based on the current step
-        let fieldsToValidate: string[] = [];
+        let fieldsToValidate: Array<keyof z.infer<typeof caseFormSchema>> = [];
         switch (stepId) {
           case "history":
             fieldsToValidate = ["chief_complaint", "history_present_illness"];

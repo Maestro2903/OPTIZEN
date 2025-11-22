@@ -39,12 +39,11 @@ const bedFormSchema = z.object({
   ward_name: z.string().min(1, "Ward name is required"),
   ward_type: z.enum(["general", "icu", "private", "semi_private", "emergency"]),
   bed_type: z.string().min(1, "Bed type is required"),
-  floor_number: z.preprocess((val) => {
-    // Convert empty string to NaN so Zod produces appropriate validation errors
-    if (val === "" || val === null || val === undefined) return NaN;
+  floor_number: z.string().optional().refine((val) => {
+    if (!val || val.trim() === "") return true; // Optional
     const num = Number(val);
-    return isNaN(num) ? NaN : num;
-  }, z.number().int().min(1, { message: "Floor number must be at least 1" })),
+    return !isNaN(num) && num >= 1;
+  }, { message: "Floor number must be at least 1" }),
   room_number: z.string().optional(),
   daily_rate: z.string().min(1, "Daily rate is required"),
   description: z.string().optional(),
@@ -115,7 +114,7 @@ export function BedForm({ children, bedData, mode = "create", onSuccess }: BedFo
         metadata: {
           bed_type: values.bed_type,
           ward_type: values.ward_type,
-          floor_number: values.floor_number || null,
+          floor_number: values.floor_number ? Number(values.floor_number) : null,
           room_number: values.room_number || null,
           daily_rate: parseFloat(values.daily_rate),
           facilities: facilitiesArray,
