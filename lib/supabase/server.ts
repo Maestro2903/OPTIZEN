@@ -68,9 +68,49 @@ export const createClient = () => {
     throw new Error('Missing Supabase environment variables')
   }
 
-  // In production without service role, we need cookies - use createAuthenticatedClient()
-  // This is a fallback that will work but may have cookie issues
-  // Note: This may fail during build - use createAuthenticatedClient() in API routes instead
+  // During build time, cookies() cannot be called - fall back to service role if available
+  if (serviceRoleKey) {
+    try {
+      const cookieStore = cookies()
+      
+      return createServerClient<Database>(
+        supabaseUrl,
+        supabaseAnonKey,
+        {
+          cookies: {
+            getAll() {
+              return cookieStore.getAll()
+            },
+            setAll(cookiesToSet) {
+              try {
+                cookiesToSet.forEach(({ name, value, options }) =>
+                  cookieStore.set(name, value, options)
+                )
+              } catch {
+                // The `setAll` method was called from a Server Component.
+                // This can be ignored if you have middleware refreshing
+                // user sessions.
+              }
+            },
+          },
+        }
+      )
+    } catch {
+      // If cookies() fails (e.g., during build), use service role client
+      return createSupabaseClient<Database>(
+        supabaseUrl,
+        serviceRoleKey,
+        {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+          }
+        }
+      )
+    }
+  }
+
+  // No service role key - must use cookies (will fail during build)
   const cookieStore = cookies()
   
   return createServerClient<Database>(
