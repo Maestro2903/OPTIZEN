@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useForm } from "react-hook-form"
+import { useForm, useFieldArray } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Button } from "@/components/ui/button"
@@ -19,6 +19,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { FileSignature, Plus, Trash2 } from "lucide-react"
 import {
   Form,
   FormControl,
@@ -48,17 +49,74 @@ const dischargeFormSchema = z.object({
   condition_on_discharge: z.string().optional(),
   instructions: z.string().optional(),
   follow_up_date: z.string().optional(),
-  medications: z.array(z.string()).optional(), // Changed to array
-  dosages: z.array(z.string()).optional(), // New field
+  medicationDosagePairs: z.array(
+    z.object({
+      medication: z.string().optional(),
+      dosage: z.string().optional(),
+    })
+  ).optional(),
   discharge_type: z.string().optional(),
   status: z.string().optional(),
-})
+}).refine((data) => {
+  // Compare ISO date strings lexicographically to avoid timezone issues
+  // Ensure both dates are non-empty before comparison
+  if (!data.admission_date || !data.discharge_date) {
+    return true; // Let other validations handle empty dates
+  }
+
+  // Compare as ISO strings (YYYY-MM-DD) lexicographically
+  return data.discharge_date >= data.admission_date;
+}, {
+  message: "Discharge date must be on or after admission date",
+  path: ["discharge_date"], // This will show the error on the discharge_date field
+});
 
 interface DischargeFormProps {
   children: React.ReactNode
   dischargeData?: any
   mode?: "add" | "edit"
   onSuccess?: () => void
+}
+
+// Helper function to transform medication and dosage IDs into paired objects
+const transformMedicationsToIdPairs = (medications: any) => {
+  if (!medications?.medicines?.ids || !medications?.dosages?.ids) {
+    return {
+      pairs: [],
+      unpairedMeds: [],
+      unpairedDosages: [],
+      warning: undefined
+    };
+  }
+
+  const medIds = medications.medicines.ids;
+  const dosageIds = medications.dosages.ids;
+
+  // Calculate the minimum length to determine how many pairs can be created
+  const minLength = Math.min(medIds.length, dosageIds.length);
+
+  // Create pairs only up to the minimum length
+  const pairs = medIds.slice(0, minLength).map((medId: string, index: number) => ({
+    medication: medId,
+    dosage: dosageIds[index] || ""
+  }));
+
+  // Collect remaining unpaired items
+  const unpairedMeds = medIds.length > minLength ? medIds.slice(minLength) : [];
+  const unpairedDosages = dosageIds.length > minLength ? dosageIds.slice(minLength) : [];
+
+  // Create warning if arrays have different lengths
+  let warning: string | undefined = undefined;
+  if (medIds.length !== dosageIds.length) {
+    warning = `Medication and dosage arrays have different lengths: ${medIds.length} medications vs ${dosageIds.length} dosages. Created ${pairs.length} pairs, with ${unpairedMeds.length} unpaired medication(s) and ${unpairedDosages.length} unpaired dosage(s).`;
+  }
+
+  return {
+    pairs,
+    unpairedMeds,
+    unpairedDosages,
+    warning
+  };
 }
 
 export function DischargeForm({ children, dischargeData, mode = "add", onSuccess }: DischargeFormProps) {
@@ -89,6 +147,26 @@ export function DischargeForm({ children, dischargeData, mode = "add", onSuccess
     [masterData.data.dosages]
   )
 
+  // Initialize form with default values
+  const medicationResult = React.useMemo(() => {
+    return dischargeData ? transformMedicationsToIdPairs(dischargeData.medications) : {
+      pairs: [],
+      unpairedMeds: [],
+      unpairedDosages: [],
+      warning: undefined
+    };
+  }, [dischargeData]);
+
+  React.useEffect(() => {
+    if (medicationResult.warning) {
+      toast({
+        title: "Data Warning",
+        description: medicationResult.warning,
+        variant: "destructive",
+      });
+    }
+  }, [medicationResult.warning]);
+
   const form = useForm<z.infer<typeof dischargeFormSchema>>({
     resolver: zodResolver(dischargeFormSchema),
     defaultValues: dischargeData ? {
@@ -99,8 +177,7 @@ export function DischargeForm({ children, dischargeData, mode = "add", onSuccess
       discharge_summary: dischargeData.discharge_summary || "",
       final_diagnosis: dischargeData.final_diagnosis?.ids || [],
       treatment_given: dischargeData.treatment_given?.ids || [],
-      medications: dischargeData.medications?.medicines?.ids || [],
-      dosages: dischargeData.medications?.dosages?.ids || [],
+      medicationDosagePairs: medicationResult.pairs,
       condition_on_discharge: dischargeData.condition_on_discharge || "",
       instructions: dischargeData.instructions || "",
       follow_up_date: dischargeData.follow_up_date || "",
@@ -113,9 +190,13 @@ export function DischargeForm({ children, dischargeData, mode = "add", onSuccess
       status: "completed",
       final_diagnosis: [],
       treatment_given: [],
-      medications: [],
-      dosages: [],
+      medicationDosagePairs: [],
     },
+  })
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "medicationDosagePairs"
   })
 
   // Load master data when dialog opens
@@ -129,6 +210,16 @@ export function DischargeForm({ children, dischargeData, mode = "add", onSuccess
   // Reset form with discharge data when dialog opens in edit mode
   React.useEffect(() => {
     if (open && mode === "edit" && dischargeData) {
+      const medResult = transformMedicationsToIdPairs(dischargeData.medications);
+
+      if (medResult.warning) {
+        toast({
+          title: "Data Warning",
+          description: medResult.warning,
+          variant: "destructive",
+        });
+      }
+
       form.reset({
         patient_id: dischargeData.patient_id || "",
         case_id: dischargeData.case_id || "",
@@ -137,8 +228,7 @@ export function DischargeForm({ children, dischargeData, mode = "add", onSuccess
         discharge_summary: dischargeData.discharge_summary || "",
         final_diagnosis: dischargeData.final_diagnosis?.ids || [],
         treatment_given: dischargeData.treatment_given?.ids || [],
-        medications: dischargeData.medications?.medicines?.ids || [],
-        dosages: dischargeData.medications?.dosages?.ids || [],
+        medicationDosagePairs: medResult.pairs,
         condition_on_discharge: dischargeData.condition_on_discharge || "",
         instructions: dischargeData.instructions || "",
         follow_up_date: dischargeData.follow_up_date || "",
@@ -251,6 +341,30 @@ export function DischargeForm({ children, dischargeData, mode = "add", onSuccess
   async function onSubmit(values: z.infer<typeof dischargeFormSchema>) {
     if (isSubmitting) return
 
+    // Validate medication dosage pairs at submit time
+    if (values.medicationDosagePairs) {
+      for (let i = 0; i < values.medicationDosagePairs.length; i++) {
+        const pair = values.medicationDosagePairs[i];
+        const med = pair?.medication?.trim() ?? "";
+        const dose = pair?.dosage?.trim() ?? "";
+
+        // Skip rows where both medication and dosage are empty
+        if (med === "" && dose === "") {
+          continue;
+        }
+
+        // If exactly one is non-empty, show validation error
+        if ((med !== "" && dose === "") || (med === "" && dose !== "")) {
+          toast({
+            title: "Validation Error",
+            description: `Both medication and dosage must be filled in row ${i + 1}`,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+    }
+
     try {
       setIsSubmitting(true)
 
@@ -273,23 +387,79 @@ export function DischargeForm({ children, dischargeData, mode = "add", onSuccess
           }
         : undefined
 
-      const medicationData = (values.medications && values.medications.length > 0) || 
-                             (values.dosages && values.dosages.length > 0)
-        ? {
-            medicines: {
-              ids: values.medications || [],
-              labels: medicineOptions
-                .filter(m => values.medications?.includes(m.value))
-                .map(m => m.label)
-            },
-            dosages: {
-              ids: values.dosages || [],
-              labels: dosageOptions
-                .filter(d => values.dosages?.includes(d.value))
-                .map(d => d.label)
+      const medicationData = values.medicationDosagePairs && values.medicationDosagePairs.length > 0
+        ? (() => {
+            // Filter out pairs where both medication and dosage are present
+            const validPairs = values.medicationDosagePairs.filter(pair =>
+              pair &&
+              pair.medication &&
+              pair.medication.trim() !== "" &&
+              pair.dosage &&
+              pair.dosage.trim() !== ""
+            );
+
+            // If no valid pairs, return undefined
+            if (validPairs.length === 0) {
+              return undefined;
             }
-          }
+
+            // Map valid pairs to create medicine and dosage data
+            const medicineLabels = validPairs.map(pair => {
+              const option = medicineOptions.find(opt => opt.value === pair.medication);
+              if (!option) {
+                console.warn(`Missing medicine option for ID: ${pair.medication}`);
+                return null; // Return null instead of the ID
+              }
+              return option.label;
+            });
+
+            // Check if any medicine label is null
+            if (medicineLabels.some(label => label === null)) {
+              toast({
+                variant: "destructive",
+                title: "Missing Master Data",
+                description: "Some medicine options are missing from the system. Please refresh the page or contact support.",
+              });
+              return undefined;
+            }
+
+            const dosageLabels = validPairs.map(pair => {
+              const option = dosageOptions.find(opt => opt.value === pair.dosage);
+              if (!option) {
+                console.warn(`Missing dosage option for ID: ${pair.dosage}`);
+                return null; // Return null instead of the ID
+              }
+              return option.label;
+            });
+
+            // Check if any dosage label is null
+            if (dosageLabels.some(label => label === null)) {
+              toast({
+                variant: "destructive",
+                title: "Missing Master Data",
+                description: "Some dosage options are missing from the system. Please refresh the page or contact support.",
+              });
+              return undefined;
+            }
+
+            return {
+              medicines: {
+                ids: validPairs.map(pair => pair.medication),
+                labels: medicineLabels
+              },
+              dosages: {
+                ids: validPairs.map(pair => pair.dosage),
+                labels: dosageLabels
+              }
+            };
+          })()
         : undefined
+
+      // If medicationData is undefined due to missing master data, stop the submission
+      if (values.medicationDosagePairs && values.medicationDosagePairs.length > 0 && medicationData === undefined) {
+        setIsSubmitting(false);
+        return; // Exit early to prevent API call with incomplete data
+      }
 
       const payload = {
         patient_id: values.patient_id,
@@ -341,245 +511,326 @@ export function DischargeForm({ children, dischargeData, mode = "add", onSuccess
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0">
+        {/* Fixed Header */}
+        <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <DialogTitle>{mode === "edit" ? "Edit Discharge Record" : "Add Discharge Record"}</DialogTitle>
           <DialogDescription>
             {mode === "edit" ? "Update discharge summary with IPD details and advice" : "Create discharge summary with IPD details and advice"}
           </DialogDescription>
         </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="patient_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Patient *</FormLabel>
-                    <FormControl>
-                      <SearchableSelect
-                        options={patients}
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        placeholder="Select patient"
-                        searchPlaceholder="Search patients..."
-                        loading={loadingPatients}
-                        disabled={mode === "edit"}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="case_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Case *</FormLabel>
-                    <FormControl>
-                      <SearchableSelect
-                        options={cases}
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        placeholder="Select case"
-                        searchPlaceholder="Search cases..."
-                        loading={loadingCases}
-                        disabled={mode === "edit"}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+        {/* Scrollable Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-6">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} id="discharge-form">
+              <div className="grid grid-cols-12 gap-6">
+                {/* Section 1: Patient & Timeline */}
+                <FormField
+                  control={form.control}
+                  name="patient_id"
+                  render={({ field }) => (
+                    <FormItem className="col-span-6">
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Patient *</FormLabel>
+                      <FormControl>
+                        <SearchableSelect
+                          options={patients}
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          placeholder="Select patient"
+                          searchPlaceholder="Search patients..."
+                          loading={loadingPatients}
+                          disabled={mode === "edit"}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="case_id"
+                  render={({ field }) => (
+                    <FormItem className="col-span-6">
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Case *</FormLabel>
+                      <FormControl>
+                        <SearchableSelect
+                          options={cases}
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          placeholder="Select case"
+                          searchPlaceholder="Search cases..."
+                          loading={loadingCases}
+                          disabled={mode === "edit"}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="admission_date"
+                  render={({ field }) => (
+                    <FormItem className="col-span-6">
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Admission Date *</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="date" 
+                          className="bg-white border-gray-200 focus:border-gray-600 focus:ring-gray-200 rounded-lg"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="discharge_date"
+                  render={({ field }) => (
+                    <FormItem className="col-span-6">
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Discharge Date *</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="date" 
+                          className="bg-white border-gray-200 focus:border-gray-600 focus:ring-gray-200 rounded-lg"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="admission_date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Admission Date *</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="discharge_date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Discharge Date *</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                {/* Section 2: Clinical Summary */}
+                <div className="col-span-12">
+                  <h3 className="text-xs font-bold uppercase text-gray-500 mb-2">Clinical Summary</h3>
+                </div>
+                <FormField
+                  control={form.control}
+                  name="final_diagnosis"
+                  render={({ field }) => (
+                    <FormItem className="col-span-12">
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Final Diagnosis</FormLabel>
+                      <FormControl>
+                        <MultiSelect
+                          options={diagnosisOptions}
+                          value={field.value || []}
+                          onValueChange={field.onChange}
+                          placeholder="Select diagnosis..."
+                          searchPlaceholder="Search diagnosis..."
+                          emptyText="No diagnosis found"
+                          loading={masterData.loading.diagnosis}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="discharge_summary"
+                  render={({ field }) => (
+                    <FormItem className="col-span-12">
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Discharge Summary</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          rows={4} 
+                          placeholder="Summary of treatment and discharge..." 
+                          className="resize-y p-3 bg-white border-gray-200 focus:border-gray-600 focus:ring-gray-200 rounded-lg"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="treatment_given"
+                  render={({ field }) => (
+                    <FormItem className="col-span-12">
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Treatment Given</FormLabel>
+                      <FormControl>
+                        <MultiSelect
+                          options={treatmentOptions}
+                          value={field.value || []}
+                          onValueChange={field.onChange}
+                          placeholder="Select treatments..."
+                          searchPlaceholder="Search treatments..."
+                          emptyText="No treatments found"
+                          loading={masterData.loading.treatments}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <FormField
-              control={form.control}
-              name="final_diagnosis"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Final Diagnosis</FormLabel>
-                  <FormControl>
-                    <MultiSelect
-                      options={diagnosisOptions}
-                      value={field.value || []}
-                      onValueChange={field.onChange}
-                      placeholder="Select diagnosis..."
-                      searchPlaceholder="Search diagnosis..."
-                      emptyText="No diagnosis found"
-                      loading={masterData.loading.diagnosis}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                {/* Section 3: Post-Discharge Plan (Grey Box) */}
+                <div className="col-span-12 bg-slate-50 border border-slate-200 rounded-xl p-6 grid grid-cols-12 gap-6">
+                  <div className="col-span-12">
+                    <h3 className="text-xs font-bold uppercase text-gray-500 mb-2">Advice & Instructions</h3>
+                  </div>
+                  <FormField
+                    control={form.control}
+                    name="condition_on_discharge"
+                    render={({ field }) => (
+                      <FormItem className="col-span-12">
+                        <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Condition on Discharge</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="Patient condition at discharge..." 
+                            className="bg-white border-gray-200 focus:border-gray-600 focus:ring-gray-200 rounded-lg"
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="col-span-12">
+                    <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2 block">
+                      Medications and Dosages
+                    </FormLabel>
+                    <div className="space-y-3">
+                      {fields.map((field, index) => (
+                        <div key={field.id} className="grid grid-cols-12 gap-3 items-end">
+                          <FormField
+                            control={form.control}
+                            name={`medicationDosagePairs.${index}.medication`}
+                            render={({ field }) => (
+                              <FormItem className="col-span-8">
+                                <FormControl>
+                                  <SearchableSelect
+                                    options={medicineOptions}
+                                    value={field.value || ""}
+                                    onValueChange={(val) => field.onChange(val)}
+                                    placeholder="Select medication..."
+                                    searchPlaceholder="Search medications..."
+                                    emptyText="No medications found"
+                                    loading={masterData.loading.medicines}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name={`medicationDosagePairs.${index}.dosage`}
+                            render={({ field }) => (
+                              <FormItem className="col-span-3">
+                                <FormControl>
+                                  <SearchableSelect
+                                    options={dosageOptions}
+                                    value={field.value || ""}
+                                    onValueChange={(val) => field.onChange(val)}
+                                    placeholder="Select dosage..."
+                                    searchPlaceholder="Search dosages..."
+                                    emptyText="No dosages found"
+                                    loading={masterData.loading.dosages}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <div className="col-span-1 flex justify-center">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => remove(index)}
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2"
+                              aria-label="Remove medication-dosage pair"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => append({ medication: "", dosage: "" })}
+                        className="mt-2"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Medication-Dosage Pair
+                      </Button>
+                    </div>
+                  </div>
+                  <FormField
+                    control={form.control}
+                    name="instructions"
+                    render={({ field }) => (
+                      <FormItem className="col-span-12">
+                        <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Instructions</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            rows={3} 
+                            placeholder="Post-discharge care instructions..." 
+                            className="resize-y p-3 bg-white border-gray-200 focus:border-gray-600 focus:ring-gray-200 rounded-lg"
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="follow_up_date"
+                    render={({ field }) => (
+                      <FormItem className="col-span-6">
+                        <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Follow-up Date</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="date" 
+                            className="bg-white border-gray-200 focus:border-gray-600 focus:ring-gray-200 rounded-lg"
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+            </form>
+          </Form>
+        </div>
 
-            <FormField
-              control={form.control}
-              name="discharge_summary"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Discharge Summary</FormLabel>
-                  <FormControl>
-                    <Textarea rows={3} placeholder="Summary of treatment and discharge..." {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="treatment_given"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Treatment Given</FormLabel>
-                  <FormControl>
-                    <MultiSelect
-                      options={treatmentOptions}
-                      value={field.value || []}
-                      onValueChange={field.onChange}
-                      placeholder="Select treatments..."
-                      searchPlaceholder="Search treatments..."
-                      emptyText="No treatments found"
-                      loading={masterData.loading.treatments}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="condition_on_discharge"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Condition on Discharge</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Patient condition at discharge..." {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="medications"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Medications Prescribed</FormLabel>
-                    <FormControl>
-                      <MultiSelect
-                        options={medicineOptions}
-                        value={field.value || []}
-                        onValueChange={field.onChange}
-                        placeholder="Select medications..."
-                        searchPlaceholder="Search medications..."
-                        emptyText="No medications found"
-                        loading={masterData.loading.medicines}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="dosages"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Dosages</FormLabel>
-                    <FormControl>
-                      <MultiSelect
-                        options={dosageOptions}
-                        value={field.value || []}
-                        onValueChange={field.onChange}
-                        placeholder="Select dosages..."
-                        searchPlaceholder="Search dosages..."
-                        emptyText="No dosages found"
-                        loading={masterData.loading.dosages}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <FormField
-              control={form.control}
-              name="instructions"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Discharge Instructions</FormLabel>
-                  <FormControl>
-                    <Textarea rows={3} placeholder="Post-discharge care instructions..." {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="follow_up_date"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Follow-up Date</FormLabel>
-                  <FormControl>
-                    <Input type="date" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isSubmitting}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? (mode === "edit" ? "Updating..." : "Saving...") : (mode === "edit" ? "Update Discharge" : "Save Discharge")}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+        {/* Fixed Footer */}
+        <DialogFooter className="px-6 py-4 border-t bg-white">
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={() => setOpen(false)} 
+            disabled={isSubmitting}
+            className="text-gray-600 hover:bg-gray-100 px-4 py-2 rounded-lg"
+          >
+            Cancel
+          </Button>
+          <Button 
+            type="submit" 
+            form="discharge-form"
+            disabled={isSubmitting}
+            className="bg-gray-900 hover:bg-black text-white px-6 py-2.5 rounded-lg font-semibold shadow-lg"
+          >
+            {isSubmitting ? (
+              mode === "edit" ? "Updating..." : "Saving..."
+            ) : (
+              <>
+                <FileSignature className="mr-2 h-4 w-4" />
+                {mode === "edit" ? "Update Discharge" : "Save Discharge"}
+              </>
+            )}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

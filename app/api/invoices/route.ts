@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { requirePermission } from '@/lib/middleware/rbac'
+import { handleDatabaseError, handleNotFoundError, handleServerError } from '@/lib/utils/api-errors'
 import { parseArrayParam, validateArrayParam, applyArrayFilter } from '@/lib/utils/query-params'
 
 // GET /api/invoices - List invoices with pagination, filtering, and sorting
@@ -100,14 +101,7 @@ export async function GET(request: NextRequest) {
     const { data: invoices, error, count } = await query
 
     if (error) {
-      console.error('Database error:', error)
-      console.error('Error details:', JSON.stringify(error, null, 2))
-      return NextResponse.json({ 
-        error: 'Failed to fetch invoices',
-        details: error.message,
-        hint: error.hint,
-        code: error.code
-      }, { status: 500 })
+      return handleDatabaseError(error, 'fetch', 'invoices')
     }
 
     // Fetch patient data for all invoices
@@ -151,8 +145,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleServerError(error, 'fetch', 'invoices')
   }
 }
 
@@ -201,7 +194,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (patientError || !patient) {
-      return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
+      return handleNotFoundError('Patient', patient_id)
     }
 
     // Calculate balance
@@ -240,11 +233,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (invoiceError) {
-      console.error('Database error creating invoice:', invoiceError)
-      if (invoiceError.code === '23505') { // Unique constraint violation
-        return NextResponse.json({ error: 'Invoice number already exists' }, { status: 409 })
-      }
-      return NextResponse.json({ error: 'Failed to create invoice' }, { status: 500 })
+      return handleDatabaseError(invoiceError, 'create', 'invoice')
     }
 
     // Return invoice with patient info
@@ -281,7 +270,6 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
 
   } catch (error) {
-    console.error('API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleServerError(error, 'create', 'invoice')
   }
 }

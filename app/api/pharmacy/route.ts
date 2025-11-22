@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { requirePermission } from '@/lib/middleware/rbac'
+import { handleDatabaseError, handleServerError } from '@/lib/utils/api-errors'
 
 // GET /api/pharmacy - List pharmacy items with stock information
 export async function GET(request: NextRequest) {
@@ -85,8 +86,7 @@ export async function GET(request: NextRequest) {
     const { data: items, error, count } = await query
 
     if (error) {
-      console.error('Database error:', error)
-      return NextResponse.json({ error: 'Failed to fetch pharmacy items' }, { status: 500 })
+      return handleDatabaseError(error, 'fetch', 'pharmacy items')
     }
 
     // Calculate pagination metadata
@@ -108,8 +108,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleServerError(error, 'fetch', 'pharmacy items')
   }
 }
 
@@ -225,8 +224,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Database error:', error)
-      return NextResponse.json({ error: 'Failed to create pharmacy item' }, { status: 500 })
+      return handleDatabaseError(error, 'create', 'pharmacy item')
     }
 
     return NextResponse.json({
@@ -236,7 +234,6 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
 
   } catch (error) {
-    console.error('API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleServerError(error, 'create', 'pharmacy item')
   }
 }

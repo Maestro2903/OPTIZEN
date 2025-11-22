@@ -14,25 +14,25 @@ import { cn } from "@/lib/utils"
 
 // Map of paths to page names
 const pathToPageName: Record<string, string> = {
-  "/dashboard": "Overview",
-  "/dashboard/patients": "Patients",
-  "/dashboard/cases": "Cases",
-  "/dashboard/billing": "Billing & Invoices",
-  "/dashboard/documents": "Documents",
-  "/dashboard/certificates": "Certificates",
-  "/dashboard/appointments": "Appointments",
-  "/dashboard/pharmacy": "Pharmacy",
-  "/dashboard/attendance": "Staff Attendance",
-  "/dashboard/revenue": "Revenue",
-  "/dashboard/beds": "Bed Management",
-  "/dashboard/operations": "Operations",
-  "/dashboard/settings": "Settings",
-  "/dashboard/master": "Master Data",
-  "/dashboard/employees": "Employees",
-  "/dashboard/discharges": "Discharges",
-  "/dashboard/finance": "Finance",
-  "/dashboard/doctor-schedule": "My Schedule",
-  "/dashboard/access-control": "Access Control",
+  "/": "Overview",
+  "/patients": "Patients",
+  "/cases": "Cases",
+  "/billing": "Billing & Invoices",
+  "/documents": "Documents",
+  "/certificates": "Certificates",
+  "/appointments": "Appointments",
+  "/pharmacy": "Pharmacy",
+  "/attendance": "Staff Attendance",
+  "/revenue": "Revenue",
+  "/beds": "Bed Management",
+  "/operations": "Operations",
+  "/settings": "Settings",
+  "/master": "Master Data",
+  "/employees": "Employees",
+  "/discharges": "Discharges",
+  "/finance": "Finance",
+  "/doctor-schedule": "My Schedule",
+  "/access-control": "Access Control",
 }
 
 function HeaderContent() {
@@ -60,7 +60,7 @@ export default function DashboardLayout({
   const pathname = usePathname()
   const router = useRouter()
   const currentPageName = pathToPageName[pathname] || "Overview"
-  const isDashboardRoot = pathname === "/dashboard"
+  const isDashboardRoot = pathname === "/"
 
   return (
     <UserProvider>
@@ -123,7 +123,7 @@ function LayoutContent({
               )}
               
               <Link
-                href="/dashboard"
+                href="/"
                 className="text-gray-500 hover:text-gray-700 font-medium transition-colors"
               >
                 Dashboard

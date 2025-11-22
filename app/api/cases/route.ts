@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { parseArrayParam, validateArrayParam, applyArrayFilter } from '@/lib/utils/query-params'
 import { requirePermission } from '@/lib/middleware/rbac'
+import { handleDatabaseError, handleServerError } from '@/lib/utils/api-errors'
 import * as z from 'zod'
 
 // Helper function to resolve treatment drug names, dosage names, and route names
@@ -560,10 +561,7 @@ export async function GET(request: NextRequest) {
         hint: error.hint,
         code: error.code
       })
-      return NextResponse.json({ 
-        error: 'Failed to fetch cases',
-        details: error.message 
-      }, { status: 500 })
+      return handleDatabaseError(error, 'fetch', 'cases')
     }
 
     // Resolve treatment drug names, complaints, diagnostic tests, and examination_data surgeries for all cases
@@ -603,8 +601,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleServerError(error, 'fetch', 'cases')
   }
 }
 
@@ -723,7 +720,7 @@ export async function POST(request: NextRequest) {
       if (error.code === '23505') { // Unique constraint violation
         return NextResponse.json({ error: 'Case number already exists' }, { status: 409 })
       }
-      return NextResponse.json({ error: 'Failed to create case', details: error.message }, { status: 500 })
+      return handleDatabaseError(error, 'create', 'case')
     }
 
     // Resolve treatment drug names, complaints, diagnostic tests, and examination_data surgeries if they exist
@@ -748,7 +745,6 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
 
   } catch (error) {
-    console.error('API error:', error)
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { 
@@ -758,6 +754,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleServerError(error, 'create', 'case')
   }
 }

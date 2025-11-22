@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { requirePermission } from '@/lib/middleware/rbac'
+import { handleDatabaseError, handleNotFoundError, handleServerError } from '@/lib/utils/api-errors'
 
 // GET /api/pharmacy/[id] - Get single pharmacy item
 export async function GET(
@@ -28,12 +29,14 @@ export async function GET(
       .single()
 
     if (error) {
-      console.error('Database error:', error)
-      return NextResponse.json({ error: 'Failed to fetch pharmacy item' }, { status: 500 })
+      if (error.code === 'PGRST116') {
+        return handleNotFoundError('Pharmacy item', id)
+      }
+      return handleDatabaseError(error, 'fetch', 'pharmacy item')
     }
 
     if (!item) {
-      return NextResponse.json({ error: 'Item not found' }, { status: 404 })
+      return handleNotFoundError('Pharmacy item', id)
     }
 
     return NextResponse.json({
@@ -41,8 +44,7 @@ export async function GET(
       data: item
     })
   } catch (error) {
-    console.error('API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleServerError(error, 'fetch', 'pharmacy item')
   }
 }
 
@@ -175,12 +177,14 @@ export async function PUT(
       .single()
 
     if (error) {
-      console.error('Database error:', error)
-      return NextResponse.json({ error: 'Failed to update pharmacy item' }, { status: 500 })
+      if (error.code === 'PGRST116') {
+        return handleNotFoundError('Pharmacy item', id)
+      }
+      return handleDatabaseError(error, 'update', 'pharmacy item')
     }
 
     if (!item) {
-      return NextResponse.json({ error: 'Item not found' }, { status: 404 })
+      return handleNotFoundError('Pharmacy item', id)
     }
 
     return NextResponse.json({
@@ -189,8 +193,7 @@ export async function PUT(
       message: 'Pharmacy item updated successfully'
     })
   } catch (error) {
-    console.error('API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleServerError(error, 'update', 'pharmacy item')
   }
 }
 
@@ -221,7 +224,7 @@ export async function DELETE(
       .single()
 
     if (fetchError || !existingItem) {
-      return NextResponse.json({ error: 'Item not found' }, { status: 404 })
+      return handleNotFoundError('Pharmacy item', id)
     }
 
     // Delete the item
@@ -231,8 +234,7 @@ export async function DELETE(
       .eq('id', id)
 
     if (deleteError) {
-      console.error('Database error:', deleteError)
-      return NextResponse.json({ error: 'Failed to delete pharmacy item' }, { status: 500 })
+      return handleDatabaseError(deleteError, 'delete', 'pharmacy item')
     }
 
     return NextResponse.json({
@@ -241,7 +243,6 @@ export async function DELETE(
       data: { id }
     })
   } catch (error) {
-    console.error('API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleServerError(error, 'delete', 'pharmacy item')
   }
 }

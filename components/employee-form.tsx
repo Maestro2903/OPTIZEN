@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Eye, EyeOff } from "lucide-react"
 import {
   Select,
   SelectContent,
@@ -89,10 +90,13 @@ interface EmployeeFormProps {
   onSubmit?: (data: EmployeeFormData) => void | Promise<void>
 }
 
-export function EmployeeForm({ children, employee, onSubmit: onSubmitCallback }: EmployeeFormProps) {
+export const EmployeeForm = React.forwardRef<HTMLDivElement, EmployeeFormProps>(
+  function EmployeeForm({ children, employee, onSubmit: onSubmitCallback }, ref) {
   const masterData = useMasterData()
   const [open, setOpen] = React.useState(false)
   const [isLoading, setIsLoading] = React.useState(false)
+  const [showPassword, setShowPassword] = React.useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = React.useState(false)
   
   // Generate next employee ID
   const generateEmployeeId = React.useCallback(() => {
@@ -101,29 +105,60 @@ export function EmployeeForm({ children, employee, onSubmit: onSubmitCallback }:
     return `EMP${year}${random}`
   }, [])
 
+  // Valid roles matching API enum - must match exactly what the API expects
+  const validRoleEnums = [
+    'super_admin', 'hospital_admin', 'receptionist', 'optometrist', 
+    'ophthalmologist', 'technician', 'billing_staff', 'admin', 
+    'doctor', 'nurse', 'finance', 'pharmacy_staff', 'pharmacy', 
+    'lab_technician', 'manager', 'read_only'
+  ] as const
+
+  // Helper function to normalize role label to enum value
+  const normalizeRoleLabel = (label: string): string => {
+    return label
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, '_')
+      .replace(/[^a-z0-9_]/g, '')
+  }
+
   // Transform master data roles to match DB enum (lowercase values)
   const roleOptions = React.useMemo(() => {
     if (masterData.data.roles && masterData.data.roles.length > 0) {
-      return masterData.data.roles.map(role => ({
-        value: role.value.toLowerCase().replace(/\s+/g, '_'), // Convert to lowercase and replace spaces with underscores
-        label: role.label
-      }))
+      // Master data returns UUIDs as values, but we need enum values
+      // Extract role name from label and normalize it
+      return masterData.data.roles
+        .map(role => {
+          const normalizedValue = normalizeRoleLabel(role.label)
+          // Only include if it matches a valid enum
+          if (validRoleEnums.includes(normalizedValue as any)) {
+            return {
+              value: normalizedValue,
+              label: role.label
+            }
+          }
+          return null
+        })
+        .filter((role): role is { value: string; label: string } => role !== null)
     }
-    // Fallback roles matching DB enum
+    // Fallback roles matching DB enum - must include all valid roles
     return [
-      { value: 'doctor', label: 'Doctor' },
-      { value: 'nurse', label: 'Nurse' },
+      { value: 'super_admin', label: 'Super Admin' },
+      { value: 'hospital_admin', label: 'Hospital Admin' },
       { value: 'receptionist', label: 'Receptionist' },
       { value: 'optometrist', label: 'Optometrist' },
       { value: 'ophthalmologist', label: 'Ophthalmologist' },
       { value: 'technician', label: 'Technician' },
-      { value: 'pharmacy_staff', label: 'Pharmacy Staff' },
-      { value: 'lab_technician', label: 'Lab Technician' },
       { value: 'billing_staff', label: 'Billing Staff' },
       { value: 'admin', label: 'Admin' },
-      { value: 'hospital_admin', label: 'Hospital Admin' },
-      { value: 'manager', label: 'Manager' },
+      { value: 'doctor', label: 'Doctor' },
+      { value: 'nurse', label: 'Nurse' },
       { value: 'finance', label: 'Finance' },
+      { value: 'pharmacy_staff', label: 'Pharmacy Staff' },
+      { value: 'pharmacy', label: 'Pharmacy' },
+      { value: 'lab_technician', label: 'Lab Technician' },
+      { value: 'manager', label: 'Manager' },
+      { value: 'read_only', label: 'Read Only' },
     ]
   }, [masterData.data.roles])
 
@@ -156,6 +191,10 @@ export function EmployeeForm({ children, employee, onSubmit: onSubmitCallback }:
   // Reset form when dialog opens or employee changes
   React.useEffect(() => {
     if (open) {
+      // Reset password visibility states
+      setShowPassword(false)
+      setShowConfirmPassword(false)
+      
       if (employee) {
         // Editing existing employee
         form.reset({
@@ -213,6 +252,15 @@ export function EmployeeForm({ children, employee, onSubmit: onSubmitCallback }:
   }, [open, employee])
 
   async function onSubmit(values: z.infer<typeof employeeFormSchema>) {
+    // Validate role is a valid enum value
+    if (!validRoleEnums.includes(values.role.toLowerCase() as any)) {
+      form.setError("role", {
+        type: "manual",
+        message: `Invalid role. Must be one of: ${validRoleEnums.join(', ')}`
+      })
+      return
+    }
+
     // Validate password for new employees
     if (!employee && (!values.password || values.password.length < 6)) {
       form.setError("password", {
@@ -234,8 +282,13 @@ export function EmployeeForm({ children, employee, onSubmit: onSubmitCallback }:
       setIsLoading(true)
       try {
         // Don't send confirmPassword to the API
+        // Ensure role is lowercase to match API expectations
         const { confirmPassword, ...submitData } = values
-        await onSubmitCallback(submitData)
+        const normalizedSubmitData = {
+          ...submitData,
+          role: submitData.role.toLowerCase()
+        }
+        await onSubmitCallback(normalizedSubmitData)
         setOpen(false)
         form.reset()
       } catch (error) {
@@ -401,11 +454,26 @@ export function EmployeeForm({ children, employee, onSubmit: onSubmitCallback }:
                       <FormItem>
                         <FormLabel>Password *</FormLabel>
                         <FormControl>
-                          <Input 
-                            type="password" 
-                            placeholder="Min 6 characters" 
-                            {...field} 
-                          />
+                          <div className="relative">
+                            <Input 
+                              type={showPassword ? "text" : "password"} 
+                              placeholder="Min 6 characters" 
+                              {...field} 
+                              className="pr-10"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword(!showPassword)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                              tabIndex={-1}
+                            >
+                              {showPassword ? (
+                                <EyeOff className="h-4 w-4" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
+                            </button>
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -418,11 +486,26 @@ export function EmployeeForm({ children, employee, onSubmit: onSubmitCallback }:
                       <FormItem>
                         <FormLabel>Confirm Password *</FormLabel>
                         <FormControl>
-                          <Input 
-                            type="password" 
-                            placeholder="Confirm password" 
-                            {...field} 
-                          />
+                          <div className="relative">
+                            <Input 
+                              type={showConfirmPassword ? "text" : "password"} 
+                              placeholder="Confirm password" 
+                              {...field} 
+                              className="pr-10"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                              tabIndex={-1}
+                            >
+                              {showConfirmPassword ? (
+                                <EyeOff className="h-4 w-4" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
+                            </button>
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -634,5 +717,6 @@ export function EmployeeForm({ children, employee, onSubmit: onSubmitCallback }:
       </DialogContent>
     </Dialog>
   )
-}
+  }
+)
 

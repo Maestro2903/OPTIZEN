@@ -1,9 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserRole, type UserRoleData } from '@/lib/utils/rbac'
+import { requirePermission } from '@/lib/middleware/rbac'
 
 // GET /api/invoices/metrics - Get aggregate invoice and revenue statistics
 export async function GET(request: NextRequest) {
+  // Authorization check - requires invoices view permission
+  const authCheck = await requirePermission('invoices', 'view')
+  if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
+  const { context } = authCheck
+
   try {
     const supabase = createClient()
     const { searchParams } = new URL(request.url)
@@ -11,37 +18,6 @@ export async function GET(request: NextRequest) {
     // Optional date range filters
     const date_from = searchParams.get('date_from') || ''
     const date_to = searchParams.get('date_to') || ''
-
-    // Check authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check if user has permission to view financial data (fail-closed approach)
-    let userRole: UserRoleData | null
-    
-    try {
-      userRole = await getUserRole(session.user.id)
-    } catch (error) {
-      console.error('Error fetching user role for financial data access', { 
-        userId: session.user.id, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
-      })
-      return NextResponse.json({ 
-        error: 'Internal Server Error: Unable to fetch user role' 
-      }, { status: 500 })
-    }
-    
-    // Fail-closed: Only allow if userRole exists AND (is admin OR has permission)
-    if (!userRole || (userRole.role !== 'admin' && !userRole.can_view_financial_data)) {
-      console.log('Access denied: User lacks financial data permission', { 
-        userId: session.user.id, 
-        role: userRole?.role || 'null',
-        can_view_financial_data: userRole?.can_view_financial_data || false
-      })
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
 
     // Build base query
     let query = supabase

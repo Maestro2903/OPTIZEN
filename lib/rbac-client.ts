@@ -4,6 +4,7 @@
  */
 
 // User roles from migration 001_initial_schema.sql
+// Note: Some roles are accepted by API but not in DB enum - they are mapped to appropriate permissions
 export type UserRole = 
   | 'super_admin'
   | 'hospital_admin'
@@ -13,6 +14,15 @@ export type UserRole =
   | 'technician'
   | 'billing_staff'
   | 'patient'
+  | 'doctor' // Legacy/alias role - treated as ophthalmologist
+  | 'admin' // Administrative role - similar to hospital_admin
+  | 'nurse' // Nursing staff - patient care and bed management
+  | 'finance' // Financial operations
+  | 'pharmacy_staff' // Pharmacy staff
+  | 'pharmacy' // Alias for pharmacy_staff
+  | 'lab_technician' // Laboratory staff
+  | 'manager' // Department/clinic management
+  | 'read_only' // View-only access
 
 // Valid user roles for runtime validation
 const VALID_USER_ROLES: readonly UserRole[] = [
@@ -23,7 +33,16 @@ const VALID_USER_ROLES: readonly UserRole[] = [
   'ophthalmologist',
   'technician',
   'billing_staff',
-  'patient'
+  'patient',
+  'doctor', // Legacy/alias role
+  'admin',
+  'nurse',
+  'finance',
+  'pharmacy_staff',
+  'pharmacy', // Alias for pharmacy_staff
+  'lab_technician',
+  'manager',
+  'read_only'
 ] as const
 
 /**
@@ -290,6 +309,258 @@ export const PERMISSIONS: Record<UserRole, {
     diagnosis: { view: false, create: false, print: false, edit: false, delete: false },
     roles: { view: false, create: false, print: false, edit: false, delete: false },
   },
+  // 'doctor' is a legacy/alias role - map to ophthalmologist permissions
+  doctor: {
+    patients: { view: true, create: true, print: true, edit: true, delete: false },
+    appointments: { view: true, create: true, print: true, edit: true, delete: false },
+    doctor_schedule: { view: true, create: true, print: true, edit: true, delete: false },
+    cases: { view: true, create: true, print: true, edit: true, delete: false },
+    invoices: { view: true, create: true, print: true, edit: true, delete: false },
+    pharmacy: { view: true, create: true, print: true, edit: true, delete: false },
+    employees: { view: true, create: false, print: false, edit: false, delete: false },
+    master_data: { view: true, create: true, print: true, edit: true, delete: false },
+    operations: { view: true, create: true, print: true, edit: true, delete: false },
+    beds: { view: true, create: true, print: true, edit: true, delete: false },
+    certificates: { view: true, create: true, print: true, edit: true, delete: false },
+    discharges: { view: true, create: true, print: true, edit: true, delete: false },
+    revenue: { view: false, create: false, print: false, edit: false, delete: false },
+    expenses: { view: false, create: false, print: false, edit: false, delete: false },
+    finance: { view: false, create: false, print: false, edit: false, delete: false },
+    attendance: { view: true, create: true, print: true, edit: true, delete: false },
+    lens: { view: true, create: true, print: true, edit: true, delete: false },
+    complaint: { view: true, create: true, print: true, edit: true, delete: false },
+    treatment: { view: true, create: true, print: true, edit: true, delete: false },
+    medicine: { view: true, create: true, print: true, edit: true, delete: false },
+    dosage: { view: true, create: true, print: true, edit: true, delete: false },
+    surgery: { view: true, create: true, print: true, edit: true, delete: false },
+    blood_investigation: { view: true, create: true, print: true, edit: true, delete: false },
+    diagnosis: { view: true, create: true, print: true, edit: true, delete: false },
+    roles: { view: false, create: false, print: false, edit: false, delete: false },
+  },
+  // 'admin' - Administrative role similar to hospital_admin
+  admin: {
+    patients: { view: true, create: true, print: true, edit: true, delete: true },
+    appointments: { view: true, create: true, print: true, edit: true, delete: true },
+    doctor_schedule: { view: true, create: true, print: true, edit: true, delete: true },
+    cases: { view: true, create: true, print: true, edit: true, delete: true },
+    invoices: { view: true, create: true, print: true, edit: true, delete: true },
+    pharmacy: { view: true, create: true, print: true, edit: true, delete: true },
+    employees: { view: true, create: true, print: true, edit: true, delete: false },
+    master_data: { view: true, create: true, print: true, edit: true, delete: true },
+    operations: { view: true, create: true, print: true, edit: true, delete: true },
+    beds: { view: true, create: true, print: true, edit: true, delete: true },
+    certificates: { view: true, create: true, print: true, edit: true, delete: true },
+    discharges: { view: true, create: true, print: true, edit: true, delete: true },
+    revenue: { view: true, create: true, print: true, edit: true, delete: false },
+    expenses: { view: true, create: true, print: true, edit: true, delete: true },
+    finance: { view: true, create: true, print: true, edit: true, delete: false },
+    attendance: { view: true, create: true, print: true, edit: true, delete: false },
+    lens: { view: true, create: true, print: true, edit: true, delete: true },
+    complaint: { view: true, create: true, print: true, edit: true, delete: true },
+    treatment: { view: true, create: true, print: true, edit: true, delete: true },
+    medicine: { view: true, create: true, print: true, edit: true, delete: true },
+    dosage: { view: true, create: true, print: true, edit: true, delete: true },
+    surgery: { view: true, create: true, print: true, edit: true, delete: true },
+    blood_investigation: { view: true, create: true, print: true, edit: true, delete: true },
+    diagnosis: { view: true, create: true, print: true, edit: true, delete: true },
+    roles: { view: true, create: false, print: false, edit: false, delete: false },
+  },
+  // 'nurse' - Nursing staff with patient care and bed management
+  nurse: {
+    patients: { view: true, create: true, print: true, edit: true, delete: false },
+    appointments: { view: true, create: true, print: true, edit: true, delete: false },
+    doctor_schedule: { view: true, create: false, print: true, edit: false, delete: false },
+    cases: { view: true, create: false, print: true, edit: true, delete: false },
+    invoices: { view: true, create: false, print: false, edit: false, delete: false },
+    pharmacy: { view: true, create: false, print: false, edit: false, delete: false },
+    employees: { view: true, create: false, print: false, edit: false, delete: false },
+    master_data: { view: true, create: false, print: false, edit: false, delete: false },
+    operations: { view: true, create: false, print: false, edit: false, delete: false },
+    beds: { view: true, create: true, print: true, edit: true, delete: false },
+    certificates: { view: true, create: false, print: true, edit: false, delete: false },
+    discharges: { view: true, create: true, print: true, edit: true, delete: false },
+    revenue: { view: false, create: false, print: false, edit: false, delete: false },
+    expenses: { view: false, create: false, print: false, edit: false, delete: false },
+    finance: { view: false, create: false, print: false, edit: false, delete: false },
+    attendance: { view: true, create: true, print: true, edit: true, delete: false },
+    lens: { view: true, create: false, print: false, edit: false, delete: false },
+    complaint: { view: true, create: false, print: false, edit: false, delete: false },
+    treatment: { view: true, create: false, print: false, edit: false, delete: false },
+    medicine: { view: true, create: false, print: false, edit: false, delete: false },
+    dosage: { view: true, create: false, print: false, edit: false, delete: false },
+    surgery: { view: true, create: false, print: false, edit: false, delete: false },
+    blood_investigation: { view: true, create: false, print: false, edit: false, delete: false },
+    diagnosis: { view: true, create: false, print: false, edit: false, delete: false },
+    roles: { view: false, create: false, print: false, edit: false, delete: false },
+  },
+  // 'finance' - Financial operations and billing management
+  finance: {
+    patients: { view: true, create: false, print: false, edit: false, delete: false },
+    appointments: { view: true, create: false, print: false, edit: false, delete: false },
+    doctor_schedule: { view: false, create: false, print: false, edit: false, delete: false },
+    cases: { view: true, create: false, print: false, edit: false, delete: false },
+    invoices: { view: true, create: true, print: true, edit: true, delete: false },
+    pharmacy: { view: true, create: false, print: false, edit: false, delete: false },
+    employees: { view: true, create: false, print: false, edit: false, delete: false },
+    master_data: { view: true, create: false, print: false, edit: false, delete: false },
+    operations: { view: false, create: false, print: false, edit: false, delete: false },
+    beds: { view: true, create: false, print: false, edit: false, delete: false },
+    certificates: { view: false, create: false, print: false, edit: false, delete: false },
+    discharges: { view: false, create: false, print: false, edit: false, delete: false },
+    revenue: { view: true, create: true, print: true, edit: true, delete: false },
+    expenses: { view: true, create: true, print: true, edit: true, delete: false },
+    finance: { view: true, create: true, print: true, edit: true, delete: false },
+    attendance: { view: true, create: false, print: false, edit: false, delete: false },
+    lens: { view: false, create: false, print: false, edit: false, delete: false },
+    complaint: { view: false, create: false, print: false, edit: false, delete: false },
+    treatment: { view: false, create: false, print: false, edit: false, delete: false },
+    medicine: { view: false, create: false, print: false, edit: false, delete: false },
+    dosage: { view: false, create: false, print: false, edit: false, delete: false },
+    surgery: { view: false, create: false, print: false, edit: false, delete: false },
+    blood_investigation: { view: false, create: false, print: false, edit: false, delete: false },
+    diagnosis: { view: false, create: false, print: false, edit: false, delete: false },
+    roles: { view: false, create: false, print: false, edit: false, delete: false },
+  },
+  // 'pharmacy_staff' - Pharmacy and medication management
+  pharmacy_staff: {
+    patients: { view: true, create: false, print: false, edit: false, delete: false },
+    appointments: { view: true, create: false, print: false, edit: false, delete: false },
+    doctor_schedule: { view: false, create: false, print: false, edit: false, delete: false },
+    cases: { view: true, create: false, print: false, edit: false, delete: false },
+    invoices: { view: true, create: false, print: false, edit: false, delete: false },
+    pharmacy: { view: true, create: true, print: true, edit: true, delete: false },
+    employees: { view: false, create: false, print: false, edit: false, delete: false },
+    master_data: { view: true, create: true, print: true, edit: true, delete: false },
+    operations: { view: false, create: false, print: false, edit: false, delete: false },
+    beds: { view: false, create: false, print: false, edit: false, delete: false },
+    certificates: { view: false, create: false, print: false, edit: false, delete: false },
+    discharges: { view: false, create: false, print: false, edit: false, delete: false },
+    revenue: { view: false, create: false, print: false, edit: false, delete: false },
+    expenses: { view: false, create: false, print: false, edit: false, delete: false },
+    finance: { view: false, create: false, print: false, edit: false, delete: false },
+    attendance: { view: true, create: true, print: true, edit: true, delete: false },
+    lens: { view: false, create: false, print: false, edit: false, delete: false },
+    complaint: { view: true, create: false, print: false, edit: false, delete: false },
+    treatment: { view: true, create: false, print: false, edit: false, delete: false },
+    medicine: { view: true, create: true, print: true, edit: true, delete: false },
+    dosage: { view: true, create: true, print: true, edit: true, delete: false },
+    surgery: { view: false, create: false, print: false, edit: false, delete: false },
+    blood_investigation: { view: false, create: false, print: false, edit: false, delete: false },
+    diagnosis: { view: false, create: false, print: false, edit: false, delete: false },
+    roles: { view: false, create: false, print: false, edit: false, delete: false },
+  },
+  // 'pharmacy' - Alias for pharmacy_staff
+  pharmacy: {
+    patients: { view: true, create: false, print: false, edit: false, delete: false },
+    appointments: { view: true, create: false, print: false, edit: false, delete: false },
+    doctor_schedule: { view: false, create: false, print: false, edit: false, delete: false },
+    cases: { view: true, create: false, print: false, edit: false, delete: false },
+    invoices: { view: true, create: false, print: false, edit: false, delete: false },
+    pharmacy: { view: true, create: true, print: true, edit: true, delete: false },
+    employees: { view: false, create: false, print: false, edit: false, delete: false },
+    master_data: { view: true, create: true, print: true, edit: true, delete: false },
+    operations: { view: false, create: false, print: false, edit: false, delete: false },
+    beds: { view: false, create: false, print: false, edit: false, delete: false },
+    certificates: { view: false, create: false, print: false, edit: false, delete: false },
+    discharges: { view: false, create: false, print: false, edit: false, delete: false },
+    revenue: { view: false, create: false, print: false, edit: false, delete: false },
+    expenses: { view: false, create: false, print: false, edit: false, delete: false },
+    finance: { view: false, create: false, print: false, edit: false, delete: false },
+    attendance: { view: true, create: true, print: true, edit: true, delete: false },
+    lens: { view: false, create: false, print: false, edit: false, delete: false },
+    complaint: { view: true, create: false, print: false, edit: false, delete: false },
+    treatment: { view: true, create: false, print: false, edit: false, delete: false },
+    medicine: { view: true, create: true, print: true, edit: true, delete: false },
+    dosage: { view: true, create: true, print: true, edit: true, delete: false },
+    surgery: { view: false, create: false, print: false, edit: false, delete: false },
+    blood_investigation: { view: false, create: false, print: false, edit: false, delete: false },
+    diagnosis: { view: false, create: false, print: false, edit: false, delete: false },
+    roles: { view: false, create: false, print: false, edit: false, delete: false },
+  },
+  // 'lab_technician' - Laboratory and diagnostic permissions
+  lab_technician: {
+    patients: { view: true, create: false, print: false, edit: false, delete: false },
+    appointments: { view: true, create: false, print: false, edit: false, delete: false },
+    doctor_schedule: { view: false, create: false, print: false, edit: false, delete: false },
+    cases: { view: true, create: false, print: true, edit: true, delete: false },
+    invoices: { view: false, create: false, print: false, edit: false, delete: false },
+    pharmacy: { view: true, create: false, print: false, edit: false, delete: false },
+    employees: { view: false, create: false, print: false, edit: false, delete: false },
+    master_data: { view: true, create: false, print: false, edit: false, delete: false },
+    operations: { view: true, create: false, print: false, edit: false, delete: false },
+    beds: { view: true, create: false, print: false, edit: false, delete: false },
+    certificates: { view: false, create: false, print: false, edit: false, delete: false },
+    discharges: { view: false, create: false, print: false, edit: false, delete: false },
+    revenue: { view: false, create: false, print: false, edit: false, delete: false },
+    expenses: { view: false, create: false, print: false, edit: false, delete: false },
+    finance: { view: false, create: false, print: false, edit: false, delete: false },
+    attendance: { view: true, create: true, print: true, edit: true, delete: false },
+    lens: { view: true, create: false, print: false, edit: false, delete: false },
+    complaint: { view: true, create: false, print: false, edit: false, delete: false },
+    treatment: { view: true, create: false, print: false, edit: false, delete: false },
+    medicine: { view: true, create: false, print: false, edit: false, delete: false },
+    dosage: { view: true, create: false, print: false, edit: false, delete: false },
+    surgery: { view: true, create: false, print: false, edit: false, delete: false },
+    blood_investigation: { view: true, create: true, print: true, edit: true, delete: false },
+    diagnosis: { view: true, create: false, print: false, edit: false, delete: false },
+    roles: { view: false, create: false, print: false, edit: false, delete: false },
+  },
+  // 'manager' - Department or clinic management permissions
+  manager: {
+    patients: { view: true, create: true, print: true, edit: true, delete: false },
+    appointments: { view: true, create: true, print: true, edit: true, delete: false },
+    doctor_schedule: { view: true, create: true, print: true, edit: true, delete: false },
+    cases: { view: true, create: true, print: true, edit: true, delete: false },
+    invoices: { view: true, create: true, print: true, edit: true, delete: false },
+    pharmacy: { view: true, create: true, print: true, edit: true, delete: false },
+    employees: { view: true, create: false, print: false, edit: true, delete: false },
+    master_data: { view: true, create: true, print: true, edit: true, delete: false },
+    operations: { view: true, create: true, print: true, edit: true, delete: false },
+    beds: { view: true, create: true, print: true, edit: true, delete: false },
+    certificates: { view: true, create: true, print: true, edit: true, delete: false },
+    discharges: { view: true, create: true, print: true, edit: true, delete: false },
+    revenue: { view: true, create: false, print: true, edit: false, delete: false },
+    expenses: { view: true, create: true, print: true, edit: true, delete: false },
+    finance: { view: true, create: false, print: true, edit: false, delete: false },
+    attendance: { view: true, create: true, print: true, edit: true, delete: false },
+    lens: { view: true, create: true, print: true, edit: true, delete: false },
+    complaint: { view: true, create: true, print: true, edit: true, delete: false },
+    treatment: { view: true, create: true, print: true, edit: true, delete: false },
+    medicine: { view: true, create: true, print: true, edit: true, delete: false },
+    dosage: { view: true, create: true, print: true, edit: true, delete: false },
+    surgery: { view: true, create: true, print: true, edit: true, delete: false },
+    blood_investigation: { view: true, create: true, print: true, edit: true, delete: false },
+    diagnosis: { view: true, create: true, print: true, edit: true, delete: false },
+    roles: { view: false, create: false, print: false, edit: false, delete: false },
+  },
+  // 'read_only' - View-only access for reports and monitoring
+  read_only: {
+    patients: { view: true, create: false, print: true, edit: false, delete: false },
+    appointments: { view: true, create: false, print: true, edit: false, delete: false },
+    doctor_schedule: { view: true, create: false, print: true, edit: false, delete: false },
+    cases: { view: true, create: false, print: true, edit: false, delete: false },
+    invoices: { view: true, create: false, print: true, edit: false, delete: false },
+    pharmacy: { view: true, create: false, print: true, edit: false, delete: false },
+    employees: { view: true, create: false, print: false, edit: false, delete: false },
+    master_data: { view: true, create: false, print: false, edit: false, delete: false },
+    operations: { view: true, create: false, print: true, edit: false, delete: false },
+    beds: { view: true, create: false, print: true, edit: false, delete: false },
+    certificates: { view: true, create: false, print: true, edit: false, delete: false },
+    discharges: { view: true, create: false, print: true, edit: false, delete: false },
+    revenue: { view: true, create: false, print: true, edit: false, delete: false },
+    expenses: { view: true, create: false, print: true, edit: false, delete: false },
+    finance: { view: true, create: false, print: true, edit: false, delete: false },
+    attendance: { view: true, create: false, print: true, edit: false, delete: false },
+    lens: { view: true, create: false, print: true, edit: false, delete: false },
+    complaint: { view: true, create: false, print: true, edit: false, delete: false },
+    treatment: { view: true, create: false, print: true, edit: false, delete: false },
+    medicine: { view: true, create: false, print: true, edit: false, delete: false },
+    dosage: { view: true, create: false, print: true, edit: false, delete: false },
+    surgery: { view: true, create: false, print: true, edit: false, delete: false },
+    blood_investigation: { view: true, create: false, print: true, edit: false, delete: false },
+    diagnosis: { view: true, create: false, print: true, edit: false, delete: false },
+    roles: { view: false, create: false, print: false, edit: false, delete: false },
+  },
 }
 
 /**
@@ -300,7 +571,15 @@ export function hasPermission(
   resource: keyof typeof PERMISSIONS[UserRole],
   action: 'view' | 'create' | 'print' | 'edit' | 'delete'
 ): boolean {
-  const permissions = PERMISSIONS[role]
+  // Map alias roles to their primary role
+  let effectiveRole: UserRole = role
+  if (role === 'doctor') {
+    effectiveRole = 'ophthalmologist' // doctor maps to ophthalmologist
+  } else if (role === 'pharmacy') {
+    effectiveRole = 'pharmacy_staff' // pharmacy maps to pharmacy_staff
+  }
+  
+  const permissions = PERMISSIONS[effectiveRole]
   if (!permissions || !permissions[resource]) {
     return false
   }
@@ -328,12 +607,12 @@ export function isAdmin(role: UserRole): boolean {
  * Helper: Check if user is medical professional
  */
 export function isMedicalProfessional(role: UserRole): boolean {
-  return ['optometrist', 'ophthalmologist', 'technician'].includes(role)
+  return ['optometrist', 'ophthalmologist', 'technician', 'doctor', 'nurse', 'lab_technician'].includes(role)
 }
 
 /**
  * Helper: Check if user has financial access
  */
 export function hasFinancialAccess(role: UserRole): boolean {
-  return ['super_admin', 'hospital_admin', 'billing_staff'].includes(role)
+  return ['super_admin', 'hospital_admin', 'billing_staff', 'finance', 'admin', 'manager'].includes(role)
 }

@@ -297,7 +297,12 @@ export async function POST(request: NextRequest) {
 
     // Validate times if provided
     if (body.check_in_time && body.check_out_time) {
-      if (body.check_out_time <= body.check_in_time) {
+      // Use Date objects for proper time comparison
+      const checkIn = new Date(`2000-01-01T${body.check_in_time}`)
+      const checkOut = new Date(`2000-01-01T${body.check_out_time}`)
+      
+      // Validate that check-out is after check-in
+      if (checkOut <= checkIn) {
         return NextResponse.json(
           { success: false, error: 'Check-out time must be after check-in time' },
           { status: 400 }
@@ -305,8 +310,6 @@ export async function POST(request: NextRequest) {
       }
       
       // Calculate working hours to validate
-      const checkIn = new Date(`2000-01-01T${body.check_in_time}`)
-      const checkOut = new Date(`2000-01-01T${body.check_out_time}`)
       const hoursWorked = (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60)
       
       if (hoursWorked > 24) {

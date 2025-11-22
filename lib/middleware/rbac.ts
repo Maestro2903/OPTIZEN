@@ -3,7 +3,7 @@
  * Works with existing users table structure
  */
 
-import { createClient } from '@/lib/supabase/server'
+import { createAuthenticatedClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { 
   UserRole, 
@@ -28,10 +28,11 @@ export interface RBACContext {
 
 /**
  * Get user role from database with runtime validation
+ * Uses createAuthenticatedClient to ensure cookie-based authentication works properly
  */
 export async function getUserContext(): Promise<RBACContext | null> {
   try {
-    const supabase = createClient()
+    const supabase = await createAuthenticatedClient()
     const { data: { session } } = await supabase.auth.getSession()
 
     if (!session) {

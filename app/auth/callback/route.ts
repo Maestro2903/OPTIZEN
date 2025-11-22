@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
       // Verify authentication was successful
       if (data?.session?.user) {
         // Clear the state cookie after successful authentication using utility function
-        const response = NextResponse.redirect(new URL('/dashboard/cases', request.url))
+        const response = NextResponse.redirect(new URL('/cases', request.url))
         clearOAuthState(response)
         return response
       } else {

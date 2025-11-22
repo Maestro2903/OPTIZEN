@@ -23,10 +23,10 @@ interface BedCardProps {
     doctor_name?: string
     patient_gender?: string
   } | null
-  onClick?: () => void
+  onClickAction?: () => void
 }
 
-export function BedCard({ bed, assignment, onClick }: BedCardProps) {
+export function BedCard({ bed, assignment, onClickAction }: BedCardProps) {
   const getStatusConfig = (status: string) => {
     switch (status) {
       case 'available':
@@ -98,9 +98,9 @@ export function BedCard({ bed, assignment, onClick }: BedCardProps) {
         isOutOfService
           ? "border-dashed border-slate-200 bg-[repeating-linear-gradient(135deg,#f8fafc,#f8fafc_10px,#f1f5f9_10px,#f1f5f9_20px)]"
           : "bg-white",
-        onClick ? "cursor-pointer hover:-translate-y-1 hover:shadow-md" : "cursor-default"
+        onClickAction ? "cursor-pointer hover:-translate-y-1 hover:shadow-md" : "cursor-default"
       )}
-      onClick={onClick}
+      onClick={onClickAction}
     >
       <div className={cn("mb-3 flex items-start justify-between", isOutOfService && "opacity-75")}>
         <div>

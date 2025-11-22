@@ -30,6 +30,13 @@ yarn-error.log*
 .env.local.*
 .env
 
+# config secret files
+config/*.env
+config/*.secret
+config/*.key
+*.secret
+*.key
+
 # vercel
 .vercel
 
@@ -38,3 +45,6 @@ yarn-error.log*
 next-env.d.ts
 
 LOGIN_CREDENTIALS.md
+
+# mcp config
+mcp_config.json

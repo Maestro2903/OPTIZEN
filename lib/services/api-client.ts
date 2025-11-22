@@ -24,23 +24,6 @@ class ApiClient {
   }
 
   /**
-   * Get current session
-   */
-  async getSession() {
-    const { data: { session }, error } = await this.supabase.auth.getSession()
-    if (error) throw error
-    return session
-  }
-
-  /**
-   * Sign out user
-   */
-  async signOut() {
-    const { error } = await this.supabase.auth.signOut()
-    if (error) throw error
-  }
-
-  /**
    * Check if user is authenticated
    */
   async isAuthenticated(): Promise<boolean> {
@@ -49,30 +32,6 @@ class ApiClient {
       return !!user
     } catch {
       return false
-    }
-  }
-
-  /**
-   * Generic query method with error handling
-   */
-  async executeQuery<T>(queryBuilder: any): Promise<T> {
-    const { data, error } = await queryBuilder
-    if (error) {
-      console.error('API Client Error:', error)
-      throw new Error(error.message)
-    }
-    return data
-  }
-
-  /**
-   * Batch operations helper
-   */
-  async executeBatch(operations: Array<() => Promise<any>>): Promise<any[]> {
-    try {
-      return await Promise.all(operations.map(op => op()))
-    } catch (error) {
-      console.error('Batch operation failed:', error)
-      throw error
     }
   }
 }

@@ -86,7 +86,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         'ophthalmologist',
         'technician',
         'billing_staff',
-        'patient'
+        'patient',
+        'doctor', // Legacy/alias role - treated as ophthalmologist
+        'admin',
+        'nurse',
+        'finance',
+        'pharmacy_staff',
+        'pharmacy', // Alias for pharmacy_staff
+        'lab_technician',
+        'manager',
+        'read_only'
       ]
       
       if (!validRoles.includes(userData.role as UserRole)) {

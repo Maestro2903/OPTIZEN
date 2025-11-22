@@ -18,6 +18,14 @@ export interface SearchableSelectOption {
   [key: string]: any
 }
 
+/**
+ * SearchableSelect component with default focus styles
+ *
+ * Note: This component always applies default focus styles ("focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2").
+ * To override these default focus styles, users should use Tailwind's important modifier (e.g., !ring-0) or other specificity techniques
+ * (custom CSS, higher-specificity selectors, or utility variants), as Tailwind class precedence is determined by the order of rules in the
+ * generated CSS (not by the order in the className prop).
+ */
 interface SearchableSelectProps {
   options: SearchableSelectOption[]
   value?: string
@@ -130,10 +138,10 @@ export function SearchableSelect({
                 className="rounded-sm opacity-70 hover:opacity-100 hover:bg-accent p-0.5 transition-opacity cursor-pointer"
                 aria-label="Clear selection"
               >
-                <X className="h-3.5 w-3.5" />
+                <X className="h-3.5 w-3.5 text-gray-400" />
               </span>
             )}
-            <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+            <ChevronsUpDown className="h-4 w-4 shrink-0 text-gray-400" />
           </div>
         </Button>
       </PopoverTrigger>
@@ -161,7 +169,7 @@ export function SearchableSelect({
         <div className="flex flex-col bg-popover text-popover-foreground rounded-md border shadow-md">
           {/* Search Input */}
           <div className="flex items-center border-b px-3 py-2 bg-background/50">
-            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+            <Search className="mr-2 h-4 w-4 shrink-0 text-gray-400" />
             <Input
               ref={inputRef}
               type="text"

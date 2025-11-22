@@ -1,8 +1,9 @@
 "use client"
 
 import * as React from "react"
-import { PrintLayout, PrintSection, PrintRow, PrintCol, PrintField, PrintSignature } from "./print-layout"
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
+import { createPortal } from "react-dom"
+import { PrintHeader, PrintSection, PrintFooter } from "./print-layout"
+import { PrintModalShell } from "./print-modal-shell"
 
 interface BillingPrintProps {
   billing: {
@@ -12,7 +13,8 @@ interface BillingPrintProps {
     patient_id?: string
     date: string
     items?: Array<{
-      description: string
+      service?: string
+      description?: string
       quantity: number
       rate: number
       amount: number
@@ -33,6 +35,7 @@ interface BillingPrintProps {
 }
 
 export function BillingPrint({ billing, children }: BillingPrintProps) {
+  const [isOpen, setIsOpen] = React.useState(false)
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-GB', {
       day: '2-digit',
@@ -52,195 +55,229 @@ export function BillingPrint({ billing, children }: BillingPrintProps) {
     const statusMap: { [key: string]: string } = {
       'paid': 'PAID',
       'pending': 'PENDING',
+      'unpaid': 'UNPAID',
       'overdue': 'OVERDUE',
       'cancelled': 'CANCELLED',
       'refunded': 'REFUNDED',
       'partial': 'PARTIALLY PAID'
     }
-    return statusMap[status] || status.toUpperCase()
+    return statusMap[status.toLowerCase()] || status.toUpperCase()
   }
 
-  // Sample items if none provided
-  const defaultItems = [
-    { description: 'Consultation Fee', quantity: 1, rate: 500, amount: 500 },
-    { description: 'Eye Examination', quantity: 1, rate: 300, amount: 300 },
-    { description: 'Prescription Glasses', quantity: 1, rate: 2000, amount: 2000 }
-  ]
+  const isPaid = billing.payment_status?.toLowerCase() === 'paid'
 
-  const invoiceItems = billing.items || defaultItems
+  // Process items - handle both service/description formats
+  const invoiceItems = billing.items || []
   const calculatedSubtotal = billing.subtotal || invoiceItems.reduce((sum, item) => sum + item.amount, 0)
-  const taxAmount = billing.tax_amount || (calculatedSubtotal * 0.18) // 18% GST
+  const taxAmount = billing.tax_amount || 0
   const discountAmount = billing.discount_amount || 0
   const finalTotal = billing.total_amount || (calculatedSubtotal + taxAmount - discountAmount)
 
-  return (
-    <Dialog>
-      <DialogTrigger asChild>
-        {children}
-      </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <PrintLayout
-          documentType="Invoice"
-          documentTitle="Medical Services Invoice"
-        >
-          <div className="print-invoice">
-            {/* Invoice Header - Professional Format */}
-            <div className="print-invoice-header">
-              <div>
-                <div className="print-invoice-number-large">
-                  INVOICE #{billing.invoice_no || billing.id}
-                </div>
-                <div style={{ fontSize: '10pt', marginTop: '4pt' }}>
-                  Date: {formatDate(billing.date)}
-                </div>
-                {billing.due_date && (
-                  <div style={{ fontSize: '10pt', marginTop: '2pt' }}>
-                    Due Date: {formatDate(billing.due_date)}
-                  </div>
-                )}
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '11pt', fontWeight: 'bold', marginBottom: '4pt' }}>
-                  Payment Status
-                </div>
-                <div style={{ 
-                  fontSize: '12pt', 
-                  fontWeight: 'bold', 
-                  textTransform: 'uppercase',
-                  padding: '4pt 12pt',
-                  border: '2px solid #000',
-                  display: 'inline-block'
-                }}>
-                  {getPaymentStatusDisplay(billing.payment_status)}
-                </div>
-              </div>
+  const invoiceTitle = `Invoice_${billing.invoice_no || billing.id}`
+
+  const modalContent = (
+    <PrintModalShell
+      isOpen={isOpen}
+      onClose={() => setIsOpen(false)}
+      title={invoiceTitle}
+    >
+      {/* Header */}
+      <PrintHeader />
+      
+      {/* Document Title */}
+      <div className="text-center mb-6">
+        <h1 className="text-2xl font-bold uppercase tracking-wide">TAX INVOICE</h1>
+      </div>
+
+      <div className="space-y-6">
+        {/* Invoice Meta-Data (Top Right) */}
+        <div className="flex justify-end mb-6">
+          <div className="text-right space-y-2">
+            <div className="text-2xl font-bold">
+              Invoice #{billing.invoice_no || billing.id}
             </div>
-
-            {/* Bill-to Section */}
-            <div className="print-bill-to">
-              <div style={{ fontSize: '11pt', fontWeight: 'bold', marginBottom: '6pt', textTransform: 'uppercase' }}>Bill To:</div>
-              <div style={{ fontSize: '11pt', lineHeight: '1.6' }}>
-                <div style={{ fontWeight: 'bold', marginBottom: '4pt' }}>{billing.patient_name}</div>
-                {billing.patient_id && <div>Patient ID: {billing.patient_id}</div>}
-                {billing.contact_number && <div>Contact: {billing.contact_number}</div>}
-                {billing.address && <div>{billing.address}</div>}
-              </div>
+            <div className="text-sm text-gray-700">
+              Date: {formatDate(billing.date)}
             </div>
-
-            {/* Service Details - Itemized Table */}
-            <PrintSection title="Service Details">
-              <table className="print-invoice-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: '5%', textAlign: 'center' }}>S.No</th>
-                    <th style={{ width: '50%' }}>Description</th>
-                    <th style={{ width: '10%', textAlign: 'center' }}>Qty</th>
-                    <th style={{ width: '15%', textAlign: 'right' }}>Rate (₹)</th>
-                    <th style={{ width: '20%', textAlign: 'right' }}>Amount (₹)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {invoiceItems.map((item, index) => (
-                    <tr key={index}>
-                      <td style={{ textAlign: 'center' }}>{index + 1}</td>
-                      <td>{item.description}</td>
-                      <td style={{ textAlign: 'center' }}>{item.quantity}</td>
-                      <td style={{ textAlign: 'right' }}>{formatCurrency(item.rate)}</td>
-                      <td style={{ textAlign: 'right' }}>{formatCurrency(item.amount)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </PrintSection>
-
-            {/* Billing Summary - Prominent Totals */}
-            <div className="print-invoice-summary">
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <tbody>
-                  <tr>
-                    <td style={{ padding: '6pt', textAlign: 'right', borderBottom: '1px solid #ccc' }}>
-                      <strong>Subtotal:</strong>
-                    </td>
-                    <td style={{ padding: '6pt', textAlign: 'right', borderBottom: '1px solid #ccc', width: '40%' }}>
-                      {formatCurrency(calculatedSubtotal)}
-                    </td>
-                  </tr>
-                  {discountAmount > 0 && (
-                    <tr>
-                      <td style={{ padding: '6pt', textAlign: 'right', borderBottom: '1px solid #ccc' }}>
-                        <strong>Discount:</strong>
-                      </td>
-                      <td style={{ padding: '6pt', textAlign: 'right', borderBottom: '1px solid #ccc' }}>
-                        -{formatCurrency(discountAmount)}
-                      </td>
-                    </tr>
-                  )}
-                  <tr>
-                    <td style={{ padding: '6pt', textAlign: 'right', borderBottom: '1px solid #ccc' }}>
-                      <strong>GST (18%):</strong>
-                    </td>
-                    <td style={{ padding: '6pt', textAlign: 'right', borderBottom: '1px solid #ccc' }}>
-                      {formatCurrency(taxAmount)}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="print-invoice-total" style={{ padding: '10pt', textAlign: 'right' }}>
-                      <strong>TOTAL AMOUNT:</strong>
-                    </td>
-                    <td className="print-invoice-total" style={{ padding: '10pt', textAlign: 'right' }}>
-                      <strong style={{ fontSize: '16pt' }}>{formatCurrency(finalTotal)}</strong>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            {/* Payment Information */}
-            <PrintSection title="Payment Information">
-              <PrintRow>
-                <PrintCol>
-                  <PrintField label="Payment Method" value={billing.payment_method || 'Cash'} />
-                  <PrintField label="Payment Status" value={getPaymentStatusDisplay(billing.payment_status)} uppercase />
-                </PrintCol>
-                <PrintCol>
-                  <PrintField label="Transaction Date" value={formatDate(billing.date)} />
-                  {billing.payment_status === 'pending' && billing.due_date && (
-                    <PrintField label="Due Date" value={formatDate(billing.due_date)} />
-                  )}
-                </PrintCol>
-              </PrintRow>
-            </PrintSection>
-
-            {/* Payment Terms */}
-            <div className="print-payment-terms">
-              <div style={{ fontWeight: 'bold', marginBottom: '4pt' }}>Payment Terms:</div>
-              <div style={{ marginBottom: '4pt' }}>
-                • Payment is due within {billing.due_date ? formatDate(billing.due_date) : '7 days'} of invoice date
+            {billing.due_date && (
+              <div className="text-sm text-gray-700">
+                Due Date: {formatDate(billing.due_date)}
               </div>
-              <div style={{ marginBottom: '4pt' }}>
-                • Late payments may incur additional charges
+            )}
+            {/* Status Stamp */}
+            <div className="mt-3">
+              <div
+                className={`inline-block px-4 py-2 border-2 font-bold text-sm uppercase ${
+                  isPaid
+                    ? 'border-green-600 text-green-700 bg-green-50'
+                    : 'border-red-600 text-red-700 bg-red-50'
+                }`}
+              >
+                {getPaymentStatusDisplay(billing.payment_status)}
               </div>
-              <div>
-                • For payment inquiries, contact the billing department
-              </div>
-            </div>
-
-            {/* Footer - GST Number and Signature */}
-            <div style={{ marginTop: '20pt', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-              <div style={{ fontSize: '9pt' }}>
-                <div><strong>GST Number:</strong> {billing.gst_number || 'GSTIN123456789'}</div>
-                <div style={{ marginTop: '4pt' }}>This is a computer-generated invoice</div>
-              </div>
-              <PrintSignature 
-                doctorName="Authorized Signatory"
-                qualification="Billing Department"
-                registrationNumber=""
-                date={formatDate(billing.date)}
-              />
             </div>
           </div>
-        </PrintLayout>
-      </DialogContent>
-    </Dialog>
+        </div>
+
+        {/* Bill To Section */}
+        <PrintSection title="BILL TO">
+          <div className="space-y-1">
+            <div className="font-bold text-base uppercase">
+              {billing.patient_name}
+            </div>
+            {billing.patient_id && (
+              <div className="text-xs text-gray-600">
+                Patient ID: {billing.patient_id}
+              </div>
+            )}
+            {billing.address && (
+              <div className="text-xs text-gray-600">
+                {billing.address}
+              </div>
+            )}
+            {billing.contact_number && (
+              <div className="text-xs text-gray-600">
+                Contact: {billing.contact_number}
+              </div>
+            )}
+          </div>
+        </PrintSection>
+
+        {/* Line Items Table */}
+        <div className="mt-6">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-gray-100 border-y border-black">
+                <th className="py-2 px-3 text-left text-xs font-bold uppercase">Item Description</th>
+                <th className="py-2 px-3 text-center text-xs font-bold uppercase w-16">Qty</th>
+                <th className="py-2 px-3 text-right text-xs font-bold uppercase w-24">Rate</th>
+                <th className="py-2 px-3 text-right text-xs font-bold uppercase w-24">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoiceItems.length > 0 ? (
+                invoiceItems.map((item, index) => (
+                  <tr key={index} className="border-b border-gray-200">
+                    <td className="py-3 px-3">
+                      <div className="font-medium">
+                        {item.service || item.description || 'Service'}
+                      </div>
+                      {item.service && item.description && (
+                        <div className="text-xs text-gray-600 mt-1">
+                          {item.description}
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-3 px-3 text-center tabular-nums">
+                      {item.quantity}
+                    </td>
+                    <td className="py-3 px-3 text-right tabular-nums">
+                      {formatCurrency(item.rate)}
+                    </td>
+                    <td className="py-3 px-3 text-right font-bold tabular-nums">
+                      {formatCurrency(item.amount)}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={4} className="py-4 text-center text-gray-500 text-sm">
+                    No items in this invoice
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Totals Stack (Bottom Right) */}
+        <div className="flex justify-end mt-6">
+          <div className="w-64 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-700">Subtotal:</span>
+              <span className="text-right tabular-nums font-medium">
+                {formatCurrency(calculatedSubtotal)}
+              </span>
+            </div>
+            {discountAmount > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-700">Discount:</span>
+                <span className="text-right tabular-nums font-medium text-red-600">
+                  -{formatCurrency(discountAmount)}
+                </span>
+              </div>
+            )}
+            {taxAmount > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-700">Tax (GST):</span>
+                <span className="text-right tabular-nums font-medium">
+                  {formatCurrency(taxAmount)}
+                </span>
+              </div>
+            )}
+            <div className="border-t-2 border-black pt-2 mt-2 bg-gray-50 -mx-2 px-2 py-2">
+              <div className="flex justify-between">
+                <span className="text-lg font-black">Total Due:</span>
+                <span className="text-xl font-black text-right tabular-nums">
+                  {formatCurrency(finalTotal)}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer & Terms */}
+        <div className="mt-12 pt-6 border-t border-gray-200">
+          <div className="grid grid-cols-2 gap-8">
+            {/* Left Side: Payment Info / Bank Details / Terms */}
+            <div className="space-y-3 text-xs text-gray-700">
+              {billing.gst_number && (
+                <div>
+                  <strong>GST Number:</strong> {billing.gst_number}
+                </div>
+              )}
+              <div>
+                <strong>Payment Terms:</strong>
+                <ul className="list-disc list-inside mt-1 space-y-1">
+                  <li>
+                    Payment is due within{' '}
+                    {billing.due_date ? formatDate(billing.due_date) : '7 days'} of invoice date
+                  </li>
+                  <li>Late payments may incur additional charges</li>
+                  <li>For payment inquiries, contact the billing department</li>
+                </ul>
+              </div>
+              {billing.notes && (
+                <div className="mt-2">
+                  <strong>Notes:</strong>
+                  <div className="mt-1 whitespace-pre-wrap">{billing.notes}</div>
+                </div>
+              )}
+            </div>
+
+            {/* Right Side: Authorized Signatory */}
+            <div className="text-right">
+              <div className="inline-block text-left">
+                <div className="h-16 border-b border-black mb-2"></div>
+                <div className="font-bold text-sm">Authorized Signatory</div>
+                <div className="text-xs text-gray-600 mt-1">Billing Department</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Print Footer with Timestamp */}
+        <PrintFooter showTimestamp={true} />
+      </div>
+    </PrintModalShell>
+  )
+
+  return (
+    <>
+      <div onClick={() => setIsOpen(true)}>
+        {children}
+      </div>
+      {typeof window !== 'undefined' && createPortal(modalContent, document.body)}
+    </>
   )
 }

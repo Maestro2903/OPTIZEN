@@ -39,7 +39,12 @@ const bedFormSchema = z.object({
   ward_name: z.string().min(1, "Ward name is required"),
   ward_type: z.enum(["general", "icu", "private", "semi_private", "emergency"]),
   bed_type: z.string().min(1, "Bed type is required"),
-  floor_number: z.string().min(1, "Floor number is required"),
+  floor_number: z.preprocess((val) => {
+    // Convert empty string to NaN so Zod produces appropriate validation errors
+    if (val === "" || val === null || val === undefined) return NaN;
+    const num = Number(val);
+    return isNaN(num) ? NaN : num;
+  }, z.number().int().min(1, { message: "Floor number must be at least 1" })),
   room_number: z.string().optional(),
   daily_rate: z.string().min(1, "Daily rate is required"),
   description: z.string().optional(),
@@ -74,7 +79,7 @@ export function BedForm({ children, bedData, mode = "create", onSuccess }: BedFo
       ward_name: bedData?.name || "",
       ward_type: bedData?.metadata?.ward_type || "general",
       bed_type: bedData?.metadata?.bed_type || "Standard",
-      floor_number: bedData?.metadata?.floor_number?.toString() || "",
+      floor_number: bedData?.metadata?.floor_number ? bedData.metadata.floor_number.toString() : "",
       room_number: bedData?.metadata?.room_number || "",
       daily_rate: bedData?.metadata?.daily_rate?.toString() || "",
       description: bedData?.description || "",
@@ -110,7 +115,7 @@ export function BedForm({ children, bedData, mode = "create", onSuccess }: BedFo
         metadata: {
           bed_type: values.bed_type,
           ward_type: values.ward_type,
-          floor_number: parseInt(values.floor_number),
+          floor_number: values.floor_number || null,
           room_number: values.room_number || null,
           daily_rate: parseFloat(values.daily_rate),
           facilities: facilitiesArray,
@@ -123,7 +128,7 @@ export function BedForm({ children, bedData, mode = "create", onSuccess }: BedFo
       // Override with new values
       bedPayload.metadata.bed_type = values.bed_type
       bedPayload.metadata.ward_type = values.ward_type
-      bedPayload.metadata.floor_number = parseInt(values.floor_number)
+      bedPayload.metadata.floor_number = values.floor_number || null
       bedPayload.metadata.room_number = values.room_number || null
       bedPayload.metadata.daily_rate = parseFloat(values.daily_rate)
       bedPayload.metadata.facilities = facilitiesArray
@@ -158,188 +163,253 @@ export function BedForm({ children, bedData, mode = "create", onSuccess }: BedFo
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0">
+        {/* Fixed Header */}
+        <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <DialogTitle>{mode === "edit" ? "Edit Bed" : "Add New Bed"}</DialogTitle>
           <DialogDescription>
             {mode === "edit" ? "Update bed information and settings" : "Register a new bed in the hospital system"}
           </DialogDescription>
         </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="bed_number"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Bed Number *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., 101, 201A" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="ward_type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Ward Type *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+
+        {/* Scrollable Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-6">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} id="bed-form">
+              <div className="grid grid-cols-2 gap-5">
+                {/* Section 1: Bed Identity */}
+                {/* Bed Number */}
+                <FormField
+                  control={form.control}
+                  name="bed_number"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Bed Number *</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select ward type" />
-                        </SelectTrigger>
+                        <Input 
+                          placeholder="e.g., 101, 201A" 
+                          className="bg-white border-gray-200 focus:border-gray-600 text-sm rounded-lg h-11"
+                          {...field} 
+                        />
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="general">General Ward</SelectItem>
-                        <SelectItem value="icu">ICU (Intensive Care)</SelectItem>
-                        <SelectItem value="private">Private Room</SelectItem>
-                        <SelectItem value="semi_private">Semi-Private</SelectItem>
-                        <SelectItem value="emergency">Emergency Ward</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <FormField
-              control={form.control}
-              name="ward_name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Ward Name *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., General Ward A, ICU Block 1" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                {/* Bed Type */}
+                <FormField
+                  control={form.control}
+                  name="bed_type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Bed Type *</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="bg-white border-gray-200 focus:border-gray-600 text-sm rounded-lg h-11">
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Standard">Standard</SelectItem>
+                          <SelectItem value="Deluxe">Deluxe</SelectItem>
+                          <SelectItem value="ICU">ICU Bed</SelectItem>
+                          <SelectItem value="Electric">Electric</SelectItem>
+                          <SelectItem value="Pediatric">Pediatric</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <div className="grid grid-cols-3 gap-4">
-              <FormField
-                control={form.control}
-                name="floor_number"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Floor Number *</FormLabel>
-                    <FormControl>
-                      <Input type="number" placeholder="1, 2, 3..." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="room_number"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Room Number</FormLabel>
-                    <FormControl>
-                      <Input placeholder="A, 101, etc." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="bed_type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Bed Type *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                {/* Section 2: Location Hierarchy (Grouped) */}
+                {/* Ward Type */}
+                <FormField
+                  control={form.control}
+                  name="ward_type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Ward Type *</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="bg-white border-gray-200 focus:border-gray-600 text-sm rounded-lg h-11">
+                            <SelectValue placeholder="Select ward type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="general">General Ward</SelectItem>
+                          <SelectItem value="icu">ICU (Intensive Care)</SelectItem>
+                          <SelectItem value="private">Private Room</SelectItem>
+                          <SelectItem value="semi_private">Semi-Private</SelectItem>
+                          <SelectItem value="emergency">Emergency Ward</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Ward Name */}
+                <FormField
+                  control={form.control}
+                  name="ward_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Ward Name *</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
+                        <Input 
+                          placeholder="e.g., General Ward A, ICU Block 1" 
+                          className="bg-white border-gray-200 focus:border-gray-600 text-sm rounded-lg h-11"
+                          {...field} 
+                        />
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Standard">Standard</SelectItem>
-                        <SelectItem value="Deluxe">Deluxe</SelectItem>
-                        <SelectItem value="ICU">ICU Bed</SelectItem>
-                        <SelectItem value="Electric">Electric</SelectItem>
-                        <SelectItem value="Pediatric">Pediatric</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <div className="rounded-lg border bg-blue-50/50 p-4">
-              <FormField
-                control={form.control}
-                name="daily_rate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-base font-semibold">Daily Rate (₹) *</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        step="0.01" 
-                        placeholder="1500" 
-                        {...field}
-                        className="text-lg font-semibold"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                    {selectedWardType && suggestedRates[selectedWardType] && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Suggested rate for {selectedWardType.replace("_", " ")}: ₹{suggestedRates[selectedWardType].toLocaleString()}
-                      </p>
+                {/* Floor Number */}
+                <FormField
+                  control={form.control}
+                  name="floor_number"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Floor Number *</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min="1"
+                          placeholder="1, 2, 3..."
+                          className="bg-white border-gray-200 focus:border-gray-600 text-sm rounded-lg h-11"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Room Number */}
+                <FormField
+                  control={form.control}
+                  name="room_number"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Room Number</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="A, 101, etc." 
+                          className="bg-white border-gray-200 focus:border-gray-600 text-sm rounded-lg h-11"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Section 3: Financials & Specs (Grey Box) */}
+                <div className="col-span-2 bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
+                  {/* Daily Rate */}
+                  <FormField
+                    control={form.control}
+                    name="daily_rate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Daily Rate *</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">₹</span>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              placeholder="1500"
+                              className="bg-white border-gray-200 focus:border-gray-600 text-sm rounded-lg h-11 pl-8"
+                              {...field}
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                        {selectedWardType && suggestedRates[selectedWardType] && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Suggested: ₹{suggestedRates[selectedWardType].toLocaleString()}
+                          </p>
+                        )}
+                      </FormItem>
                     )}
-                  </FormItem>
-                )}
-              />
-            </div>
+                  />
 
-            <FormField
-              control={form.control}
-              name="facilities"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Facilities</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., AC, TV, Attached Bathroom (comma-separated)" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                  <p className="text-xs text-muted-foreground">Enter facilities separated by commas</p>
-                </FormItem>
-              )}
-            />
+                  {/* Facilities - Tag Builder Style */}
+                  <FormField
+                    control={form.control}
+                    name="facilities"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Facilities</FormLabel>
+                        <FormControl>
+                          <div className="bg-white border border-gray-200 rounded-lg p-2 min-h-[44px]">
+                            <Input 
+                              placeholder="AC, TV, Oxygen" 
+                              className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 p-0 h-auto text-sm"
+                              {...field} 
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Separate by comma (e.g., AC, TV, Oxygen)
+                        </p>
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Additional information about this bed..." rows={3} {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                {/* Description */}
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2">
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Description</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Additional information about this bed..." 
+                          rows={3} 
+                          className="bg-white border-gray-200 focus:border-gray-600 text-sm rounded-lg"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </form>
+          </Form>
+        </div>
 
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsOpen(false)} disabled={isSubmitting}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Saving..." : (mode === "edit" ? "Update Bed" : "Add Bed")}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+        {/* Fixed Footer */}
+        <DialogFooter className="px-6 py-4 border-t bg-white">
+          <Button 
+            type="button" 
+            variant="ghost" 
+            onClick={() => setIsOpen(false)} 
+            disabled={isSubmitting}
+            className="text-gray-600 hover:bg-gray-100"
+          >
+            Cancel
+          </Button>
+          <Button 
+            type="submit" 
+            form="bed-form"
+            disabled={isSubmitting}
+            className="bg-gray-900 hover:bg-black text-white px-6 py-2.5 rounded-lg font-semibold"
+          >
+            {isSubmitting ? "Saving..." : (mode === "edit" ? "Update Bed" : "Add Bed")}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

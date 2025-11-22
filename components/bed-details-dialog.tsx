@@ -353,7 +353,7 @@ export function BedDetailsDialog({
             </BedForm>
             {bedData.status === 'available' && (
               <BedAssignmentForm
-                onSuccess={() => {
+                onSuccessAction={() => {
                   onRefresh?.()
                   onOpenChange(false)
                 }}

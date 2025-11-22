@@ -19,7 +19,7 @@ export default function NotFound() {
           </CardDescription>
         </CardHeader>
         <CardContent className="text-center">
-          <Link href="/dashboard">
+          <Link href="/">
             <Button className="w-full" variant="default">
               <Home className="mr-2 h-4 w-4" />
               Go to Dashboard

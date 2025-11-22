@@ -9,14 +9,66 @@
     display: none !important;
   }
 
-  /* Hide dialog overlays and backdrops */
+  /* Hide dialog overlays and backdrops - except certificate print overlay */
   [data-radix-dialog-overlay],
   [data-radix-portal],
-  .fixed.inset-0[class*="bg-black"],
-  .fixed.inset-0[class*="bg-background"],
-  [class*="backdrop"],
-  [class*="overlay"] {
+  .fixed.inset-0[class*="bg-black"]:not(.certificate-print-overlay),
+  .fixed.inset-0[class*="bg-background"]:not(.certificate-print-overlay),
+  .fixed.inset-0[class*="bg-gray-900"]:not(.certificate-print-overlay),
+  [class*="backdrop"]:not(.certificate-print-overlay),
+  [class*="overlay"]:not(.certificate-print-overlay) {
     display: none !important;
+  }
+  
+  /* Certificate print paper - always visible in print, even if parent is hidden */
+  .certificate-print-paper {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative !important;
+    width: 100% !important;
+    min-height: 100% !important;
+    margin: 0 !important;
+    padding: 20mm !important;
+    background: white !important;
+    box-shadow: none !important;
+    page-break-after: always;
+  }
+  
+  /* Ensure certificate print paper content is visible */
+  .certificate-print-paper * {
+    visibility: visible !important;
+    opacity: 1 !important;
+    display: revert !important;
+  }
+  
+  /* Make certificate overlay container visible for print */
+  .certificate-print-overlay {
+    position: static !important;
+    background: transparent !important;
+    display: block !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    height: auto !important;
+    min-height: auto !important;
+  }
+  
+  /* Hide close button in appointment print dialog */
+  .print-dialog-content button[aria-label*="close" i],
+  .print-dialog-content button[aria-label*="Close"],
+  .print-dialog-content [role="button"][aria-label*="close" i] {
+    display: none !important;
+  }
+  
+  /* Appointment print paper container - print specific */
+  .print-paper-container {
+    width: 100% !important;
+    min-height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    background: white !important;
   }
 
   /* Hide all buttons - but not if they're inside print container (shouldn't be any, but just in case) */
@@ -134,6 +186,14 @@
     height: auto !important;
     overflow: visible !important;
   }
+  
+  /* Appointment print dialog specific - ensure full width */
+  .print-dialog-content {
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
 
   /* Show dialog content - it contains our print content */
   [data-radix-dialog-content] {
@@ -178,6 +238,45 @@
     padding-bottom: 8pt;
     margin-bottom: 12pt;
     page-break-after: avoid;
+  }
+  
+  /* Custom appointment header layout - override center alignment */
+  .print-header-custom {
+    border-bottom: none !important;
+    text-align: left !important;
+  }
+  
+  .print-header .flex {
+    display: flex !important;
+    text-align: inherit;
+  }
+  
+  .print-header .text-right {
+    text-align: right !important;
+  }
+  
+  .print-header .text-center {
+    text-align: center !important;
+  }
+  
+  /* Ensure logo displays properly in print */
+  .print-header img {
+    max-width: 80pt !important;
+    height: auto !important;
+  }
+  
+  /* Preserve serif font and sizing in print */
+  .print-header .text-3xl {
+    font-size: 24pt !important;
+    font-family: 'Times New Roman', serif !important;
+  }
+  
+  .print-header .text-xl {
+    font-size: 16pt !important;
+  }
+  
+  .print-header .text-sm {
+    font-size: 9pt !important;
   }
 
   .print-clinic-name {
@@ -893,6 +992,56 @@
   }
 }
 
+/* Case Print Paper Container - A4 Standard */
+@media print {
+  /* Ensure A4 paper container fills page in print */
+  .case-print-paper {
+    width: 100% !important;
+    min-height: 100% !important;
+    margin: 0 !important;
+    padding: 20mm !important;
+    background: white !important;
+    box-shadow: none !important;
+    page-break-after: always;
+  }
+
+  /* Ensure header displays correctly in print */
+  .case-print-paper .flex {
+    display: flex !important;
+  }
+
+  /* Ensure logo displays in print */
+  .case-print-paper img {
+    display: block !important;
+    max-width: 48px !important;
+    height: auto !important;
+  }
+
+  /* Ensure text sizes are preserved in print */
+  .case-print-paper .text-2xl {
+    font-size: 24pt !important;
+  }
+
+  .case-print-paper .text-xl {
+    font-size: 20pt !important;
+  }
+
+  .case-print-paper .text-sm {
+    font-size: 11pt !important;
+  }
+
+  /* Ensure border displays in print */
+  .case-print-paper .border-t-2 {
+    border-top-width: 2pt !important;
+    border-color: black !important;
+  }
+
+  /* Ensure underline displays in print */
+  .case-print-paper .underline {
+    text-decoration: underline !important;
+  }
+}
+
 /* Screen preview styles */
 @media screen {
   .print-container {
@@ -903,5 +1052,12 @@
     margin: 20px auto;
     padding: 15mm 20mm;
     font-family: 'Arial', 'Helvetica', sans-serif;
+  }
+
+  /* Case Print Paper Container - Screen Preview */
+  .case-print-paper {
+    background: white;
+    box-shadow: 0 0 15px rgba(0,0,0,0.1);
+    font-family: 'Times New Roman', 'Georgia', serif;
   }
 }

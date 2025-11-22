@@ -42,4 +42,15 @@ For detailed deployment instructions, see [VERCEL_DEPLOYMENT.md](./VERCEL_DEPLOY
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase anonymous/public key
 - `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key (server-side only)
 
+## Model Context Protocol (MCP) Configuration
+
+This project includes MCP configuration to enable AI assistants to interact with external tools:
+
+- **Figma Integration**: Connect to Figma for design operations
+- **Supabase Integration**: Connect to Supabase project for database operations
+
+Configuration is stored in `mcp_config.json` (not committed for security) and `mcp_config.example.json` (template).
+
+See [mcp_config.md](./mcp_config.md) for detailed information about MCP configuration.
+
 See [VERCEL_DEPLOYMENT.md](./VERCEL_DEPLOYMENT.md) for detailed setup instructions.

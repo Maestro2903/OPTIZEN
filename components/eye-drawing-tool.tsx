@@ -32,10 +32,29 @@ export function EyeDrawingTool({ rightEye, leftEye, onChangeAction, defaultBothU
   const CANVAS_W = 425
   const CANVAS_H = 350
 
+  // Shared function to draw dot grid pattern
+  const drawDotGridPattern = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    ctx.fillStyle = "#ffffff"
+    ctx.fillRect(0, 0, width, height)
+
+    // Draw subtle dot grid pattern
+    ctx.fillStyle = "#e5e7eb" // gray-200
+    const spacing = 20
+    const dotSize = 1
+
+    for (let x = spacing; x < width; x += spacing) {
+      for (let y = spacing; y < height; y += spacing) {
+        ctx.beginPath()
+        ctx.arc(x, y, dotSize, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }
+  }
+
   React.useEffect(() => {
     if (initializedRef.current) return
     initializedRef.current = true
-    
+
     // Initialize canvases with the actual eye image
     const init = (side: Side) => {
       const canvas = side === "right" ? rightRef.current : leftRef.current
@@ -43,19 +62,37 @@ export function EyeDrawingTool({ rightEye, leftEye, onChangeAction, defaultBothU
       canvas.width = CANVAS_W
       canvas.height = CANVAS_H
       const ctx = canvas.getContext("2d")!
-      ctx.fillStyle = "#ffffff"
-      ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
+      
+      // Draw dot grid pattern as background
+      drawDotGridPattern(ctx, CANVAS_W, CANVAS_H)
       
       if ((side === "right" && rightEye) || (side === "left" && leftEye)) {
         const img = new Image()
+        img.crossOrigin = "anonymous"
         img.onload = () => {
+          // Redraw grid pattern first, then the image
+          drawDotGridPattern(ctx, CANVAS_W, CANVAS_H)
           ctx.drawImage(img, 0, 0, CANVAS_W, CANVAS_H)
+          // take snapshot as first history state
+          historyRef.current[side] = [ctx.getImageData(0, 0, CANVAS_W, CANVAS_H)]
+          redoRef.current[side] = []
+        }
+        img.onerror = (e) => {
+          console.error(`Failed to load ${side} eye image:`, side === "right" ? rightEye : leftEye, e)
+          // Set history and redo to sensible defaults when image fails to load
+          // Clear canvas to maintain UI consistency
+          ctx.clearRect(0, 0, CANVAS_W, CANVAS_H)
+          drawDotGridPattern(ctx, CANVAS_W, CANVAS_H)
+          // Take snapshot of the cleared canvas as the first history state
+          historyRef.current[side] = [ctx.getImageData(0, 0, CANVAS_W, CANVAS_H)]
+          redoRef.current[side] = []
         }
         img.src = side === "right" ? rightEye! : leftEye!
+      } else {
+        // take snapshot as first history state
+        historyRef.current[side] = [ctx.getImageData(0, 0, CANVAS_W, CANVAS_H)]
+        redoRef.current[side] = []
       }
-      // take snapshot as first history state
-      historyRef.current[side] = [ctx.getImageData(0, 0, CANVAS_W, CANVAS_H)]
-      redoRef.current[side] = []
     }
     init("right")
     init("left")
@@ -65,12 +102,13 @@ export function EyeDrawingTool({ rightEye, leftEye, onChangeAction, defaultBothU
       img.crossOrigin = "anonymous"
       img.onload = () => {
         const half = Math.floor(img.width / 2)
+
         const sliceDraw = (side: Side) => {
           const canvas = side === "right" ? rightRef.current : leftRef.current
           if (!canvas) return
           const ctx = canvas.getContext("2d")!
-          ctx.fillStyle = "#ffffff"
-          ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
+          // Draw dot grid pattern first
+          drawDotGridPattern(ctx, CANVAS_W, CANVAS_H)
           const sx = side === "right" ? 0 : half
           const sy = 0
           const sWidth = half
@@ -100,6 +138,11 @@ export function EyeDrawingTool({ rightEye, leftEye, onChangeAction, defaultBothU
   }
 
   const startDraw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>, side: Side) => {
+    // Prevent default for touch events to stop scrolling
+    if ('touches' in e) {
+      e.preventDefault();
+    }
+
     drawingRef.current = true
     redoRef.current[side] = [] // new stroke invalidates redo
     const pos = getPos(e, side)
@@ -110,6 +153,11 @@ export function EyeDrawingTool({ rightEye, leftEye, onChangeAction, defaultBothU
   }
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>, side: Side) => {
+    // Prevent default for touch events to stop scrolling
+    if ('touches' in e) {
+      e.preventDefault();
+    }
+
     if (!drawingRef.current) return
     const ctx = getCtx(side)
     const last = lastPosRef.current
@@ -140,8 +188,6 @@ export function EyeDrawingTool({ rightEye, leftEye, onChangeAction, defaultBothU
   const clearSide = (side: Side) => {
     const ctx = getCtx(side)
     if (!ctx) return
-    ctx.fillStyle = "#ffffff"
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
     
     // Reload the original eye image when clearing
     if (defaultBothUrl) {
@@ -149,6 +195,8 @@ export function EyeDrawingTool({ rightEye, leftEye, onChangeAction, defaultBothU
       img.onload = () => {
         const half = Math.floor(img.width / 2)
         const sx = side === "right" ? 0 : half
+        // Draw dot grid pattern first
+        drawDotGridPattern(ctx, CANVAS_W, CANVAS_H)
         ctx.drawImage(img, sx, 0, half, img.height, 0, 0, CANVAS_W, CANVAS_H)
         historyRef.current[side].push(ctx.getImageData(0, 0, CANVAS_W, CANVAS_H))
         redoRef.current[side] = []
@@ -157,6 +205,8 @@ export function EyeDrawingTool({ rightEye, leftEye, onChangeAction, defaultBothU
       }
       img.src = defaultBothUrl
     } else {
+      // Just draw dot grid pattern
+      drawDotGridPattern(ctx, CANVAS_W, CANVAS_H)
       historyRef.current[side].push(ctx.getImageData(0, 0, CANVAS_W, CANVAS_H))
       redoRef.current[side] = []
       const canvas = side === "right" ? rightRef.current : leftRef.current
@@ -234,43 +284,51 @@ export function EyeDrawingTool({ rightEye, leftEye, onChangeAction, defaultBothU
   }
 
   const CanvasBox = React.memo<{ side: Side; title: string; refEl: React.RefObject<HTMLCanvasElement> }>(function CanvasBox({ side, title, refEl }) {
+
     return (
-    <div className={cn(
-      "p-2 rounded border",
-      active === side ? "ring-1 ring-foreground/20 border-foreground/20" : "border-muted"
-    )}
-         onClick={() => setActive(side)}>
-      <div className="text-center text-sm mb-1 font-medium">{title}</div>
-      <canvas
-        key={`canvas-${side}`}
-        ref={refEl}
-        className="w-full h-auto bg-white rounded border select-none touch-none"
-        style={{ maxHeight: '350px', aspectRatio: '425/350', objectFit: 'contain' }}
-        onMouseDown={(e) => startDraw(e, side)}
-        onMouseMove={(e) => draw(e, side)}
-        onMouseUp={() => endDraw(side)}
-        onMouseLeave={() => endDraw(side)}
-        onTouchStart={(e) => startDraw(e, side)}
-        onTouchMove={(e) => draw(e, side)}
-        onTouchEnd={() => endDraw(side)}
-        onWheel={(e) => { e.preventDefault() }}
-      />
-    </div>
+      <div 
+        className={cn(
+          "border-2 border-gray-200 border-t-0 rounded-b-lg overflow-hidden",
+          active === side ? "ring-2 ring-gray-400" : ""
+        )}
+        onClick={() => setActive(side)}
+      >
+        <div className="bg-gray-100 text-xs font-bold text-gray-600 uppercase py-1 text-center rounded-t-lg border-t-2 border-gray-200">
+          {title}
+        </div>
+        <div className="bg-white p-2">
+          <canvas
+            key={`canvas-${side}`}
+            ref={refEl}
+            className="w-full h-auto rounded select-none touch-none"
+            style={{ maxHeight: '350px', aspectRatio: '425/350', objectFit: 'contain' }}
+            onMouseDown={(e) => startDraw(e, side)}
+            onMouseMove={(e) => draw(e, side)}
+            onMouseUp={() => endDraw(side)}
+            onMouseLeave={() => endDraw(side)}
+            onTouchStart={(e) => startDraw(e, side)}
+            onTouchMove={(e) => draw(e, side)}
+            onTouchEnd={() => endDraw(side)}
+            onWheel={(e) => { e.preventDefault() }}
+          />
+        </div>
+      </div>
     )
   })
 
   // Sync when external images change (e.g., file upload)
   React.useEffect(() => {
+
     const apply = (side: Side, dataUrl?: string) => {
       if (!dataUrl) return
       const canvas = side === "right" ? rightRef.current : leftRef.current
       if (!canvas) return
       const ctx = canvas.getContext("2d")!
-      // clear and redraw
-      ctx.fillStyle = "#ffffff"
-      ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
       const img = new Image()
+      img.crossOrigin = "anonymous"
       img.onload = () => {
+        // Redraw grid pattern first, then the image
+        drawDotGridPattern(ctx, CANVAS_W, CANVAS_H)
         ctx.drawImage(img, 0, 0, CANVAS_W, CANVAS_H)
         // reset history baseline after external load
         historyRef.current[side] = [ctx.getImageData(0, 0, CANVAS_W, CANVAS_H)]
@@ -284,46 +342,72 @@ export function EyeDrawingTool({ rightEye, leftEye, onChangeAction, defaultBothU
   }, [rightEye, leftEye])
 
   return (
-    <div className="rounded-xl border bg-card">
-      <div className="p-3 border-b flex flex-wrap items-center gap-3 text-sm justify-between">
-        <div className="flex items-center gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={() => undo(active)}>⟲ Undo</Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => redo(active)}>⟲⟲ Redo</Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => clearSide(active)}>🧹 Clear</Button>
-          <div className="ml-2 flex items-center gap-2">
-            <span className="text-muted-foreground w-10 text-right">{size}px</span>
-            <input
-              type="range"
-              min={1}
-              max={12}
-              step={1}
-              value={size}
-              onChange={(e) => setSize(Number(e.target.value) || 1)}
-              className="w-[140px]"
-            />
-          </div>
+    <div className="space-y-4">
+      {/* Floating Toolbar Dock */}
+      <div className="bg-white shadow-lg border border-gray-200 rounded-full px-6 py-2 flex items-center gap-4 mx-auto w-max mb-4">
+        <Button 
+          type="button" 
+          variant="outline" 
+          size="sm" 
+          onClick={() => undo(active)}
+          className={cn("h-8")}
+        >
+          ⟲ Undo
+        </Button>
+        <Button 
+          type="button" 
+          variant="outline" 
+          size="sm" 
+          onClick={() => redo(active)}
+          className={cn("h-8")}
+        >
+          ⟲⟲ Redo
+        </Button>
+        <Button 
+          type="button" 
+          variant="outline" 
+          size="sm" 
+          onClick={() => clearSide(active)}
+          className={cn("h-8")}
+        >
+          🧹 Clear
+        </Button>
+        <div className="flex items-center gap-2 px-2">
+          <span className="text-xs text-gray-600 w-8 text-right">{size}px</span>
+          <input
+            type="range"
+            min={1}
+            max={12}
+            step={1}
+            value={size}
+            onChange={(e) => setSize(Number(e.target.value) || 1)}
+            className="w-24"
+            aria-label={`Brush size ${size}px`}
+          />
+        </div>
+        <div className={cn(
+          "relative",
+          "ring-2 ring-gray-400 rounded-full"
+        )}>
           <input
             type="color"
             aria-label="Brush color"
             value={color}
             onChange={(e) => setColor(e.target.value)}
-            className="h-8 w-8 rounded border p-0"
+            className="h-8 w-8 rounded-full border-2 border-gray-300 cursor-pointer"
+            style={{ 
+              WebkitAppearance: 'none',
+              MozAppearance: 'none',
+              appearance: 'none',
+            }}
           />
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-muted-foreground">Active: {active === 'right' ? 'Right Eye' : 'Left Eye'}</span>
-          <Button type="button" variant="outline" size="sm" onClick={() => download(active)}>⬇︎ {active === 'right' ? 'Right' : 'Left'}</Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => download("both")}>⬇︎ Both</Button>
-        </div>
       </div>
-      <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-        <CanvasBox side="right" title="Right Eye" refEl={rightRef} />
-        <CanvasBox side="left" title="Left Eye" refEl={leftRef} />
-      </div>
-      <div className="px-4 pb-4">
-        <div className="text-xs text-muted-foreground rounded-md bg-muted/50 p-2">
-          Tip: Click an eye canvas to make it active. Use the toolbar to draw, undo/redo, clear, or download. Adjust brush color and size.
-        </div>
+
+      {/* Comparison Frame */}
+      <div className="grid grid-cols-2 gap-4">
+        <CanvasBox side="right" title="RIGHT EYE (OD)" refEl={rightRef} />
+        <CanvasBox side="left" title="LEFT EYE (OS)" refEl={leftRef} />
       </div>
     </div>
   )

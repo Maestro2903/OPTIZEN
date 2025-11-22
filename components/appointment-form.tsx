@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { CalendarPlus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -8,6 +9,7 @@ import {
   DialogDescription,
   DialogFooter,
   DialogHeader,
+  DialogOverlay,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
@@ -35,6 +37,10 @@ import * as z from "zod"
 import { patientsApi, employeesApi, masterDataApi } from "@/lib/services/api"
 import { useToast } from "@/hooks/use-toast"
 
+// Shared class names for consistent styling
+const inputClassName = "h-11 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:border-gray-600 focus:ring-2 focus:ring-gray-200 focus:outline-none focus:ring-offset-0 focus-visible:border-gray-600 focus-visible:ring-2 focus-visible:ring-gray-200 focus-visible:outline-none focus-visible:ring-offset-0"
+const textareaClassName = "h-auto bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:border-gray-600 focus:ring-2 focus:ring-gray-200 focus:outline-none focus:ring-offset-0 focus-visible:border-gray-600 focus-visible:ring-2 focus-visible:ring-gray-200 focus-visible:outline-none focus-visible:ring-offset-0"
+
 const appointmentSchema = z.object({
   patient_id: z.string().min(1, "Patient is required"),
   provider_id: z.string().min(1, "Doctor is required"),
@@ -44,7 +50,40 @@ const appointmentSchema = z.object({
   type: z.enum(["consult", "follow-up", "surgery", "refraction", "other"]),
   room: z.string().optional(),
   notes: z.string().optional(),
-})
+}).refine(
+  (data) => {
+    // Validate start_time format and range
+    const startMatch = data.start_time.match(/^(\d{1,2}):(\d{2})$/);
+    if (!startMatch) return false;
+    const [, startHoursStr, startMinutesStr] = startMatch;
+    const startHours = Number(startHoursStr);
+    const startMinutes = Number(startMinutesStr);
+
+    // Validate hour and minute ranges for start time
+    if (startHours < 0 || startHours > 23 || startMinutes < 0 || startMinutes > 59) return false;
+
+    // Validate end_time format and range
+    const endMatch = data.end_time.match(/^(\d{1,2}):(\d{2})$/);
+    if (!endMatch) return false;
+    const [, endHoursStr, endMinutesStr] = endMatch;
+    const endHours = Number(endHoursStr);
+    const endMinutes = Number(endMinutesStr);
+
+    // Validate hour and minute ranges for end time
+    if (endHours < 0 || endHours > 23 || endMinutes < 0 || endMinutes > 59) return false;
+
+    // Convert to total minutes since midnight for comparison
+    const startTotalMinutes = startHours * 60 + startMinutes;
+    const endTotalMinutes = endHours * 60 + endMinutes;
+
+    // Check if end time is after start time
+    return endTotalMinutes > startTotalMinutes;
+  },
+  {
+    message: "End time must be after start time",
+    path: ["end_time"], // Attach error to the end_time field
+  }
+);
 
 interface AppointmentFormProps {
   children?: React.ReactNode
@@ -91,6 +130,54 @@ export function AppointmentForm({
       notes: appointmentData?.notes || "",
     },
   })
+
+  // Helper function to format date for date input (YYYY-MM-DD)
+  const formatDateForInput = (dateString: string | undefined | null): string => {
+    if (!dateString) return ""
+    try {
+      // If it's already in YYYY-MM-DD format, return as is
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+        return dateString
+      }
+      // Otherwise, parse and format
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) return ""
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    } catch {
+      return ""
+    }
+  }
+
+  // Reset form when dialog opens in edit mode or when appointmentData changes
+  React.useEffect(() => {
+    if (isOpen && appointmentData) {
+      form.reset({
+        patient_id: appointmentData.patient_id || "",
+        provider_id: appointmentData.provider_id || "",
+        appointment_date: formatDateForInput(appointmentData.appointment_date),
+        start_time: appointmentData.start_time || "",
+        end_time: appointmentData.end_time || "",
+        type: appointmentData.type || "consult",
+        room: appointmentData.room || "",
+        notes: appointmentData.notes || "",
+      })
+    } else if (isOpen && mode === "create") {
+      // Reset to defaults for create mode
+      form.reset({
+        patient_id: "",
+        provider_id: "",
+        appointment_date: "",
+        start_time: "",
+        end_time: "",
+        type: "consult",
+        room: "",
+        notes: "",
+      })
+    }
+  }, [isOpen, appointmentData, mode, form])
 
   // Load patients from backend
   React.useEffect(() => {
@@ -243,22 +330,30 @@ export function AppointmentForm({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       {children && <DialogTrigger asChild>{children}</DialogTrigger>}
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{mode === "edit" ? "Edit Appointment" : "Book New Appointment"}</DialogTitle>
-          <DialogDescription>
-            {mode === "edit" ? "Update appointment details" : "Schedule a new appointment for a patient"}
+      <DialogOverlay className="bg-gray-900/50 backdrop-blur-sm" />
+      <DialogContent
+        className="max-w-2xl rounded-2xl bg-white shadow-2xl"
+      >
+        <DialogHeader className="pb-4 border-b border-gray-100">
+          <DialogTitle className="text-xl font-bold text-gray-900">
+            {mode === "edit" ? "Edit Appointment" : "Book Appointment"}
+          </DialogTitle>
+          <DialogDescription className="text-sm text-gray-500">
+            {mode === "edit" ? "Update appointment details" : "Schedule a new consultation or procedure."}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Row 1: People */}
               <FormField
                 control={form.control}
                 name="patient_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Patient *</FormLabel>
+                    <FormLabel className="block text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1.5">
+                      Patient *
+                    </FormLabel>
                     <FormControl>
                       <SearchableSelect
                         options={patients}
@@ -267,6 +362,7 @@ export function AppointmentForm({
                         placeholder="Select patient"
                         searchPlaceholder="Search patients..."
                         loading={loadingPatients}
+                        className={inputClassName}
                       />
                     </FormControl>
                     <FormMessage />
@@ -278,7 +374,9 @@ export function AppointmentForm({
                 name="provider_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Doctor *</FormLabel>
+                    <FormLabel className="block text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1.5">
+                      Doctor *
+                    </FormLabel>
                     <FormControl>
                       <SearchableSelect
                         options={doctors}
@@ -287,67 +385,90 @@ export function AppointmentForm({
                         placeholder="Select doctor"
                         searchPlaceholder="Search doctors..."
                         loading={loadingDoctors}
+                        className={inputClassName}
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </div>
 
-            <FormField
-              control={form.control}
-              name="appointment_date"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Appointment Date *</FormLabel>
-                  <FormControl>
-                    <Input type="date" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-2 gap-4">
+              {/* Row 2: Timing */}
               <FormField
                 control={form.control}
-                name="start_time"
+                name="appointment_date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Start Time *</FormLabel>
+                    <FormLabel className="block text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1.5">
+                      Appointment Date *
+                    </FormLabel>
                     <FormControl>
-                      <Input type="time" {...field} />
+                      <Input
+                        type="date"
+                        {...field}
+                        className={inputClassName}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="end_time"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>End Time *</FormLabel>
-                    <FormControl>
-                      <Input type="time" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+              <fieldset className="space-y-2">
+                <legend className="block text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1.5">
+                  Time Slot *
+                </legend>
+                <div className="flex gap-2">
+                  <FormField
+                    control={form.control}
+                    name="start_time"
+                    render={({ field }) => (
+                      <FormItem className="flex-1">
+                        <FormLabel className="sr-only">Start Time *</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="time"
+                            {...field}
+                            aria-label="Start time"
+                            className={inputClassName}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="end_time"
+                    render={({ field }) => (
+                      <FormItem className="flex-1">
+                        <FormLabel className="sr-only">End Time *</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="time"
+                            {...field}
+                            aria-label="End time"
+                            className={inputClassName}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </fieldset>
 
-            <div className="grid grid-cols-2 gap-4">
+              {/* Row 3: Details */}
               <FormField
                 control={form.control}
                 name="type"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Appointment Type *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormLabel className="block text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1.5">
+                      Appointment Type *
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className={inputClassName}>
                           <SelectValue placeholder="Select type" />
                         </SelectTrigger>
                       </FormControl>
@@ -368,7 +489,9 @@ export function AppointmentForm({
                 name="room"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Room</FormLabel>
+                    <FormLabel className="block text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1.5">
+                      Room
+                    </FormLabel>
                     <FormControl>
                       <SearchableSelect
                         options={rooms}
@@ -377,6 +500,29 @@ export function AppointmentForm({
                         placeholder="Select room"
                         searchPlaceholder="Search rooms..."
                         loading={loadingRooms}
+                        className={inputClassName}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Row 4: Notes (Full Width) */}
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <FormLabel className="block text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1.5">
+                      Notes
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Additional information..."
+                        rows={3}
+                        {...field}
+                        className={textareaClassName}
                       />
                     </FormControl>
                     <FormMessage />
@@ -385,25 +531,21 @@ export function AppointmentForm({
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notes</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Additional information..." rows={3} {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
+            <DialogFooter className="flex justify-end gap-3 pt-6 mt-6 border-t border-gray-100">
+              <Button 
+                type="button" 
+                onClick={() => setIsOpen(false)}
+                className="px-4 py-2.5 rounded-lg border border-gray-300 text-gray-700 font-medium bg-white hover:bg-gray-50"
+              >
                 Cancel
               </Button>
-              <Button type="submit">{mode === "edit" ? "Update Appointment" : "Book Appointment"}</Button>
+              <Button 
+                type="submit"
+                className="px-6 py-2.5 rounded-lg shadow-md font-medium transition-colors bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                <CalendarPlus className="h-4 w-4 mr-2" />
+                {mode === "edit" ? "Update Appointment" : "Book Appointment"}
+              </Button>
             </DialogFooter>
           </form>
         </Form>

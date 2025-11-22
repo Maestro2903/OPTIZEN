@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { handleDatabaseError, handleNotFoundError, handleServerError } from '@/lib/utils/api-errors'
 
 // GET /api/invoices/[id] - Get a specific invoice by ID
 export async function GET(
@@ -59,11 +60,10 @@ export async function GET(
       .single()
 
     if (error) {
-      if (error.code === 'PGRST116') { // Not found
-        return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
+      if (error.code === 'PGRST116') {
+        return handleNotFoundError('Invoice', id)
       }
-      console.error('Database error:', error)
-      return NextResponse.json({ error: 'Failed to fetch invoice' }, { status: 500 })
+      return handleDatabaseError(error, 'fetch', 'invoice')
     }
 
     return NextResponse.json({
@@ -72,8 +72,7 @@ export async function GET(
     })
 
   } catch (error) {
-    console.error('API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleServerError(error, 'fetch', 'invoice')
   }
 }
 
@@ -173,11 +172,10 @@ export async function PUT(
         .single()
 
       if (fetchError) {
-        console.error('Database error:', fetchError)
-        if (fetchError.code === 'PGRST116') { // Not found
-          return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
+        if (fetchError.code === 'PGRST116') {
+          return handleNotFoundError('Invoice', id)
         }
-        return NextResponse.json({ error: 'Failed to fetch current invoice' }, { status: 500 })
+        return handleDatabaseError(fetchError, 'fetch', 'current invoice')
       }
 
       // Use nullish coalescing to preserve zero values
@@ -218,11 +216,10 @@ export async function PUT(
       .single()
 
     if (error) {
-      if (error.code === 'PGRST116') { // Not found
-        return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
+      if (error.code === 'PGRST116') {
+        return handleNotFoundError('Invoice', id)
       }
-      console.error('Database error:', error)
-      return NextResponse.json({ error: 'Failed to update invoice' }, { status: 500 })
+      return handleDatabaseError(error, 'update', 'invoice')
     }
 
     return NextResponse.json({
@@ -232,8 +229,7 @@ export async function PUT(
     })
 
   } catch (error) {
-    console.error('API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleServerError(error, 'update', 'invoice')
   }
 }
 
@@ -297,11 +293,10 @@ export async function DELETE(
       .single()
 
     if (error) {
-      if (error.code === 'PGRST116') { // Not found
-        return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
+      if (error.code === 'PGRST116') {
+        return handleNotFoundError('Invoice', id)
       }
-      console.error('Database error:', error)
-      return NextResponse.json({ error: 'Failed to cancel invoice' }, { status: 500 })
+      return handleDatabaseError(error, 'cancel', 'invoice')
     }
 
     return NextResponse.json({
@@ -311,7 +306,6 @@ export async function DELETE(
     })
 
   } catch (error) {
-    console.error('API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleServerError(error, 'cancel', 'invoice')
   }
 }

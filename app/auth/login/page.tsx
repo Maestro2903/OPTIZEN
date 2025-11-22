@@ -18,9 +18,16 @@ export default function LoginPage() {
   const [password, setPassword] = React.useState("")
   const [showPassword, setShowPassword] = React.useState(false)
   const [isLoading, setIsLoading] = React.useState(false)
+  const isSubmittingRef = React.useRef(false)
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = React.useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
+    e.stopPropagation()
+    
+    // Prevent multiple submissions
+    if (isSubmittingRef.current) {
+      return
+    }
     
     // Validate inputs
     if (!email || !password) {
@@ -32,6 +39,7 @@ export default function LoginPage() {
       return
     }
 
+    isSubmittingRef.current = true
     setIsLoading(true)
 
     try {
@@ -52,6 +60,8 @@ export default function LoginPage() {
           description: error.message || "Invalid email or password. Please check your credentials and try again.",
           variant: "destructive",
         })
+        isSubmittingRef.current = false
+        setIsLoading(false)
         return
       }
 
@@ -60,14 +70,19 @@ export default function LoginPage() {
           title: "Login Successful",
           description: "Welcome back!",
         })
-        router.push("/dashboard/cases")
+        // Small delay to ensure session is fully established
+        await new Promise(resolve => setTimeout(resolve, 100))
+        router.push("/cases")
         router.refresh()
+        // Don't reset loading state here as we're navigating away
       } else {
         toast({
           title: "Login Failed",
           description: "No session was created. Please try again.",
           variant: "destructive",
         })
+        isSubmittingRef.current = false
+        setIsLoading(false)
       }
     } catch (error: any) {
       console.error('Unexpected login error:', error)
@@ -76,10 +91,10 @@ export default function LoginPage() {
         description: error.message || "An unexpected error occurred. Please try again.",
         variant: "destructive",
       })
-    } finally {
+      isSubmittingRef.current = false
       setIsLoading(false)
     }
-  }
+  }, [email, password, router, toast])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-50 p-4">
@@ -126,17 +141,7 @@ export default function LoginPage() {
 
               {/* Password Field */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  <Button
-                    type="button"
-                    variant="link"
-                    className="px-0 text-xs"
-                    onClick={() => router.push("/auth/forgot-password")}
-                  >
-                    Forgot password?
-                  </Button>
-                </div>
+                <Label htmlFor="password">Password</Label>
                 <div className="relative">
                   <Input
                     id="password"

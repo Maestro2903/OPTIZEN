@@ -1,8 +1,9 @@
 "use client"
 
-import * as React from "react"
-import { PrintLayout, PrintSection, PrintRow, PrintCol, PrintField, PrintSignature } from "./print-layout"
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
+import React from "react"
+import { createPortal } from "react-dom"
+import { PrintHeader, PrintSection, PrintGrid, PrintFooter } from "./print-layout"
+import { PrintModalShell } from "./print-modal-shell"
 
 interface AppointmentPrintProps {
   appointment: {
@@ -28,147 +29,210 @@ interface AppointmentPrintProps {
 }
 
 export function AppointmentPrint({ appointment, children }: AppointmentPrintProps) {
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    })
+  const [isOpen, setIsOpen] = React.useState(false)
+  // Helper function to validate if a date string is valid
+  const isValidDate = (dateString: string): boolean => {
+    if (!dateString) return false
+    const date = new Date(dateString)
+    return !isNaN(date.getTime()) && dateString.trim() !== ''
+  }
+
+  // Format date with validation and fallback
+  const formatDate = (dateString: string): string => {
+    if (!isValidDate(dateString)) {
+      // Fallback to current date if invalid
+      const now = new Date()
+      return now.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      })
+    }
+    
+    try {
+      const date = new Date(dateString)
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      })
+    } catch {
+      // Fallback to current date on error
+      const now = new Date()
+      return now.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      })
+    }
   }
 
   const formatTime = (timeString: string) => {
-    return new Date(`1970-01-01T${timeString}`).toLocaleTimeString('en-GB', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    })
+    if (!timeString) return '-'
+    try {
+      return new Date(`1970-01-01T${timeString}`).toLocaleTimeString('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      })
+    } catch {
+      return timeString
+    }
+  }
+
+  // Helper function to check if a string is a UUID
+  const isUUID = (str: string | undefined | null): boolean => {
+    if (!str) return false
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    return uuidRegex.test(str)
+  }
+
+  // Helper function to format appointment ID - hide UUID if formatted number exists
+  const formatAppointmentId = (appointmentNo?: string, id?: string): string => {
+    if (appointmentNo && !isUUID(appointmentNo)) {
+      return appointmentNo
+    }
+    if (id && !isUUID(id)) {
+      return id
+    }
+    // If both are UUIDs, show the appointment_no if it exists, otherwise show formatted version
+    if (appointmentNo) {
+      return appointmentNo.substring(0, 8).toUpperCase() // Show first 8 chars of UUID
+    }
+    if (id) {
+      return `APT-${id.substring(0, 8).toUpperCase()}` // Format as APT-XXXXXXXX
+    }
+    return '-'
+  }
+
+  // Helper function to format patient ID - hide UUID if formatted ID exists
+  const formatPatientId = (patientId?: string): string => {
+    if (!patientId) return '-'
+    if (!isUUID(patientId)) {
+      return patientId // Already formatted ID like PAT-20251110-UCR50T
+    }
+    // If it's a UUID, show formatted version
+    return `PAT-${patientId.substring(0, 8).toUpperCase()}`
   }
 
   const getStatusDisplay = (status: string) => {
-    const statusMap: { [key: string]: string } = {
-      'scheduled': 'SCHEDULED',
-      'checked-in': 'CHECKED IN',
-      'in-progress': 'IN PROGRESS',
-      'completed': 'COMPLETED',
-      'cancelled': 'CANCELLED',
-      'no-show': 'NO SHOW'
+    // Map status to stamp text - only return 'CONFIRMED' or 'SCHEDULED'
+    const normalizedStatus = status.toLowerCase().trim()
+    
+    // Return 'SCHEDULED' for scheduled appointments
+    if (normalizedStatus === 'scheduled') {
+      return 'SCHEDULED'
     }
-    return statusMap[status] || status.toUpperCase()
+    
+    // Return 'CONFIRMED' for active/in-progress/completed appointments
+    if (normalizedStatus === 'checked-in' ||
+        normalizedStatus === 'in-progress' ||
+        normalizedStatus === 'completed' ||
+        normalizedStatus === 'confirmed') {
+      return 'CONFIRMED'
+    }
+    
+    // Default to 'SCHEDULED' for all other statuses
+    return 'SCHEDULED'
   }
 
-  return (
-    <Dialog>
-      <DialogTrigger asChild>
+  if (!isOpen) {
+    return (
+      <div onClick={() => setIsOpen(true)}>
         {children}
-      </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <PrintLayout
-          documentType="Appointment"
-          documentTitle="Appointment Confirmation Slip"
-        >
-          {/* Appointment Slip Container */}
-          <div className="print-appointment-slip">
-            {/* Large Appointment Number */}
-            <div className="print-appointment-number">
-              APPOINTMENT #{appointment.appointment_no || appointment.id}
-            </div>
+      </div>
+    )
+  }
 
-            {/* Prominent Date/Time Display */}
-            <div className="print-appointment-datetime">
-              <div style={{ fontSize: '14pt', marginBottom: '4pt' }}>{formatDate(appointment.date)}</div>
-              <div style={{ fontSize: '18pt', fontWeight: 'bold' }}>{formatTime(appointment.time)}</div>
-            </div>
+  const modalContent = (
+    <PrintModalShell
+      isOpen={isOpen}
+      onClose={() => setIsOpen(false)}
+      title={`Appointment_Slip_${formatAppointmentId(appointment.appointment_no, appointment.id)}`}
+    >
+      {/* Header */}
+      <PrintHeader />
+      
+      {/* Document Title */}
+      <div className="text-xl font-bold uppercase tracking-widest border-b-2 border-gray-900 pb-2 mb-8 text-center">
+        APPOINTMENT CONFIRMATION
+      </div>
 
-            {/* Patient Information - Compact */}
-            <div style={{ marginBottom: '10pt', fontSize: '10pt' }}>
-              <div style={{ marginBottom: '6pt' }}>
-                <div className="print-label" style={{ fontSize: '8pt' }}>Patient Name</div>
-                <div style={{ fontSize: '12pt', fontWeight: 'bold', textTransform: 'uppercase' }}>
-                  {appointment.patient_name}
-                </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8pt', marginTop: '6pt' }}>
-                <div>
-                  <div className="print-label" style={{ fontSize: '8pt' }}>Patient ID</div>
-                  <div style={{ fontSize: '10pt' }}>{appointment.patient_id || '-'}</div>
-                </div>
-                <div>
-                  <div className="print-label" style={{ fontSize: '8pt' }}>Contact</div>
-                  <div style={{ fontSize: '10pt' }}>{appointment.contact_number || appointment.email || '-'}</div>
-                </div>
-              </div>
-            </div>
+      {/* Appointment Slip Container */}
+      <div className="print-appointment-slip relative pt-8">
+        {/* Date in Top-Right Corner */}
+        <div className="absolute top-0 right-0 font-mono text-sm text-gray-600">
+          Date: {formatDate(appointment.date)}
+        </div>
 
-            {/* Doctor & Department - Compact */}
-            <div style={{ marginBottom: '10pt', fontSize: '10pt', borderTop: '1px solid #ddd', paddingTop: '8pt' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8pt' }}>
-                <div>
-                  <div className="print-label" style={{ fontSize: '8pt' }}>Doctor</div>
-                  <div style={{ fontSize: '11pt', fontWeight: 'bold' }}>
-                    {appointment.doctor || 'Dr. [To be assigned]'}
-                  </div>
-                </div>
-                <div>
-                  <div className="print-label" style={{ fontSize: '8pt' }}>Department</div>
-                  <div style={{ fontSize: '11pt' }}>{appointment.department || 'Ophthalmology'}</div>
-                </div>
-                <div>
-                  <div className="print-label" style={{ fontSize: '8pt' }}>Type</div>
-                  <div style={{ fontSize: '10pt', textTransform: 'uppercase' }}>{appointment.type}</div>
-                </div>
-                <div>
-                  <div className="print-label" style={{ fontSize: '8pt' }}>Duration</div>
-                  <div style={{ fontSize: '10pt' }}>{appointment.duration || '30 minutes'}</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Room Number */}
-            {appointment.room_number && (
-              <div style={{ marginBottom: '10pt', fontSize: '10pt' }}>
-                <div className="print-label" style={{ fontSize: '8pt' }}>Room Number</div>
-                <div style={{ fontSize: '12pt', fontWeight: 'bold' }}>{appointment.room_number}</div>
-              </div>
-            )}
-
-            {/* Purpose of Visit - Condensed */}
-            {appointment.reason && (
-              <div style={{ marginBottom: '10pt', fontSize: '9pt', borderTop: '1px solid #ddd', paddingTop: '8pt' }}>
-                <div className="print-label" style={{ fontSize: '8pt' }}>Purpose of Visit</div>
-                <div style={{ fontSize: '10pt', lineHeight: '1.4' }}>{appointment.reason}</div>
-              </div>
-            )}
-
-            {/* Special Notes - Condensed */}
-            {appointment.notes && (
-              <div style={{ marginBottom: '10pt', fontSize: '9pt', borderTop: '1px solid #ddd', paddingTop: '8pt' }}>
-                <div className="print-label" style={{ fontSize: '8pt' }}>Special Instructions</div>
-                <div style={{ fontSize: '10pt', lineHeight: '1.4' }}>{appointment.notes}</div>
-              </div>
-            )}
-
-            {/* Status */}
-            <div style={{ marginBottom: '10pt', textAlign: 'center' }}>
-              <div className="print-label" style={{ fontSize: '8pt', marginBottom: '4pt' }}>Status</div>
-              <div style={{ 
-                fontSize: '11pt', 
-                fontWeight: 'bold', 
-                textTransform: 'uppercase',
-                display: 'inline-block',
-                padding: '4pt 12pt',
-                border: '2px solid #000'
-              }}>
-                {getStatusDisplay(appointment.status)}
-              </div>
-            </div>
-
-            {/* Tear Line */}
-            <div className="print-tear-line">
-              Please bring this slip for your appointment
+        {/* Grid Layout with Status Stamp */}
+        <div className="relative">
+          {/* Use PrintGrid for standard label-value pairs */}
+          <PrintGrid
+            items={[
+              { label: 'Patient Name', value: appointment.patient_name || '-' },
+              { label: 'Appointment ID', value: formatAppointmentId(appointment.appointment_no, appointment.id) },
+              { label: 'Patient ID', value: formatPatientId(appointment.patient_id) },
+              { label: 'Contact No.', value: appointment.contact_number || appointment.email || '-' },
+              { label: 'Doctor', value: appointment.doctor || 'Dr. [To be assigned]' },
+              { label: 'Department', value: appointment.department || 'Ophthalmology' },
+              { label: 'Appointment Type', value: appointment.type || '-' },
+              { label: 'Duration', value: appointment.duration || '30 minutes' }
+            ]}
+            className="mt-4"
+          />
+          
+          {/* Rubber Stamp Status - Floating over the grid */}
+          <div className="absolute bottom-0 right-0 -mb-6 print:relative print:inline-block print:float-right print:mb-4 print:mt-4">
+            <div className="border-4 border-emerald-600 text-emerald-600 text-xl font-black uppercase px-4 py-2 -rotate-6 opacity-80 rounded-md tracking-widest print:opacity-100">
+              {getStatusDisplay(appointment.status)}
             </div>
           </div>
-        </PrintLayout>
-      </DialogContent>
-    </Dialog>
+        </div>
+
+        {/* Additional Information Section */}
+        <div className="mt-8 space-y-6">
+          {/* Room Number */}
+          {appointment.room_number && (
+            <PrintSection title="Room Number">
+              {appointment.room_number}
+            </PrintSection>
+          )}
+
+          {/* Purpose of Visit */}
+          {appointment.reason && (
+            <PrintSection title="Purpose of Visit">
+              {appointment.reason}
+            </PrintSection>
+          )}
+
+          {/* Special Notes */}
+          {appointment.notes && (
+            <PrintSection title="Special Instructions">
+              {appointment.notes}
+            </PrintSection>
+          )}
+        </div>
+
+        {/* Instructions Box */}
+        <div className="bg-gray-50 p-4 rounded border border-gray-200 mb-4 mt-8">
+          <div className="text-sm font-bold text-gray-900 mb-3">Important Instructions:</div>
+          <ol className="list-decimal list-inside space-y-1 text-sm text-gray-700">
+            <li>Please arrive 15 mins early.</li>
+            <li>Bring this slip.</li>
+            <li>Carry previous reports.</li>
+          </ol>
+        </div>
+
+        {/* Standardized Footer */}
+        <PrintFooter showTimestamp={true} />
+      </div>
+    </PrintModalShell>
+  )
+
+  return (
+    <>
+      {typeof window !== 'undefined' && createPortal(modalContent, document.body)}
+    </>
   )
 }

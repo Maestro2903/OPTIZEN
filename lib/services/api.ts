@@ -423,6 +423,29 @@ export interface InvoiceFilters extends PaginationParams {
   date_to?: string
 }
 
+export interface InvoiceMetrics {
+  total_invoices: number
+  total_revenue: number
+  paid_amount: number
+  pending_amount: number
+  payment_status: {
+    paid: number
+    unpaid: number
+    partial: number
+  }
+  invoice_status: {
+    draft: number
+    sent: number
+    overdue: number
+  }
+  collection_rate: string
+  average_invoice_value: string
+  date_range: {
+    from: string | null
+    to: string | null
+  }
+}
+
 export const invoicesApi = {
   list: (params: InvoiceFilters = {}) =>
     apiService.getList<Invoice>('invoices', params),
@@ -438,6 +461,15 @@ export const invoicesApi = {
 
   delete: (id: string) =>
     apiService.delete<Invoice>('invoices', id),
+
+  metrics: (params: { date_from?: string; date_to?: string } = {}): Promise<ApiResponse<InvoiceMetrics>> => {
+    const queryParams = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value) queryParams.append(key, String(value))
+    })
+    const query = queryParams.toString() ? `?${queryParams.toString()}` : ''
+    return apiService.fetchApi<InvoiceMetrics>(`/invoices/metrics${query}`)
+  },
 }
 
 // ===============================
@@ -471,11 +503,6 @@ export interface Employee {
   updated_at: string
   created_by?: string
   updated_by?: string
-}
-
-// Helper function to get employee status for display
-export const getEmployeeStatus = (employee: Employee): 'active' | 'inactive' => {
-  return employee.is_active ? 'active' : 'inactive'
 }
 
 export interface EmployeeFilters extends PaginationParams {
@@ -588,6 +615,16 @@ export interface PharmacyFilters extends PaginationParams {
   low_stock?: boolean
 }
 
+export interface PharmacyMetrics {
+  total_items: number
+  low_stock_count: number
+  out_of_stock_count: number
+  total_inventory_value: number
+  average_unit_price: number
+  low_stock_by_computed: number
+  items_above_reorder: number
+}
+
 export const pharmacyApi = {
   list: (params: PharmacyFilters = {}) =>
     apiService.getList<PharmacyItem>('pharmacy', params),
@@ -603,6 +640,10 @@ export const pharmacyApi = {
 
   delete: (id: string) =>
     apiService.delete<PharmacyItem>('pharmacy', id),
+
+  metrics: (): Promise<ApiResponse<PharmacyMetrics>> => {
+    return apiService.fetchApi<PharmacyMetrics>('/pharmacy/metrics')
+  },
 }
 
 // ===============================
@@ -1064,6 +1105,22 @@ export interface ExpenseFilters extends PaginationParams {
   date_to?: string
 }
 
+export interface ExpenseMetrics {
+  total_expenses: number
+  this_month_expenses: number
+  last_month_expenses: number
+  expenses_change: number
+  total_expense_entries: number
+  average_expense_per_entry: number
+  expenses_by_category: Record<string, number>
+  expenses_by_payment_method: Record<string, number>
+  this_month_expenses_by_category: Record<string, number>
+  date_range: {
+    from: string | null
+    to: string | null
+  }
+}
+
 export const expensesApi = {
   list: (params: ExpenseFilters = {}) =>
     apiService.getList<Expense>('expenses', params),
@@ -1079,6 +1136,15 @@ export const expensesApi = {
 
   delete: (id: string) =>
     apiService.delete<Expense>('expenses', id),
+
+  metrics: (params: { date_from?: string; date_to?: string } = {}): Promise<ApiResponse<ExpenseMetrics>> => {
+    const queryParams = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value) queryParams.append(key, String(value))
+    })
+    const query = queryParams.toString() ? `?${queryParams.toString()}` : ''
+    return apiService.fetchApi<ExpenseMetrics>(`/expenses/metrics${query}`)
+  },
 }
 
 // ===============================
@@ -1163,6 +1229,26 @@ export interface FinanceRevenue {
   updated_at: string
 }
 
+export interface FinanceRevenueMetrics {
+  total_revenue: number
+  this_month_revenue: number
+  last_month_revenue: number
+  revenue_change: number
+  received_revenue: number
+  pending_revenue: number
+  total_entries: number
+  payment_status: {
+    received: number
+    pending: number
+    partial: number
+  }
+  average_revenue_per_entry: number
+  date_range: {
+    from: string | null
+    to: string | null
+  }
+}
+
 export const financeRevenueApi = {
   list: (params: PaginationParams & Record<string, any> = {}): Promise<ApiResponse<FinanceRevenue[]>> => {
     const queryParams = new URLSearchParams()
@@ -1194,6 +1280,15 @@ export const financeRevenueApi = {
     apiService.fetchApi<FinanceRevenue>(`/finance-revenue/${id}`, {
       method: 'DELETE',
     }),
+
+  metrics: (params: { date_from?: string; date_to?: string } = {}): Promise<ApiResponse<FinanceRevenueMetrics>> => {
+    const queryParams = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value) queryParams.append(key, String(value))
+    })
+    const query = queryParams.toString() ? `?${queryParams.toString()}` : ''
+    return apiService.fetchApi<FinanceRevenueMetrics>(`/finance-revenue/metrics${query}`)
+  },
 }
 
 // ===============================

@@ -27,6 +27,7 @@ interface MultiSelectProps {
   maxDisplay?: number
   id?: string
   name?: string
+  searchInputSize?: "default" | "large"
 }
 
 export function MultiSelect({
@@ -42,6 +43,7 @@ export function MultiSelect({
   maxDisplay = 3,
   id,
   name,
+  searchInputSize = "default",
 }: MultiSelectProps) {
   const [open, setOpen] = React.useState(false)
   const [searchQuery, setSearchQuery] = React.useState("")
@@ -165,8 +167,8 @@ export function MultiSelect({
       >
         <div className="flex flex-col bg-popover text-popover-foreground rounded-md border shadow-md">
           {/* Search Input - matches SearchableSelect */}
-          <div className="flex items-center border-b px-3 py-2 bg-background/50">
-            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+          <div className={`flex items-center border-b bg-background/50 ${searchInputSize === "large" ? "px-4 py-3" : "px-3 py-2"}`}>
+            <Search className={`mr-2 shrink-0 opacity-50 ${searchInputSize === "large" ? "h-5 w-5" : "h-4 w-4"}`} />
             <Input
               placeholder={searchPlaceholder}
               value={searchQuery}
@@ -176,7 +178,10 @@ export function MultiSelect({
                   setOpen(false)
                 }
               }}
-              className="h-8 border-0 bg-transparent px-0 py-0 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+              className={cn(
+                "border-0 bg-transparent px-0 py-0 placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
+                searchInputSize === "large" ? "h-12 text-lg" : "h-8 text-sm"
+              )}
               autoComplete="off"
               autoFocus
             />

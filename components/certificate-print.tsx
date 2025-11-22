@@ -1,13 +1,15 @@
 "use client"
 
 import * as React from "react"
-import { PrintLayout, PrintSection, PrintRow, PrintCol, PrintField, PrintSignature } from "./print-layout"
+import { PrintLayout, PrintHeader, PrintFooter } from "./print-layout"
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
 
 interface CertificatePrintProps {
   certificate: {
     id: string
+    certificate_number?: string
     date: string
+    issue_date?: string
     patient_name: string
     type: string
     purpose?: string
@@ -26,179 +28,119 @@ interface CertificatePrintProps {
     leave_to?: string
     title?: string
     content?: string
+    hospital_name?: string
+    hospital_address?: string
+    doctor_name?: string
+    doctor_qualification?: string
+    doctor_registration_number?: string
   }
   children: React.ReactNode
 }
 
 export function CertificatePrint({ certificate, children }: CertificatePrintProps) {
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-GB', {
+  // Fix the 'Invalid Date' Bug - safely parse dates
+  const formatDate = (dateString: string | undefined | null): string => {
+    if (!dateString) return new Date().toLocaleDateString('en-GB', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric'
     })
-  }
-
-  const renderCertificateBody = () => {
-    switch (certificate.type) {
-      case 'Fitness Certificate':
-        return (
-          <div className="print-certificate">
-            <h2 style={{ textAlign: 'center', marginBottom: '20pt', fontSize: '18pt' }}>
-              MEDICAL FITNESS CERTIFICATE
-            </h2>
-            <div className="print-certificate-body">
-              <p>This is to certify that <strong>{certificate.patient_name}</strong> has been examined by me on <strong>{certificate.exam_date || certificate.date}</strong>.</p>
-
-              <div style={{ margin: '15pt 0' }}>
-                <strong>Examination Findings:</strong>
-                <div style={{ marginTop: '5pt', padding: '8pt', border: '1px solid #ccc' }}>
-                  {certificate.findings || 'No significant abnormalities detected.'}
-                </div>
-              </div>
-
-              <p>Based on my medical examination, I certify that the above-mentioned person is <strong>MEDICALLY FIT</strong> for {certificate.purpose || 'the intended purpose'}.</p>
-
-              <p>This certificate is valid from the date of issue unless otherwise specified.</p>
-            </div>
-          </div>
-        )
-
-      case 'Medical Certificate':
-        return (
-          <div className="print-certificate">
-            <h2 style={{ textAlign: 'center', marginBottom: '20pt', fontSize: '18pt' }}>
-              MEDICAL CERTIFICATE
-            </h2>
-            <div className="print-certificate-body">
-              <p>This is to certify that <strong>{certificate.patient_name}</strong> was under my medical care and treatment.</p>
-
-              <div style={{ margin: '15pt 0' }}>
-                <strong>Diagnosis:</strong>
-                <div style={{ marginTop: '5pt', padding: '8pt', border: '1px solid #ccc' }}>
-                  {certificate.diagnosis || 'As per medical examination'}
-                </div>
-              </div>
-
-              {certificate.treatment_period && (
-                <p>Treatment Period: <strong>{certificate.treatment_period}</strong></p>
-              )}
-
-              {certificate.recommendations && (
-                <div style={{ margin: '15pt 0' }}>
-                  <strong>Recommendations:</strong>
-                  <div style={{ marginTop: '5pt', padding: '8pt', border: '1px solid #ccc' }}>
-                    {certificate.recommendations}
-                  </div>
-                </div>
-              )}
-
-              <p>This certificate is issued for {certificate.purpose || 'medical purposes'} as requested.</p>
-            </div>
-          </div>
-        )
-
-      case 'Eye Test':
-        return (
-          <div className="print-certificate">
-            <h2 style={{ textAlign: 'center', marginBottom: '20pt', fontSize: '18pt' }}>
-              EYE EXAMINATION CERTIFICATE
-            </h2>
-            <div className="print-certificate-body">
-              <p>This is to certify that <strong>{certificate.patient_name}</strong> has undergone comprehensive eye examination on <strong>{certificate.exam_date || certificate.date}</strong>.</p>
-
-              <div style={{ margin: '15pt 0' }}>
-                <strong>Visual Acuity Assessment:</strong>
-                <div style={{ display: 'flex', marginTop: '10pt' }}>
-                  <div className="print-vision-box">
-                    <strong>Right Eye</strong><br />
-                    {certificate.visual_acuity_right || '6/6'}
-                  </div>
-                  <div className="print-vision-box">
-                    <strong>Left Eye</strong><br />
-                    {certificate.visual_acuity_left || '6/6'}
-                  </div>
-                </div>
-              </div>
-
-              {certificate.color_vision && (
-                <p><strong>Color Vision:</strong> {certificate.color_vision}</p>
-              )}
-
-              {certificate.driving_fitness && (
-                <div style={{ margin: '15pt 0' }}>
-                  <strong>Driving Fitness:</strong>
-                  <div style={{ marginTop: '5pt', padding: '8pt', border: '1px solid #ccc' }}>
-                    {certificate.driving_fitness}
-                  </div>
-                </div>
-              )}
-
-              <p>This certificate is issued for {certificate.purpose || 'driving license and related purposes'}.</p>
-            </div>
-          </div>
-        )
-
-      case 'Sick Leave':
-        return (
-          <div className="print-certificate">
-            <h2 style={{ textAlign: 'center', marginBottom: '20pt', fontSize: '18pt' }}>
-              MEDICAL LEAVE CERTIFICATE
-            </h2>
-            <div className="print-certificate-body">
-              <p>This is to certify that <strong>{certificate.patient_name}</strong> was under my medical treatment for the following condition:</p>
-
-              <div style={{ margin: '15pt 0' }}>
-                <strong>Medical Condition:</strong>
-                <div style={{ marginTop: '5pt', padding: '8pt', border: '1px solid #ccc' }}>
-                  {certificate.illness || 'Medical condition as diagnosed'}
-                </div>
-              </div>
-
-              <p>The patient is advised medical rest from <strong>{certificate.leave_from ? formatDate(certificate.leave_from) : 'date of consultation'}</strong> to <strong>{certificate.leave_to ? formatDate(certificate.leave_to) : 'as per medical advice'}</strong>.</p>
-
-              {certificate.recommendations && (
-                <div style={{ margin: '15pt 0' }}>
-                  <strong>Medical Recommendations:</strong>
-                  <div style={{ marginTop: '5pt', padding: '8pt', border: '1px solid #ccc' }}>
-                    {certificate.recommendations}
-                  </div>
-                </div>
-              )}
-
-              <p>This certificate is issued for the purpose of {certificate.purpose || 'medical leave application'}.</p>
-            </div>
-          </div>
-        )
-
-      case 'Custom':
-        return (
-          <div className="print-certificate">
-            <h2 style={{ textAlign: 'center', marginBottom: '20pt', fontSize: '18pt' }}>
-              {certificate.title?.toUpperCase() || 'MEDICAL CERTIFICATE'}
-            </h2>
-            <div className="print-certificate-body">
-              <div style={{ whiteSpace: 'pre-wrap', textAlign: 'justify' }}>
-                {certificate.content || 'Custom certificate content'}
-              </div>
-            </div>
-          </div>
-        )
-
-      default:
-        return (
-          <div className="print-certificate">
-            <h2 style={{ textAlign: 'center', marginBottom: '20pt', fontSize: '18pt' }}>
-              MEDICAL CERTIFICATE
-            </h2>
-            <div className="print-certificate-body">
-              <p>This is to certify that <strong>{certificate.patient_name}</strong> has been examined and treated by me.</p>
-              <p>This certificate is issued for {certificate.purpose || 'medical purposes'} as requested.</p>
-            </div>
-          </div>
-        )
+    
+    try {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) {
+        return new Date().toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        })
+      }
+      return date.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      })
+    } catch (error) {
+      return new Date().toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      })
     }
   }
+
+  // Get certificate number (support both certificate_number and id)
+  const getCertNumber = () => {
+    return certificate.certificate_number || certificate.id || 'N/A'
+  }
+
+  // Get issue date (support both issue_date and date)
+  const getIssueDate = () => {
+    return certificate.issue_date || certificate.date
+  }
+
+  // Get certificate title based on type
+  const getCertificateTitle = () => {
+    switch (certificate.type) {
+      case 'Fitness Certificate':
+        return 'FITNESS CERTIFICATE'
+      case 'Medical Certificate':
+        return 'MEDICAL CERTIFICATE'
+      case 'Eye Test Certificate':
+      case 'Eye Test':
+        return 'EYE EXAMINATION CERTIFICATE'
+      case 'Sick Leave':
+        return 'SICK LEAVE NOTE'
+      case 'Custom':
+        return certificate.title?.toUpperCase() || 'MEDICAL CERTIFICATE'
+      default:
+        return 'MEDICAL CERTIFICATE'
+    }
+  }
+
+  // Process certificate body content
+  // - Replace [Patient Name] with actual patient name
+  // - For Medical Certificate, prepend "TO WHOM IT MAY CONCERN" if not already there
+  const getCertificateBody = () => {
+    let bodyContent = certificate.content || ''
+
+    // Replace [Patient Name] placeholder with actual patient name
+    if (bodyContent && certificate.patient_name) {
+      bodyContent = bodyContent.replace(/\[Patient Name\]/gi, certificate.patient_name)
+    }
+
+    // For Medical Certificate type, prepend "TO WHOM IT MAY CONCERN" if not already there
+    if (certificate.type === 'Medical Certificate') {
+      const concernText = 'TO WHOM IT MAY CONCERN'
+      const upperContent = bodyContent.toUpperCase().trim()
+      
+      if (!upperContent.startsWith(concernText) && !upperContent.includes(concernText)) {
+        bodyContent = `${concernText}\n\n${bodyContent}`
+      }
+    }
+
+    return bodyContent
+  }
+
+  // Get doctor name with fallback
+  const getDoctorName = () => {
+    return certificate.doctor_name || 'Dr. [Doctor Name]'
+  }
+
+  // Get doctor qualification with fallback
+  const getDoctorQualification = () => {
+    return certificate.doctor_qualification || 'MBBS, MS (Ophthal)'
+  }
+
+  // Get doctor registration number with fallback
+  const getDoctorRegNumber = () => {
+    return certificate.doctor_registration_number || 'Reg: 12345'
+  }
+
+  const formattedDate = formatDate(getIssueDate())
+  const certNumber = getCertNumber()
+  const certificateTitle = getCertificateTitle()
+  const certificateBody = getCertificateBody()
 
   return (
     <Dialog>
@@ -207,106 +149,96 @@ export function CertificatePrint({ certificate, children }: CertificatePrintProp
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <PrintLayout
-          documentType="Medical Certificate"
-          documentTitle={`Certificate No: ${certificate.id}`}
+          documentType="Certificate"
+          documentTitle={certificateTitle}
+          showHeader={false}
           isDraft={certificate.status === 'Draft'}
         >
-          {/* Certificate Details */}
-          <PrintSection title="Certificate Information">
-            <PrintRow>
-              <PrintCol>
-                <PrintField label="Certificate No." value={certificate.id} uppercase />
-                <PrintField label="Issue Date" value={formatDate(certificate.date)} />
-              </PrintCol>
-              <PrintCol>
-                <PrintField label="Certificate Type" value={certificate.type} />
-                <PrintField label="Status" value={certificate.status} uppercase />
-              </PrintCol>
-            </PrintRow>
-            <PrintRow>
-              <PrintCol>
-                <PrintField label="Patient Name" value={certificate.patient_name} uppercase />
-              </PrintCol>
-              <PrintCol>
-                <PrintField label="Purpose" value={certificate.purpose} />
-              </PrintCol>
-            </PrintRow>
-          </PrintSection>
+          {/* Header & Branding */}
+          <PrintHeader />
 
-          {/* Certificate Body */}
-          {renderCertificateBody()}
+          {/* Reference Section (Top Right) */}
+          <div className="flex justify-end mb-6">
+            <div className="text-right space-y-1">
+              <div className="text-sm font-mono text-gray-900">
+                Ref/Cert No: {certNumber}
+              </div>
+              <div className="text-sm font-bold text-gray-900">
+                Date: {formattedDate}
+              </div>
+            </div>
+          </div>
 
-          {/* Doctor Signature */}
-          <PrintSignature date={formatDate(certificate.date)} />
+          {/* Dynamic Title */}
+          <div className="text-xl font-bold uppercase text-center underline decoration-2 underline-offset-4 mb-8 text-gray-900">
+            {certificateTitle}
+          </div>
+
+          {/* Certificate Body (The Narrative) */}
+          <div className="min-h-[300px] py-8 px-4">
+            <div className="font-serif text-lg leading-loose text-gray-900 whitespace-pre-wrap text-justify">
+              {certificateBody || 'Certificate content not available.'}
+            </div>
+          </div>
+
+          {/* Footer & Signature (Two-Column) */}
+          <div className="mt-12 pt-6 border-t border-gray-200">
+            <div className="grid grid-cols-2 gap-8">
+              {/* Left: Purpose */}
+              <div className="text-sm italic text-gray-500">
+                Issued for: {certificate.purpose || 'Medical purposes'}
+              </div>
+
+              {/* Right: Doctor's Signature Block */}
+              <div className="text-right">
+                <div className="space-y-1">
+                  <div className="font-bold text-sm text-gray-900">
+                    {getDoctorName()}
+                  </div>
+                  <div className="text-xs text-gray-600">
+                    ({getDoctorQualification()})
+                  </div>
+                  <div className="text-xs text-gray-600">
+                    {getDoctorRegNumber()}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-2">
+                    Authorized Signature
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </PrintLayout>
       </DialogContent>
     </Dialog>
   )
 }
 
-// Quick print function for certificates
+// Quick print function for certificates (kept for backward compatibility)
 export function QuickCertificatePrint({ certificate }: { certificate: any }) {
   const handlePrint = () => {
     const printWindow = window.open('', '_blank')
     if (!printWindow) return
 
     const formatDate = (dateString: string) => {
-      return new Date(dateString).toLocaleDateString('en-GB')
+      if (!dateString) return new Date().toLocaleDateString('en-GB')
+      try {
+        const date = new Date(dateString)
+        if (isNaN(date.getTime())) return new Date().toLocaleDateString('en-GB')
+        return date.toLocaleDateString('en-GB')
+      } catch {
+        return new Date().toLocaleDateString('en-GB')
+      }
     }
 
-    let certificateBody = ''
-    switch (certificate.type) {
-      case 'Fitness Certificate':
-        certificateBody = `
-          <div class="certificate">
-            <h2>MEDICAL FITNESS CERTIFICATE</h2>
-            <div class="certificate-body">
-              <p>This is to certify that <strong>${certificate.patient_name}</strong> has been examined by me on <strong>${certificate.exam_date || certificate.date}</strong>.</p>
-              <div class="findings-box">
-                <strong>Examination Findings:</strong><br>
-                ${certificate.findings || 'No significant abnormalities detected.'}
-              </div>
-              <p>Based on my medical examination, I certify that the above-mentioned person is <strong>MEDICALLY FIT</strong> for ${certificate.purpose || 'the intended purpose'}.</p>
-            </div>
-          </div>
-        `
-        break
-      case 'Eye Test':
-        certificateBody = `
-          <div class="certificate">
-            <h2>EYE EXAMINATION CERTIFICATE</h2>
-            <div class="certificate-body">
-              <p>This is to certify that <strong>${certificate.patient_name}</strong> has undergone comprehensive eye examination on <strong>${certificate.exam_date || certificate.date}</strong>.</p>
-              <div class="vision-results">
-                <div class="vision-box">
-                  <strong>Right Eye:</strong> ${certificate.visual_acuity_right || '6/6'}
-                </div>
-                <div class="vision-box">
-                  <strong>Left Eye:</strong> ${certificate.visual_acuity_left || '6/6'}
-                </div>
-              </div>
-              <p>This certificate is issued for ${certificate.purpose || 'driving license and related purposes'}.</p>
-            </div>
-          </div>
-        `
-        break
-      default:
-        certificateBody = `
-          <div class="certificate">
-            <h2>MEDICAL CERTIFICATE</h2>
-            <div class="certificate-body">
-              <p>This is to certify that <strong>${certificate.patient_name}</strong> has been examined and treated by me.</p>
-              <p>This certificate is issued for ${certificate.purpose || 'medical purposes'} as requested.</p>
-            </div>
-          </div>
-        `
-    }
+    const certNumber = certificate.certificate_number || certificate.id || 'N/A'
+    const issueDate = certificate.issue_date || certificate.date
 
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Certificate - ${certificate.id}</title>
+        <title>Certificate - ${certNumber}</title>
         <style>
           @media print {
             @page { size: A4; margin: 1in 0.75in; }
@@ -315,12 +247,8 @@ export function QuickCertificatePrint({ certificate }: { certificate: any }) {
             .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 15pt; margin-bottom: 20pt; }
             .clinic-name { font-size: 20pt; font-weight: bold; margin-bottom: 5pt; }
             .clinic-details { font-size: 10pt; margin-bottom: 8pt; }
-            .certificate { border: 3px solid #000; padding: 20pt; margin: 20pt 0; text-align: center; }
-            .certificate h2 { font-size: 18pt; font-weight: bold; margin-bottom: 20pt; }
-            .certificate-body { text-align: justify; font-size: 12pt; line-height: 1.6; }
-            .findings-box { margin: 15pt 0; padding: 8pt; border: 1px solid #ccc; text-align: left; }
-            .vision-results { display: flex; justify-content: space-between; margin: 15pt 0; }
-            .vision-box { flex: 1; border: 1px solid #ccc; padding: 8pt; margin: 0 5pt; text-align: center; }
+            .cert-title { font-size: 18pt; font-weight: bold; margin-bottom: 20pt; text-decoration: underline; }
+            .certificate-body { padding: 20pt; margin: 20pt 0; font-size: 14pt; line-height: 2; text-align: justify; }
             .signature-section { margin-top: 40pt; }
             .signature-box { float: right; width: 200pt; text-align: center; border-top: 1px solid #000; padding-top: 5pt; margin-top: 30pt; }
             .footer { margin-top: 30pt; padding-top: 10pt; border-top: 1px solid #ccc; font-size: 10pt; text-align: center; clear: both; }
@@ -329,25 +257,27 @@ export function QuickCertificatePrint({ certificate }: { certificate: any }) {
       </head>
       <body>
         <div class="header">
-          <div class="clinic-name">EyeCare Medical Center</div>
+          <div class="clinic-name">OptiZen Medical Center</div>
           <div class="clinic-details">123 Medical Plaza, Healthcare District, City - 123456<br>Phone: +91 98765 43210</div>
-          <div style="font-size: 14pt; font-weight: bold; margin-top: 10pt;">Certificate No: ${certificate.id}</div>
+          <div class="cert-title">${certificate.type?.toUpperCase() || 'MEDICAL CERTIFICATE'}</div>
         </div>
 
-        ${certificateBody}
+        <div class="certificate-body">
+          ${certificate.content || 'Certificate content not available.'}
+        </div>
 
         <div class="signature-section">
           <div class="signature-box">
             <div style="height: 30pt;"></div>
-            <div><strong>Dr. [Doctor Name]</strong></div>
-            <div style="font-size: 10pt;">MBBS, MS (Ophthalmology)</div>
-            <div style="font-size: 10pt;">Registration: REG/12345/2020</div>
-            <div style="font-size: 10pt; margin-top: 5pt;">Date: ${formatDate(certificate.date)}</div>
+            <div><strong>${certificate.doctor_name || 'Dr. [Doctor Name]'}</strong></div>
+            <div style="font-size: 10pt;">${certificate.doctor_qualification || 'MBBS, MS (Ophthalmology)'}</div>
+            <div style="font-size: 10pt;">Reg. No: ${certificate.doctor_registration_number || 'REG/12345/2020'}</div>
+            <div style="font-size: 10pt; margin-top: 5pt;">Date: ${formatDate(issueDate)}</div>
           </div>
         </div>
 
         <div class="footer">
-          <div>Certificate No: ${certificate.id} | Date: ${formatDate(certificate.date)}</div>
+          <div>Certificate No: ${certNumber} | Date: ${formatDate(issueDate)}</div>
           <div style="margin-top: 5pt;">For verification, please contact the clinic with this certificate number.</div>
         </div>
       </body>

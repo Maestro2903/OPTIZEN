@@ -38,7 +38,7 @@ import { CalendarIcon } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { patientsApi } from "@/lib/services/api"
-import { Loader2, FileText } from "lucide-react"
+import { Loader2, Printer, FileBadge } from "lucide-react"
 
 const certificateSchema = z.object({
   patient_id: z.string().min(1, "Patient is required"),
@@ -76,7 +76,7 @@ export function CertificateGeneratorForm({ children, onSuccess }: CertificateGen
       purpose: "",
       content: "",
       issue_date: new Date().toISOString().split('T')[0], // Default to today's date
-      hospital_name: "EyeCare Medical Center",
+      hospital_name: "OptiZen Medical Center",
       hospital_address: "123 Medical Plaza, Healthcare District",
       doctor_name: "",
       doctor_qualification: "MBBS, MS (Ophthalmology)",
@@ -197,6 +197,7 @@ This certificate is issued for the purpose of medical leave application.`,
       })
     }
 
+
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
@@ -287,7 +288,7 @@ This certificate is issued for the purpose of medical leave application.`,
       </head>
       <body>
         <div class="header">
-          <div class="hospital-name">${certificate.hospital_name || 'EyeCare Medical Center'}</div>
+          <div class="hospital-name">${certificate.hospital_name || 'OptiZen Medical Center'}</div>
           <div class="hospital-address">${certificate.hospital_address || '123 Medical Plaza, Healthcare District'}</div>
           <div class="cert-title">${certificate.type?.toUpperCase() || 'MEDICAL CERTIFICATE'}</div>
         </div>
@@ -295,7 +296,7 @@ This certificate is issued for the purpose of medical leave application.`,
         <div class="certificate-body">
           <div class="cert-number">Certificate No: ${certificate.certificate_number}</div>
           <div class="cert-number">Date: ${formatDate(certificate.issue_date || certificate.date)}</div>
-          
+
           <div class="content">${certificate.content || 'Certificate content not available.'}</div>
         </div>
 
@@ -339,14 +340,118 @@ This certificate is issued for the purpose of medical leave application.`,
     printWindow.document.close()
   }
 
+  // Function to safely extract patient ID from selectedPatient object
+  const getPatientId = (selectedPatient?: any): string => {
+    if (!selectedPatient) {
+      return "[Patient ID]";
+    }
+
+    // Try to get patient_id from the object directly (e.g., selectedPatient.patient_id, selectedPatient.id, selectedPatient.patientId)
+    if (selectedPatient.patient_id) {
+      return selectedPatient.patient_id;
+    } else if (selectedPatient.id) {
+      if (selectedPatient.id.startsWith("PAT")) {
+        return selectedPatient.id;
+      } else {
+        // Check if the id is a UUID format
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(selectedPatient.id)) {
+          return selectedPatient.id;
+        }
+        // If it's not a PAT id or UUID, continue to check other properties
+      }
+    } else if (selectedPatient.patientId) {
+      return selectedPatient.patientId;
+    }
+
+    // If the value looks like a UUID, parse the patient ID from the label
+    if (selectedPatient.label && typeof selectedPatient.label === "string") {
+      // Try to extract patient ID from format like "Name (PAT001)"
+      const match = selectedPatient.label.match(/\(([^)]+)\)/);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+
+    // If value exists and doesn't appear to be a UUID, use it as the patient ID
+    if (selectedPatient.value && typeof selectedPatient.value === "string" && !selectedPatient.value.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      return selectedPatient.value;
+    }
+
+    // If we can't determine a proper patient ID, return the fallback
+    return "[Patient ID]";
+  };
+
+  // Function to replace placeholders in content with actual values
+  const replacePlaceholders = (content: string, values: CertificateFormValues, selectedPatient?: any) => {
+    // Get patient name from the selected patient, with defensive checks
+    let patientName = "[Patient Name]";
+    if (selectedPatient && selectedPatient.label && typeof selectedPatient.label === "string") {
+      if (selectedPatient.label.includes(" (")) {
+        patientName = selectedPatient.label.split(" (")[0];
+      } else {
+        patientName = selectedPatient.label;
+      }
+    }
+
+    // Replace common placeholders
+    let processedContent = content
+      .replace(/\[Patient Name\]/g, patientName)
+      .replace(/\[Patient ID\]/g, getPatientId(selectedPatient))
+      .replace(/\[Doctor Name\]/g, values.doctor_name || "[Doctor Name]")
+      .replace(/\[Doctor Qualification\]/g, values.doctor_qualification || "[Doctor Qualification]")
+      .replace(/\[Doctor Registration Number\]/g, values.doctor_registration_number || "[Registration Number]")
+      .replace(/\[Hospital Name\]/g, values.hospital_name || "[Hospital Name]")
+      .replace(/\[Hospital Address\]/g, values.hospital_address || "[Hospital Address]")
+      .replace(/\[Issue Date\]/g, values.issue_date ? new Date(values.issue_date).toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric"
+      }) : new Date().toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric"
+      }))
+      .replace(/\[Certificate Type\]/g, values.type || "[Certificate Type]")
+      .replace(/\[Purpose\]/g, values.purpose || "[Purpose]")
+
+    // Define the whitelist of supported placeholders
+    const supportedPlaceholders = [
+      "Patient Name", "Patient ID", "Doctor Name", "Doctor Qualification",
+      "Doctor Registration Number", "Hospital Name", "Hospital Address",
+      "Issue Date", "Certificate Type", "Purpose"
+    ];
+
+    // Find any remaining placeholders and only warn for unsupported ones
+    processedContent = processedContent.replace(/\[(.*?)\]/g, (match, placeholder) => {
+      if (!supportedPlaceholders.includes(placeholder)) {
+        // Log a warning for unrecognized placeholders but keep them visible to the user
+        console.warn(`Unrecognized placeholder found: ${match}`);
+        return match; // Keep the original placeholder if not recognized
+      }
+      // For placeholders that were already replaced, they will return their actual values
+      // This handles any edge cases where a supported placeholder might remain
+      return match;
+    });
+
+    return processedContent;
+  }
+
   async function onSubmit(values: CertificateFormValues) {
     setSubmitting(true)
     try {
+      // Get the selected patient to access their details
+      const selectedPatient = patients.find(p => p.value === values.patient_id);
+
+      // Process the content to replace placeholders with actual values
+      const processedContent = replacePlaceholders(values.content, values, selectedPatient);
+
       const response = await fetch("/api/certificates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...values,
+          content: processedContent, // Use the processed content with placeholders replaced
           issue_date: values.issue_date || new Date().toISOString().split("T")[0],
           status: "Issued",
         }),
@@ -360,16 +465,16 @@ This certificate is issued for the purpose of medical leave application.`,
 
       // Success! Now print the certificate
       const certificate = data.data
-      
+
       // Close the form dialog
       form.reset()
       setOpen(false)
-      
+
       // Open print window with the certificate
       setTimeout(() => {
         printCertificate(certificate)
       }, 300)
-      
+
       // Refresh the certificate list
       onSuccess?.()
     } catch (error: any) {
@@ -383,267 +488,315 @@ This certificate is issued for the purpose of medical leave application.`,
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
+      <DialogContent className="max-w-4xl h-[85vh] p-0 flex flex-col">
+        {/* Fixed Header */}
+        <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-200 flex-shrink-0">
+          <DialogTitle className="flex items-center gap-2 text-xl font-bold text-gray-900">
+            <FileBadge className="h-5 w-5" />
             Generate Medical Certificate
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-sm text-gray-500 mt-1">
             Fill in the details to generate a professional medical certificate
           </DialogDescription>
         </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {/* Patient Selection */}
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="patient_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Patient *</FormLabel>
-                    <FormControl>
-                      <SearchableSelect
-                        options={patients}
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        placeholder="Select patient"
-                        searchPlaceholder="Search patients..."
-                        loading={loadingPatients}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Doctor Selection */}
-              <FormField
-                control={form.control}
-                name="issued_by"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Issued By (Doctor) *</FormLabel>
-                    <FormControl>
-                      <SearchableSelect
-                        options={doctors}
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        placeholder="Select doctor"
-                        searchPlaceholder="Search doctors..."
-                        loading={loadingDoctors}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              {/* Certificate Type */}
-              <FormField
-                control={form.control}
-                name="type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Certificate Type *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Fitness Certificate">Fitness Certificate</SelectItem>
-                        <SelectItem value="Medical Certificate">Medical Certificate</SelectItem>
-                        <SelectItem value="Eye Test Certificate">Eye Test Certificate</SelectItem>
-                        <SelectItem value="Sick Leave">Sick Leave</SelectItem>
-                        <SelectItem value="Custom">Custom</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Purpose */}
-              <FormField
-                control={form.control}
-                name="purpose"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Purpose *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Employment, School, etc." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            {/* Issue Date */}
-            <FormField
-              control={form.control}
-              name="issue_date"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Issue Date *</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "w-full pl-3 text-left font-normal",
-                            !field.value && "text-muted-foreground"
-                          )}
-                        >
-                          {field.value ? (
-                            format(new Date(field.value), "PPP")
-                          ) : (
-                            <span>Pick a date</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value ? new Date(field.value) : undefined}
-                        onSelect={(date) => {
-                          if (date) {
-                            field.onChange(date.toISOString().split('T')[0])
-                          }
-                        }}
-                        disabled={(date) =>
-                          date > new Date() || date < new Date("1900-01-01")
-                        }
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Certificate Content */}
-            <FormField
-              control={form.control}
-              name="content"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Certificate Content *</FormLabel>
-                  <FormControl>
-                    <Textarea 
-                      rows={8} 
-                      placeholder="Certificate content will appear here..."
-                      className="font-mono text-sm"
-                      {...field} 
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Hospital Details */}
-            <div className="border-t pt-4">
-              <h4 className="font-medium mb-3">Hospital & Doctor Details</h4>
-              <div className="grid grid-cols-2 gap-4">
+        {/* Scrollable Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-6">
+          <Form {...form}>
+            <form id="certificate-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              {/* Section 1: Certificate Meta-Data (Top Grid) */}
+              <div className="grid grid-cols-12 gap-5">
+                {/* Patient - Col-span-6 */}
                 <FormField
                   control={form.control}
-                  name="hospital_name"
+                  name="patient_id"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Hospital Name</FormLabel>
+                    <FormItem className="col-span-6">
+                      <FormLabel className="text-xs font-bold text-gray-500 uppercase">Patient *</FormLabel>
                       <FormControl>
-                        <Input {...field} />
+                        <SearchableSelect
+                          options={patients}
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          placeholder="Select patient"
+                          searchPlaceholder="Search patients..."
+                          loading={loadingPatients}
+                          className="bg-white border-gray-200 rounded-lg focus:border-gray-800"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
+                {/* Doctor - Col-span-6 */}
                 <FormField
                   control={form.control}
-                  name="hospital_address"
+                  name="issued_by"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Hospital Address</FormLabel>
+                    <FormItem className="col-span-6">
+                      <FormLabel className="text-xs font-bold text-gray-500 uppercase">Issued By (Doctor) *</FormLabel>
                       <FormControl>
-                        <Input {...field} />
+                        <SearchableSelect
+                          options={doctors}
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          placeholder="Select doctor"
+                          searchPlaceholder="Search doctors..."
+                          loading={loadingDoctors}
+                          className="bg-white border-gray-200 rounded-lg focus:border-gray-800"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
+                {/* Certificate Type - Col-span-4 */}
                 <FormField
                   control={form.control}
-                  name="doctor_name"
+                  name="type"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Doctor Name</FormLabel>
+                    <FormItem className="col-span-4">
+                      <FormLabel className="text-xs font-bold text-gray-500 uppercase">Certificate Type *</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="bg-white border-gray-200 rounded-lg focus:border-gray-800">
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Fitness Certificate">Fitness Certificate</SelectItem>
+                          <SelectItem value="Medical Certificate">Medical Certificate</SelectItem>
+                          <SelectItem value="Eye Test Certificate">Eye Test Certificate</SelectItem>
+                          <SelectItem value="Sick Leave">Sick Leave</SelectItem>
+                          <SelectItem value="Custom">Custom</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Purpose - Col-span-4 */}
+                <FormField
+                  control={form.control}
+                  name="purpose"
+                  render={({ field }) => (
+                    <FormItem className="col-span-4">
+                      <FormLabel className="text-xs font-bold text-gray-500 uppercase">Purpose *</FormLabel>
                       <FormControl>
-                        <Input {...field} />
+                        <Input 
+                          placeholder="e.g., Employment, School, etc." 
+                          className="bg-white border-gray-200 rounded-lg focus:border-gray-800"
+                          {...field} 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
+                {/* Issue Date - Col-span-4 */}
                 <FormField
                   control={form.control}
-                  name="doctor_qualification"
+                  name="issue_date"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Qualification</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="doctor_registration_number"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Registration Number</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
+                    <FormItem className="col-span-4 flex flex-col">
+                      <FormLabel className="text-xs font-bold text-gray-500 uppercase">Issue Date *</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={"outline"}
+                              className={cn(
+                                "w-full pl-3 text-left font-normal bg-white border-gray-200 rounded-lg focus:border-gray-800",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              {field.value ? (
+                                format(new Date(field.value), "PPP")
+                              ) : (
+                                <span>Pick a date</span>
+                              )}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value ? new Date(field.value) : undefined}
+                            onSelect={(date) => {
+                              if (date) {
+                                field.onChange(date.toISOString().split('T')[0])
+                              }
+                            }}
+                            disabled={(date) =>
+                              date > new Date() || date < new Date("1900-01-01")
+                            }
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
-            </div>
 
-            <DialogFooter>
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => setOpen(false)}
-                disabled={submitting}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={submitting}>
-                {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Generate Certificate
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+              {/* Section 2: The "Editor" (Certificate Content) */}
+              <div>
+                <FormLabel className="text-xs font-bold text-gray-500 uppercase mb-2 block">Certificate Body</FormLabel>
+                <FormField
+                  control={form.control}
+                  name="content"
+                  render={({ field }) => (
+                    <FormItem>
+                      <div className="relative">
+                        <FormControl>
+                          <Textarea 
+                            className="w-full min-h-[200px] p-6 bg-slate-50 border border-slate-300 rounded-xl font-medium text-gray-800 text-base leading-relaxed focus:bg-white focus:ring-2 focus:ring-gray-200 transition-colors resize-none"
+                            placeholder="Certificate content will appear here..."
+                            {...field} 
+                          />
+                        </FormControl>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">Use [brackets] for dynamic placeholders.</p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Section 3: Issuer Details (The 'Footer' Box) */}
+              <div className="bg-gray-50 border-t border-gray-100 p-6 mt-6 -mx-6 -mb-6">
+                <div className="grid grid-cols-2 gap-6">
+                  {/* Hospital Info - Left */}
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-bold text-gray-500 uppercase">Hospital Information</h4>
+                    <FormField
+                      control={form.control}
+                      name="hospital_name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs font-bold text-gray-500 uppercase">Hospital Name</FormLabel>
+                          <FormControl>
+                            <Input 
+                              className="h-9 text-xs bg-white border-gray-200 rounded-lg focus:border-gray-800"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="hospital_address"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs font-bold text-gray-500 uppercase">Hospital Address</FormLabel>
+                          <FormControl>
+                            <Input 
+                              className="h-9 text-xs bg-white border-gray-200 rounded-lg focus:border-gray-800"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Doctor Credentials - Right */}
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-bold text-gray-500 uppercase">Doctor Credentials</h4>
+                    <FormField
+                      control={form.control}
+                      name="doctor_name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs font-bold text-gray-500 uppercase">Doctor Name</FormLabel>
+                          <FormControl>
+                            <Input 
+                              className="h-9 text-xs bg-white border-gray-200 rounded-lg focus:border-gray-800"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="doctor_qualification"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs font-bold text-gray-500 uppercase">Qualification</FormLabel>
+                          <FormControl>
+                            <Input 
+                              className="h-9 text-xs bg-white border-gray-200 rounded-lg focus:border-gray-800"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="doctor_registration_number"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs font-bold text-gray-500 uppercase">Registration Number</FormLabel>
+                          <FormControl>
+                            <Input 
+                              className="h-9 text-xs bg-white border-gray-200 rounded-lg focus:border-gray-800"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+              </div>
+            </form>
+          </Form>
+        </div>
+
+        {/* Fixed Footer (Sticky Action Bar) */}
+        <DialogFooter className="px-6 py-4 border-t border-gray-200 flex-shrink-0 bg-white">
+          <Button 
+            type="button" 
+            variant="ghost" 
+            onClick={() => setOpen(false)}
+            disabled={submitting}
+            className="text-gray-600 hover:bg-gray-100"
+          >
+            Cancel
+          </Button>
+          <Button 
+            type="submit"
+            form="certificate-form"
+            disabled={submitting}
+            className="bg-gray-900 hover:bg-black text-white px-8 py-2.5 rounded-lg font-semibold shadow-lg"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Printer className="mr-2 h-4 w-4" />
+                Generate & Print
+              </>
+            )}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

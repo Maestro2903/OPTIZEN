@@ -35,8 +35,15 @@ export async function middleware(req: NextRequest) {
     session = null
   }
 
-  // Protect dashboard routes
-  if (req.nextUrl.pathname.startsWith('/dashboard')) {
+  // Protect dashboard routes (excluding root, auth, portal, and API routes)
+  const pathname = req.nextUrl.pathname
+  const isProtectedRoute = pathname !== '/' && 
+    !pathname.startsWith('/auth') && 
+    !pathname.startsWith('/portal') && 
+    !pathname.startsWith('/api') &&
+    pathname !== '/not-found'
+  
+  if (isProtectedRoute) {
     if (!session) {
       const redirectUrl = req.nextUrl.clone()
       redirectUrl.pathname = '/auth/login'
@@ -44,8 +51,8 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(redirectUrl)
     }
 
-    // Check for super_admin access to /dashboard/access-control
-    if (req.nextUrl.pathname.startsWith('/dashboard/access-control')) {
+    // Check for super_admin access to /access-control
+    if (pathname.startsWith('/access-control')) {
       // Try to get role from session metadata first (faster)
       const userRole = session.user.user_metadata?.role || session.user.app_metadata?.role
       
@@ -61,26 +68,26 @@ export async function middleware(req: NextRequest) {
           if (error) {
             console.error('Error fetching user role in middleware:', error)
             const redirectUrl = req.nextUrl.clone()
-            redirectUrl.pathname = '/dashboard/cases'
+            redirectUrl.pathname = '/cases'
             redirectUrl.searchParams.set('error', 'db_error')
             return NextResponse.redirect(redirectUrl)
           }
 
           if (!user || user.role !== 'super_admin') {
             const redirectUrl = req.nextUrl.clone()
-            redirectUrl.pathname = '/dashboard/cases'
+            redirectUrl.pathname = '/cases'
             return NextResponse.redirect(redirectUrl)
           }
         } catch (err) {
           console.error('Middleware: role lookup failed:', err)
           const redirectUrl = req.nextUrl.clone()
-          redirectUrl.pathname = '/dashboard/cases'
+          redirectUrl.pathname = '/cases'
           redirectUrl.searchParams.set('error', 'db_error')
           return NextResponse.redirect(redirectUrl)
         }
       } else if (userRole !== 'super_admin') {
         const redirectUrl = req.nextUrl.clone()
-        redirectUrl.pathname = '/dashboard/cases'
+        redirectUrl.pathname = '/cases'
         return NextResponse.redirect(redirectUrl)
       }
     }
@@ -99,13 +106,23 @@ export async function middleware(req: NextRequest) {
   if (req.nextUrl.pathname.startsWith('/auth') && 
       !req.nextUrl.pathname.startsWith('/auth/logout') && 
       session) {
-    return NextResponse.redirect(new URL('/dashboard/cases', req.url))
+    return NextResponse.redirect(new URL('/cases', req.url))
   }
 
   return res
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/portal/:path*', '/auth/:path*'],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public files (public folder)
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
 }
 

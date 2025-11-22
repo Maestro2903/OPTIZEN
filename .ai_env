@@ -1,0 +1,7 @@
+# AI Environment Configuration for MCP Servers
+
+# This directory contains configuration for Model Context Protocol (MCP) servers
+# that can be used by AI assistants to interact with external tools and services.
+
+# The configuration for MCP servers is defined in mcp_config.json
+# Skills and extensions are defined in the skills/ subdirectory

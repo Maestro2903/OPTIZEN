@@ -40,49 +40,49 @@ const navigationGroups = [
     items: [
       {
         title: "Patients",
-        url: "/dashboard/patients",
+        url: "/patients",
         icon: Users,
         requiredPermission: "patients" as const,
       },
       {
         title: "Appointments",
-        url: "/dashboard/appointments",
+        url: "/appointments",
         icon: Calendar,
         requiredPermission: "appointments" as const,
       },
       {
         title: "My Schedule",
-        url: "/dashboard/doctor-schedule",
+        url: "/doctor-schedule",
         icon: CalendarClock,
         requiredPermission: "doctor_schedule" as const,
       },
       {
         title: "Cases",
-        url: "/dashboard/cases",
+        url: "/cases",
         icon: FolderOpen,
         requiredPermission: "cases" as const,
       },
       {
         title: "Operations",
-        url: "/dashboard/operations",
+        url: "/operations",
         icon: Stethoscope,
         requiredPermission: "operations" as const,
       },
       {
         title: "Discharges",
-        url: "/dashboard/discharges",
+        url: "/discharges",
         icon: FileText,
         requiredPermission: "discharges" as const,
       },
       {
         title: "Beds",
-        url: "/dashboard/beds",
+        url: "/beds",
         icon: Bed,
         requiredPermission: "beds" as const,
       },
       {
         title: "Certificates",
-        url: "/dashboard/certificates",
+        url: "/certificates",
         icon: Award,
         requiredPermission: "certificates" as const,
       },
@@ -93,31 +93,31 @@ const navigationGroups = [
     items: [
       {
         title: "Billing",
-        url: "/dashboard/billing",
+        url: "/billing",
         icon: CreditCard,
         requiredPermission: "invoices" as const,
       },
       {
         title: "Finance",
-        url: "/dashboard/finance",
+        url: "/finance",
         icon: TrendingUp,
         requiredPermission: "finance" as const,
       },
       {
         title: "Pharmacy",
-        url: "/dashboard/pharmacy",
+        url: "/pharmacy",
         icon: Package,
         requiredPermission: "pharmacy" as const,
       },
       {
         title: "Attendance",
-        url: "/dashboard/attendance",
+        url: "/attendance",
         icon: Clock,
         requiredPermission: "attendance" as const,
       },
       {
         title: "Employees",
-        url: "/dashboard/employees",
+        url: "/employees",
         icon: UserCog,
         requiredPermission: "employees" as const,
       },
@@ -128,7 +128,7 @@ const navigationGroups = [
     items: [
       {
         title: "Master Data",
-        url: "/dashboard/master",
+        url: "/master",
         icon: Database,
         requiredPermission: "master_data" as const,
       },
@@ -163,7 +163,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       if (systemGroup) {
         systemGroup.items.push({
           title: "Access Control",
-          url: "/dashboard/access-control",
+          url: "/access-control",
           icon: Shield,
           requiredPermission: "roles" as any,
         })
@@ -173,7 +173,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           header: "SYSTEM",
           items: [{
             title: "Access Control",
-            url: "/dashboard/access-control",
+            url: "/access-control",
             icon: Shield,
             requiredPermission: "roles" as any,
           }],

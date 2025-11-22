@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { parseArrayParam, validateArrayParam, applyArrayFilter } from '@/lib/utils/query-params'
 import { requirePermission } from '@/lib/middleware/rbac'
 import { generatePatientId } from '@/lib/utils/id-generator'
+import { handleDatabaseError, handleServerError } from '@/lib/utils/api-errors'
 
 // GET /api/patients - List patients with pagination, filtering, and sorting
 export async function GET(request: NextRequest) {
@@ -110,8 +111,7 @@ export async function GET(request: NextRequest) {
     const { data: patients, error, count } = await query
 
     if (error) {
-      console.error('Database error:', error)
-      return NextResponse.json({ error: 'Failed to fetch patients' }, { status: 500 })
+      return handleDatabaseError(error, 'fetch', 'patients')
     }
 
     // Calculate pagination metadata
@@ -133,8 +133,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleServerError(error, 'fetch', 'patients')
   }
 }
 
@@ -367,7 +366,6 @@ export async function POST(request: NextRequest) {
     )
 
   } catch (error) {
-    console.error('API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleServerError(error, 'create', 'patient')
   }
 }

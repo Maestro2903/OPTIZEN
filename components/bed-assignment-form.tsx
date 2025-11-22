@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
 import { patientsApi, masterDataApi, employeesApi, bedsApi } from "@/lib/services/api"
 import { useToast } from "@/hooks/use-toast"
+import { UserCheck } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -36,6 +37,9 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 
+// Tailwind class for SearchableSelect styling
+const searchableSelectWrapperClass = "[&>div>button]:bg-white [&>div>button]:border-gray-200 [&>div>button]:focus:border-gray-600 [&>div>button]:text-sm [&>div>button]:rounded-lg [&>div>button]:h-11"
+
 const bedAssignmentSchema = z.object({
   patient_id: z.string().min(1, "Patient is required"),
   bed_id: z.string().min(1, "Bed is required"),
@@ -53,12 +57,12 @@ interface BedAssignmentFormProps {
   children: React.ReactNode
   assignmentData?: any
   mode?: "create" | "edit"
-  onSuccess?: () => void
+  onSuccessAction?: () => void
 }
 
 
 
-export function BedAssignmentForm({ children, assignmentData, mode = "create", onSuccess }: BedAssignmentFormProps) {
+export function BedAssignmentForm({ children, assignmentData, mode = "create", onSuccessAction }: BedAssignmentFormProps) {
   const { toast } = useToast()
   const [isOpen, setIsOpen] = React.useState(false)
   const [selectedBedInfo, setSelectedBedInfo] = React.useState<{
@@ -266,7 +270,7 @@ export function BedAssignmentForm({ children, assignmentData, mode = "create", o
         })
         setIsOpen(false)
         form.reset()
-        onSuccess?.() // Refresh beds list
+        onSuccessAction?.() // Refresh beds list
       } else {
         throw new Error(data.error || "Failed to assign bed")
       }
@@ -283,208 +287,248 @@ export function BedAssignmentForm({ children, assignmentData, mode = "create", o
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0">
+        {/* Fixed Header */}
+        <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <DialogTitle>{mode === "edit" ? "Update Bed Assignment" : "Assign Patient to Bed"}</DialogTitle>
           <DialogDescription>
             {mode === "edit" ? "Update patient bed assignment details" : "Assign a patient to an available bed"}
           </DialogDescription>
         </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="patient_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Patient *</FormLabel>
-                    <FormControl>
-                      <SearchableSelect
-                        options={patients}
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        placeholder="Select patient"
-                        searchPlaceholder="Search patients..."
-                        loading={loadingPatients}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="bed_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Bed *</FormLabel>
-                    <Select 
-                      onValueChange={(value) => {
-                        field.onChange(value)
-                        handleBedChange(value)
-                      }} 
-                      defaultValue={field.value}
-                      disabled={loadingBeds}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={loadingBeds ? "Loading beds..." : "Select bed"} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {availableBeds.length === 0 ? (
-                          <SelectItem value="no-beds" disabled>
-                            No available beds
-                          </SelectItem>
-                        ) : (
-                          availableBeds.map((bed) => (
-                            <SelectItem key={bed.id} value={bed.id}>
-                              {bed.bed_number} - {bed.name}
-                              {bed.description && ` (${bed.description})`}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
 
-            <FormField
-              control={form.control}
-              name="admission_reason"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Admission Reason *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., Cataract Surgery, Post-operative Care" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {selectedBedInfo.ward_name && (
-              <div className="rounded-lg border bg-muted/50 p-4 space-y-3">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium">Bed Type:</span>
-                    <Badge variant="secondary" className="capitalize">
-                      {selectedBedInfo.ward_name}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Selected bed from master data
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="admission_date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Admission Date *</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="expected_discharge_date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Expected Discharge Date</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="assigned_doctor_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Assigned Doctor</FormLabel>
-                    <FormControl>
-                      <SearchableSelect
-                        options={doctors}
-                        value={field.value || ""}
-                        onValueChange={field.onChange}
-                        placeholder="Select doctor"
-                        searchPlaceholder="Search doctors..."
-                        loading={loadingDoctors}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="assigned_nurse_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Assigned Nurse</FormLabel>
-                    <FormControl>
-                      <SearchableSelect
-                        options={nurses}
-                        value={field.value || ""}
-                        onValueChange={field.onChange}
-                        placeholder="Select nurse"
-                        searchPlaceholder="Search nurses..."
-                        loading={loadingNurses}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="text-sm font-medium">Surgery Details (Optional)</div>
-              <div className="grid grid-cols-2 gap-4">
+        {/* Scrollable Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-6">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} id="bed-assignment-form">
+              <div className="grid grid-cols-12 gap-6">
+                {/* Section 1: Assignment Basics */}
+                {/* Patient */}
                 <FormField
                   control={form.control}
-                  name="surgery_scheduled_time"
+                  name="patient_id"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Surgery Scheduled Time</FormLabel>
+                    <FormItem className="col-span-6">
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Patient *</FormLabel>
                       <FormControl>
-                        <Input type="datetime-local" {...field} />
+                        <div className={searchableSelectWrapperClass}>
+                          <SearchableSelect
+                            options={patients}
+                            value={field.value || ""}
+                            onValueChange={field.onChange}
+                            placeholder="Select patient"
+                            searchPlaceholder="Search patients..."
+                            loading={loadingPatients}
+                          />
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+                {/* Bed */}
                 <FormField
                   control={form.control}
-                  name="surgery_type"
+                  name="bed_id"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Surgery Type</FormLabel>
+                    <FormItem className="col-span-6">
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Bed *</FormLabel>
+                      <Select
+                        onValueChange={(value) => {
+                          field.onChange(value)
+                          handleBedChange(value)
+                        }}
+                        value={field.value || ""}
+                        disabled={loadingBeds}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="bg-white border-gray-200 focus:border-gray-600 text-sm rounded-lg h-11">
+                            <SelectValue placeholder={loadingBeds ? "Loading beds..." : "Select bed"} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {availableBeds.length === 0 ? (
+                            <SelectItem value="no-beds" disabled>
+                              No available beds
+                            </SelectItem>
+                          ) : (
+                            availableBeds.map((bed) => (
+                              <SelectItem key={bed.id} value={bed.id}>
+                                {bed.bed_number} - {bed.name}
+                                {bed.description && ` (${bed.description})`}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {/* Admission Date */}
+                <FormField
+                  control={form.control}
+                  name="admission_date"
+                  render={({ field }) => (
+                    <FormItem className="col-span-6">
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Admission Date *</FormLabel>
                       <FormControl>
-                        <SearchableSelect
-                          options={surgeryTypes}
-                          value={field.value || ""}
-                          onValueChange={field.onChange}
-                          placeholder="Select surgery type"
-                          searchPlaceholder="Search surgery types..."
-                          loading={loadingSurgeryTypes}
+                        <Input 
+                          type="date" 
+                          className="bg-white border-gray-200 focus:border-gray-600 text-sm rounded-lg h-11"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {/* Expected Discharge */}
+                <FormField
+                  control={form.control}
+                  name="expected_discharge_date"
+                  render={({ field }) => (
+                    <FormItem className="col-span-6">
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Expected Discharge</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="date" 
+                          className="bg-white border-gray-200 focus:border-gray-600 text-sm rounded-lg h-11"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Section 2: Clinical Context (Grey Box) */}
+                <div className="col-span-12 bg-slate-50 border border-slate-200 rounded-xl p-5">
+                  <div className="text-xs font-bold uppercase text-gray-500 mb-4">Clinical Context</div>
+                  
+                  {/* Admission Reason */}
+                  <FormField
+                    control={form.control}
+                    name="admission_reason"
+                    render={({ field }) => (
+                      <FormItem className="col-span-12 mb-4">
+                        <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Admission Reason *</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="e.g., Cataract Surgery, Post-operative Care" 
+                            className="bg-white border-gray-200 focus:border-gray-600 text-sm rounded-lg h-11"
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Surgery Details */}
+                  <div className="grid grid-cols-12 gap-4 mb-4">
+                    <FormField
+                      control={form.control}
+                      name="surgery_scheduled_time"
+                      render={({ field }) => (
+                        <FormItem className="col-span-6">
+                          <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Surgery Scheduled Time</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="datetime-local" 
+                              className="bg-white border-gray-200 focus:border-gray-600 text-sm rounded-lg h-11"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="surgery_type"
+                      render={({ field }) => (
+                        <FormItem className="col-span-6">
+                          <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Surgery Type</FormLabel>
+                          <FormControl>
+                            <div className={searchableSelectWrapperClass}>
+                              <SearchableSelect
+                                options={surgeryTypes}
+                                value={field.value || ""}
+                                onValueChange={field.onChange}
+                                placeholder="Select surgery type"
+                                searchPlaceholder="Search surgery types..."
+                                loading={loadingSurgeryTypes}
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Staff */}
+                  <div className="grid grid-cols-12 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="assigned_doctor_id"
+                      render={({ field }) => (
+                        <FormItem className="col-span-6">
+                          <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Assigned Doctor</FormLabel>
+                          <FormControl>
+                            <div className={searchableSelectWrapperClass}>
+                              <SearchableSelect
+                                options={doctors}
+                                value={field.value || ""}
+                                onValueChange={field.onChange}
+                                placeholder="Select doctor"
+                                searchPlaceholder="Search doctors..."
+                                loading={loadingDoctors}
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="assigned_nurse_id"
+                      render={({ field }) => (
+                        <FormItem className="col-span-6">
+                          <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Nurse</FormLabel>
+                          <FormControl>
+                            <div className={searchableSelectWrapperClass}>
+                              <SearchableSelect
+                                options={nurses}
+                                value={field.value || ""}
+                                onValueChange={field.onChange}
+                                placeholder="Select nurse"
+                                searchPlaceholder="Search nurses..."
+                                loading={loadingNurses}
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                {/* Notes */}
+                <FormField
+                  control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem className="col-span-12">
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Notes</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Additional information..." 
+                          rows={3} 
+                          className="bg-white border-gray-200 focus:border-gray-600 text-sm rounded-lg"
+                          {...field} 
                         />
                       </FormControl>
                       <FormMessage />
@@ -492,30 +536,29 @@ export function BedAssignmentForm({ children, assignmentData, mode = "create", o
                   )}
                 />
               </div>
-            </div>
+            </form>
+          </Form>
+        </div>
 
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notes</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Additional information..." rows={3} {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit">{mode === "edit" ? "Update Assignment" : "Assign Bed"}</Button>
-            </DialogFooter>
-          </form>
-        </Form>
+        {/* Fixed Footer */}
+        <DialogFooter className="px-6 py-4 border-t bg-white">
+          <Button 
+            type="button" 
+            variant="ghost" 
+            onClick={() => setIsOpen(false)}
+            className="text-gray-600 hover:bg-gray-100"
+          >
+            Cancel
+          </Button>
+          <Button 
+            type="submit" 
+            form="bed-assignment-form"
+            className="bg-gray-900 hover:bg-black text-white px-6 py-2.5 rounded-lg font-semibold"
+          >
+            <UserCheck className="h-4 w-4 mr-2" />
+            {mode === "edit" ? "Update Assignment" : "Assign Bed"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

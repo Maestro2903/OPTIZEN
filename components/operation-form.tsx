@@ -29,6 +29,7 @@ import { useToast } from "@/hooks/use-toast"
 import { patientsApi, casesApi, masterDataApi, operationsApi } from "@/lib/services/api"
 import { useMasterData } from "@/hooks/use-master-data"
 import { Checkbox } from "@/components/ui/checkbox"
+import { CalendarCheck } from "lucide-react"
 
 const operationFormSchema = z.object({
   patient_id: z.string().min(1, "Patient is required"),
@@ -395,389 +396,541 @@ export function OperationForm({ children, onSubmit, operationData, mode = "creat
     }
   }
 
+  const printNotes = form.watch("print_notes")
+  const printPayment = form.watch("print_payment")
+  const printIol = form.watch("print_iol")
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {mode === "create" && <DialogTrigger asChild>{children}</DialogTrigger>}
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{mode === "create" ? "Schedule Operation" : "Edit Operation"}</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="max-w-4xl max-h-[85vh] p-0 flex flex-col">
+        {/* Fixed Header */}
+        <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-200 flex-shrink-0">
+          <DialogTitle className="text-xl font-bold text-gray-900">
+            {mode === "create" ? "Schedule Operation" : "Edit Operation"}
+          </DialogTitle>
+          <DialogDescription className="text-sm text-gray-500">
             {mode === "create" ? "Schedule a new surgical operation" : "Update operation details"}
           </DialogDescription>
         </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="patient_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Patient *</FormLabel>
-                    <FormControl>
-                      <SearchableSelect
-                        options={patients}
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        placeholder="Select patient"
-                        searchPlaceholder="Search patients..."
-                        loading={loadingPatients}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
-              <FormField
-                control={form.control}
-                name="case_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Case (Optional)</FormLabel>
-                    <FormControl>
-                      <SearchableSelect
-                        options={cases}
-                        value={field.value || ""}
-                        onValueChange={field.onChange}
-                        placeholder="Select case"
-                        searchPlaceholder="Search cases..."
-                        loading={loadingCases}
-                        disabled={!selectedPatientId}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="operation_name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Operation Type *</FormLabel>
-                    <FormControl>
-                      <SearchableSelect
-                        options={surgeryTypes}
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        placeholder="Select operation type"
-                        searchPlaceholder="Search surgeries..."
-                        loading={loadingSurgeries}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="operation_date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Operation Date *</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <FormField
-                control={form.control}
-                name="begin_time"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Begin Time</FormLabel>
-                    <FormControl>
-                      <Input type="time" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="end_time"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>End Time</FormLabel>
-                    <FormControl>
-                      <Input type="time" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="eye"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Eye</FormLabel>
-                    <FormControl>
-                      <SearchableSelect
-                        options={masterData.data.eyeSelection || []}
-                        value={field.value || ""}
-                        onValueChange={field.onChange}
-                        placeholder="Select eye"
-                        searchPlaceholder="Search eye..."
-                        emptyText="No options found."
-                        loading={masterData.loading.eyeSelection}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="sys_diagnosis"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Diagnosis</FormLabel>
-                    <FormControl>
-                      <SearchableSelect
-                        options={masterData.data.diagnosis || []}
-                        value={field.value || ""}
-                        onValueChange={field.onChange}
-                        placeholder="Select diagnosis"
-                        searchPlaceholder="Search diagnosis..."
-                        emptyText="No diagnosis found."
-                        loading={masterData.loading.diagnosis}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="anesthesia"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Anesthesia</FormLabel>
-                    <FormControl>
-                      <SearchableSelect
-                        options={masterData.data.anesthesiaTypes || []}
-                        value={field.value || ""}
-                        onValueChange={field.onChange}
-                        placeholder="Select anesthesia type"
-                        searchPlaceholder="Search anesthesia..."
-                        emptyText="No anesthesia types found."
-                        loading={masterData.loading.anesthesiaTypes}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <FormField
-                control={form.control}
-                name="iol_name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>IOL Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="IOL name" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="iol_power"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>IOL Power</FormLabel>
-                    <FormControl>
-                      <Input placeholder="IOL power" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Amount</FormLabel>
-                    <FormControl>
-                      <Input type="number" placeholder="0.00" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <FormField
-              control={form.control}
-              name="payment_mode"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Payment Mode</FormLabel>
-                  <FormControl>
-                    <SearchableSelect
-                      options={[
-                        { value: "Cash", label: "Cash" },
-                        { value: "Card", label: "Card" },
-                        { value: "UPI", label: "UPI" },
-                        { value: "Cheque", label: "Cheque" },
-                        { value: "Insurance", label: "Insurance" },
-                      ]}
-                      value={field.value || ""}
-                      onValueChange={field.onChange}
-                      placeholder="Select payment mode"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="operation_notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Operation Notes</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Enter operation notes..." rows={3} {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="flex items-center gap-4">
-              <FormField
-                control={form.control}
-                name="print_notes"
-                render={({ field }) => (
-                  <FormItem className="flex items-center gap-2 space-y-0">
-                    <FormControl>
-                      <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                    </FormControl>
-                    <FormLabel className="!mt-0 cursor-pointer">Print Notes</FormLabel>
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="print_payment"
-                render={({ field }) => (
-                  <FormItem className="flex items-center gap-2 space-y-0">
-                    <FormControl>
-                      <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                    </FormControl>
-                    <FormLabel className="!mt-0 cursor-pointer">Print Payment</FormLabel>
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="print_iol"
-                render={({ field }) => (
-                  <FormItem className="flex items-center gap-2 space-y-0">
-                    <FormControl>
-                      <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                    </FormControl>
-                    <FormLabel className="!mt-0 cursor-pointer">Print IOL</FormLabel>
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            {/* Follow-up Section */}
-            <div className="space-y-4 border-t pt-4">
-              <h3 className="font-semibold text-lg">Follow-up Information</h3>
-              
-              <div className="grid grid-cols-2 gap-4">
+        {/* Scrollable Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-6">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} id="operation-form">
+              <div className="grid grid-cols-12 gap-6">
+                {/* Section 1: Scheduling Essentials */}
+                {/* Patient & Case */}
                 <FormField
                   control={form.control}
-                  name="follow_up_date"
+                  name="patient_id"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Follow-up Date</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="follow_up_visit_type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Follow-up Visit Type</FormLabel>
+                    <FormItem className="col-span-6">
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                        Patient <span className="text-red-500">*</span>
+                      </FormLabel>
                       <FormControl>
                         <SearchableSelect
-                          options={masterData.data.visitTypes || []}
-                          value={field.value || ""}
+                          options={patients}
+                          value={field.value}
                           onValueChange={field.onChange}
-                          placeholder="Select follow-up visit type"
-                          searchPlaceholder="Search visit types..."
-                          emptyText="No visit types found."
-                          loading={masterData.loading.visitTypes}
+                          placeholder="Select patient"
+                          searchPlaceholder="Search patients..."
+                          loading={loadingPatients}
+                          className="h-11 bg-white border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-200 focus:border-gray-600"
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={form.control}
+                  name="case_id"
+                  render={({ field }) => (
+                    <FormItem className="col-span-6">
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                        Case (Optional)
+                      </FormLabel>
+                      <FormControl>
+                        <SearchableSelect
+                          options={cases}
+                          value={field.value || ""}
+                          onValueChange={field.onChange}
+                          placeholder="Select case"
+                          searchPlaceholder="Search cases..."
+                          loading={loadingCases}
+                          disabled={!selectedPatientId}
+                          className="h-11 bg-white border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-200 focus:border-gray-600"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Operation Type & Date */}
+                <FormField
+                  control={form.control}
+                  name="operation_name"
+                  render={({ field }) => (
+                    <FormItem className="col-span-6">
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                        Operation Type <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <SearchableSelect
+                          options={surgeryTypes}
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          placeholder="Select operation type"
+                          searchPlaceholder="Search surgeries..."
+                          loading={loadingSurgeries}
+                          className="h-11 bg-white border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-200 focus:border-gray-600"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="operation_date"
+                  render={({ field }) => (
+                    <FormItem className="col-span-6">
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                        Operation Date <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="date" 
+                          className="h-11 bg-white border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-200 focus:border-gray-600"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Time & Eye */}
+                <FormField
+                  control={form.control}
+                  name="begin_time"
+                  render={({ field }) => (
+                    <FormItem className="col-span-3">
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                        Begin Time
+                      </FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="time" 
+                          className="h-11 bg-white border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-200 focus:border-gray-600"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="end_time"
+                  render={({ field }) => (
+                    <FormItem className="col-span-3">
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                        End Time
+                      </FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="time" 
+                          className="h-11 bg-white border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-200 focus:border-gray-600"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="eye"
+                  render={({ field }) => (
+                    <FormItem className="col-span-6">
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                        Eye Selection
+                      </FormLabel>
+                      <FormControl>
+                        <SearchableSelect
+                          options={masterData.data.eyeSelection || []}
+                          value={field.value || ""}
+                          onValueChange={field.onChange}
+                          placeholder="Select eye"
+                          searchPlaceholder="Search eye..."
+                          emptyText="No options found."
+                          loading={masterData.loading.eyeSelection}
+                          className="h-11 bg-white border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-200 focus:border-gray-600"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Section 2: Clinical & IOL Details (Grey Box) */}
+                <div className="col-span-12 bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
+                  <div className="text-xs font-bold uppercase text-gray-500 mb-4">
+                    Clinical & IOL Details
+                  </div>
+                  
+                  <div className="grid grid-cols-12 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="sys_diagnosis"
+                      render={({ field }) => (
+                        <FormItem className="col-span-6">
+                          <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                            Diagnosis
+                          </FormLabel>
+                          <FormControl>
+                            <SearchableSelect
+                              options={masterData.data.diagnosis || []}
+                              value={field.value || ""}
+                              onValueChange={field.onChange}
+                              placeholder="Select diagnosis"
+                              searchPlaceholder="Search diagnosis..."
+                              emptyText="No diagnosis found."
+                              loading={masterData.loading.diagnosis}
+                              className="h-11 bg-white border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-200 focus:border-gray-600"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="anesthesia"
+                      render={({ field }) => (
+                        <FormItem className="col-span-6">
+                          <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                            Anesthesia
+                          </FormLabel>
+                          <FormControl>
+                            <SearchableSelect
+                              options={masterData.data.anesthesiaTypes || []}
+                              value={field.value || ""}
+                              onValueChange={field.onChange}
+                              placeholder="Select anesthesia type"
+                              searchPlaceholder="Search anesthesia..."
+                              emptyText="No anesthesia types found."
+                              loading={masterData.loading.anesthesiaTypes}
+                              className="h-11 bg-white border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-200 focus:border-gray-600"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* IOL Row */}
+                    <FormField
+                      control={form.control}
+                      name="iol_name"
+                      render={({ field }) => (
+                        <FormItem className="col-span-5">
+                          <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                            IOL Name
+                          </FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="IOL name" 
+                              className="h-11 bg-white border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-200 focus:border-gray-600"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="iol_power"
+                      render={({ field }) => (
+                        <FormItem className="col-span-4">
+                          <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                            IOL Power
+                          </FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="IOL power" 
+                              className="h-11 bg-white border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-200 focus:border-gray-600"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="amount"
+                      render={({ field }) => (
+                        <FormItem className="col-span-3">
+                          <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                            Amount
+                          </FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              placeholder="0.00" 
+                              className="h-11 bg-white border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-200 focus:border-gray-600"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                {/* Payment Mode */}
+                <FormField
+                  control={form.control}
+                  name="payment_mode"
+                  render={({ field }) => (
+                    <FormItem className="col-span-6">
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                        Payment Mode
+                      </FormLabel>
+                      <FormControl>
+                        <SearchableSelect
+                          options={[
+                            { value: "Cash", label: "Cash" },
+                            { value: "Card", label: "Card" },
+                            { value: "UPI", label: "UPI" },
+                            { value: "Cheque", label: "Cheque" },
+                            { value: "Insurance", label: "Insurance" },
+                          ]}
+                          value={field.value || ""}
+                          onValueChange={field.onChange}
+                          placeholder="Select payment mode"
+                          className="h-11 bg-white border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-200 focus:border-gray-600"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Operation Notes */}
+                <FormField
+                  control={form.control}
+                  name="operation_notes"
+                  render={({ field }) => (
+                    <FormItem className="col-span-12">
+                      <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                        Operation Notes
+                      </FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Enter operation notes..." 
+                          rows={3} 
+                          className="bg-white border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-200 focus:border-gray-600"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Section 3: Print Options (Toggle Chips) */}
+                <div className="col-span-12 flex gap-3 items-center py-2">
+                  <FormField
+                    control={form.control}
+                    name="print_notes"
+                    render={({ field }) => (
+                      <FormItem className="space-y-0">
+                        <FormControl>
+                          <button
+                            type="button"
+                            onClick={() => field.onChange(!field.value)}
+                            aria-pressed={field.value}
+                            aria-label={`Print Notes, ${field.value ? 'enabled' : 'disabled'}`}
+                            className={`border rounded-full px-4 py-1 text-xs font-medium cursor-pointer transition-colors ${
+                              printNotes
+                                ? "bg-gray-900 text-white border-gray-900"
+                                : "border-gray-300 hover:bg-gray-100"
+                            }`}
+                          >
+                            Print Notes
+                          </button>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="print_payment"
+                    render={({ field }) => (
+                      <FormItem className="space-y-0">
+                        <FormControl>
+                          <button
+                            type="button"
+                            onClick={() => field.onChange(!field.value)}
+                            aria-pressed={field.value}
+                            aria-label={`Print Payment, ${field.value ? 'enabled' : 'disabled'}`}
+                            className={`border rounded-full px-4 py-1 text-xs font-medium cursor-pointer transition-colors ${
+                              printPayment
+                                ? "bg-gray-900 text-white border-gray-900"
+                                : "border-gray-300 hover:bg-gray-100"
+                            }`}
+                          >
+                            Print Payment
+                          </button>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="print_iol"
+                    render={({ field }) => (
+                      <FormItem className="space-y-0">
+                        <FormControl>
+                          <button
+                            type="button"
+                            onClick={() => field.onChange(!field.value)}
+                            aria-pressed={field.value}
+                            aria-label={`Print IOL, ${field.value ? 'enabled' : 'disabled'}`}
+                            className={`border rounded-full px-4 py-1 text-xs font-medium cursor-pointer transition-colors ${
+                              printIol
+                                ? "bg-gray-900 text-white border-gray-900"
+                                : "border-gray-300 hover:bg-gray-100"
+                            }`}
+                          >
+                            Print IOL
+                          </button>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Section 3: Follow-up Fields */}
+                <div className="col-span-12 space-y-4 border-t border-gray-200 pt-4">
+                  <div className="text-xs font-bold uppercase text-gray-500 mb-2">
+                    Follow-up Information
+                  </div>
+                  
+                  <div className="grid grid-cols-12 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="follow_up_date"
+                      render={({ field }) => (
+                        <FormItem className="col-span-6">
+                          <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                            Follow-up Date
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type="date"
+                              className="h-11 bg-white border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-200 focus:border-gray-600"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="follow_up_visit_type"
+                      render={({ field }) => (
+                        <FormItem className="col-span-6">
+                          <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                            Visit Type
+                          </FormLabel>
+                          <FormControl>
+                            <SearchableSelect
+                              options={masterData.data.visitTypes || []}
+                              value={field.value || ""}
+                              onValueChange={field.onChange}
+                              placeholder="Select follow-up visit type"
+                              searchPlaceholder="Search visit types..."
+                              emptyText="No visit types found."
+                              loading={masterData.loading.visitTypes}
+                              className="h-11 bg-white border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-200 focus:border-gray-600"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-12 gap-4 mt-2">
+                    <FormField
+                      control={form.control}
+                      name="follow_up_notes"
+                      render={({ field }) => (
+                        <FormItem className="col-span-12">
+                          <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                            Follow-up Notes
+                          </FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Enter follow-up notes..."
+                              rows={4}
+                              className="bg-white border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-200 focus:border-gray-600"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
               </div>
+            </form>
+          </Form>
+        </div>
 
-              <FormField
-                control={form.control}
-                name="follow_up_notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Follow-up Notes</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="Enter follow-up notes or instructions..." rows={3} {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit">
-                {mode === "create" ? "Schedule Operation" : "Update Operation"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+        {/* Fixed Footer */}
+        <DialogFooter className="px-6 py-4 border-t border-gray-200 flex-shrink-0 bg-white">
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={() => setOpen(false)}
+            className="text-gray-600 hover:bg-gray-100 px-4 py-2 rounded-lg"
+          >
+            Cancel
+          </Button>
+          <Button 
+            type="submit"
+            form="operation-form"
+            className="bg-gray-900 hover:bg-black text-white px-8 py-2.5 rounded-lg font-semibold shadow-lg"
+          >
+            <CalendarCheck className="h-4 w-4 mr-2" />
+            {mode === "create" ? "Schedule Operation" : "Update Operation"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

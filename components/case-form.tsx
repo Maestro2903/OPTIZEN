@@ -39,9 +39,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Check, Trash2, X, Save, Pill } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 import dynamic from "next/dynamic"
 
 const EyeDrawingTool = dynamic(() => import("@/components/eye-drawing-tool").then(m => m.EyeDrawingTool), { ssr: false })
@@ -403,6 +405,8 @@ const caseFormSchema = z.object({
   
   // 8. Diagnosis
   diagnosis: z.array(z.string()).optional(),
+  no_complaints_flag: z.boolean().optional(),
+  diagnosis_pending_flag: z.boolean().optional(),
   
   // 9. Diagnostic Tests
   iop_right: z.string().optional(),
@@ -438,6 +442,7 @@ const caseFormSchema = z.object({
   left_eye_diagram: z.string().optional(),
   // 12. Advice
   advice_remarks: z.string().optional(),
+  surgery_remarks: z.string().optional(),
 })
 
 interface CaseFormProps {
@@ -450,6 +455,8 @@ interface CaseFormProps {
 export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitCallback }: CaseFormProps) {
   const [open, setOpen] = React.useState(false)
   const [currentStep, setCurrentStep] = React.useState("register")
+  const [completedSteps, setCompletedSteps] = React.useState<Set<string>>(new Set())
+  const [visitedSteps, setVisitedSteps] = React.useState<Set<string>>(new Set())
   const [patients, setPatients] = React.useState<SearchableSelectOption[]>([])
   const [loadingPatients, setLoadingPatients] = React.useState(false)
   const [selectedPatient, setSelectedPatient] = React.useState<Patient | null>(null)
@@ -474,19 +481,30 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
   const [showAddMedicineDialog, setShowAddMedicineDialog] = React.useState(false)
   const [newMedicineName, setNewMedicineName] = React.useState("")
   const [newMedicineDescription, setNewMedicineDescription] = React.useState("")
+  const [showMedicineForm, setShowMedicineForm] = React.useState(false)
+  const [showInlineTreatmentForm, setShowInlineTreatmentForm] = React.useState(false)
+  const [newTreatment, setNewTreatment] = React.useState("")
+  const [newTreatmentYears, setNewTreatmentYears] = React.useState("")
+  const [showInlineMedicineForm, setShowInlineMedicineForm] = React.useState(false)
+  const [newPastMedicineName, setNewPastMedicineName] = React.useState("")
+  const [newPastMedicineType, setNewPastMedicineType] = React.useState("")
+  const [newPastMedicineDuration, setNewPastMedicineDuration] = React.useState("")
+  const [newPastMedicineEye, setNewPastMedicineEye] = React.useState("R")
 
   // State for surgery form inputs
   const [newSurgeryEye, setNewSurgeryEye] = React.useState("")
   const [newSurgeryName, setNewSurgeryName] = React.useState("")
   const [newSurgeryAnesthesia, setNewSurgeryAnesthesia] = React.useState("")
-  
+  const [showSurgeryForm, setShowSurgeryForm] = React.useState(false)
+
   // State for diagnostic test form inputs
   const [newTestId, setNewTestId] = React.useState("")
   const [newTestEye, setNewTestEye] = React.useState("")
   const [newTestType, setNewTestType] = React.useState("")
   const [newTestProblem, setNewTestProblem] = React.useState("")
   const [newTestNotes, setNewTestNotes] = React.useState("")
-  
+  const [showComplaintForm, setShowComplaintForm] = React.useState(false)
+
   const masterData = useMasterData()
 
   // Initialize form BEFORE any code that references it
@@ -499,10 +517,13 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
       visit_type: "First",
         complaints: [],
         diagnosis: [],
+        no_complaints_flag: false,
+        diagnosis_pending_flag: false,
         blood_tests: [],
         treatments: [],
         right_eye_diagram: "",
         left_eye_diagram: "",
+        surgery_remarks: "",
     },
   })
 
@@ -559,6 +580,8 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
         visit_type: "First",
         complaints: [],
         diagnosis: [],
+        no_complaints_flag: false,
+        diagnosis_pending_flag: false,
         blood_tests: [],
         treatments: [],
         right_eye_diagram: "",
@@ -739,7 +762,7 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
             type="button"
             variant="outline"
             role="combobox"
-            className={`w-full justify-between border-gray-300 text-left font-normal ${!value && 'text-muted-foreground'} ${className || ''}`}
+            className={`w-full justify-between text-left font-normal ${!value && 'text-muted-foreground'} ${className || 'border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm'}`}
           >
             <span className="truncate">{displayValue || placeholder || "Select option"}</span>
             <span className="ml-2">▼</span>
@@ -941,6 +964,28 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
     }
   }, [mode, caseData, form])
 
+  // Coordinate no_complaints_flag with complaints array
+  const noComplaintsFlag = form.watch("no_complaints_flag");
+  const complaints = form.watch("complaints");
+
+  React.useEffect(() => {
+    // If complaints are added, uncheck the no complaints flag
+    if (complaints && complaints.length > 0 && noComplaintsFlag) {
+      form.setValue("no_complaints_flag", false);
+    }
+  }, [complaints, noComplaintsFlag, form]);
+
+  // Coordinate diagnosis_pending_flag with diagnosis array
+  const diagnosisPendingFlag = form.watch("diagnosis_pending_flag");
+  const diagnosis = form.watch("diagnosis");
+
+  React.useEffect(() => {
+    // If diagnosis is added, uncheck the diagnosis pending flag
+    if (diagnosis && diagnosis.length > 0 && diagnosisPendingFlag) {
+      form.setValue("diagnosis_pending_flag", false);
+    }
+  }, [diagnosis, diagnosisPendingFlag, form]);
+
   // Function to add new complaint
   const handleAddComplaint = () => {
     if (newComplaintId) {
@@ -960,16 +1005,24 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
   }
 
   // Function to add new medicine
-  const handleAddMedicine = () => {
+  const handleAddMedicine = (medicineData?: { drug: string; eye: string; dosage: string; route: string; duration: string; quantity: string }) => {
+    // If medicineData is provided (from inline buttons), use that, otherwise use current state
+    const drug = medicineData?.drug || newMedicineDrug;
+    const eye = medicineData?.eye || newMedicineEye;
+    const dosage = medicineData?.dosage || newMedicineDosage;
+    const route = medicineData?.route || newMedicineRoute;
+    const duration = medicineData?.duration || newMedicineDuration;
+    const quantity = medicineData?.quantity || newMedicineQuantity;
+
     // Require only essential fields: drug, eye, and dosage
-    if (newMedicineDrug && newMedicineEye && newMedicineDosage) {
+    if (drug && eye && dosage) {
       appendMedicine({
-        drug_name: newMedicineDrug,
-        eye: newMedicineEye,
-        dosage: newMedicineDosage,
-        route: newMedicineRoute,
-        duration: newMedicineDuration,
-        quantity: newMedicineQuantity,
+        drug_name: drug,
+        eye: eye,
+        dosage: dosage,
+        route: route,
+        duration: duration,
+        quantity: quantity,
       })
       setNewMedicineDrug("")
       setNewMedicineEye("")
@@ -1258,6 +1311,7 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
         medications_prescribed: values.dosage || undefined,
         follow_up_instructions: values.surgery_advised || undefined,
         advice_remarks: values.advice_remarks || undefined,
+        surgery_remarks: values.surgery_remarks || undefined,
         status: 'active'
       }
       
@@ -1293,32 +1347,219 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
     { id: "advice", label: "Advice", number: 10 },
   ]
 
+  // Validate step based on current step
+  const validateStep = async (stepId: string): Promise<boolean> => {
+    // Handle steps with special validation logic first
+    switch (stepId) {
+      case "register":
+        // Validate patient selection and visit type
+        const patientId = form.getValues("patient_id");
+        const visitType = form.getValues("visit_type");
+        return !!patientId && !!visitType;
+      case "complaints":
+        // Validate that either at least one complaint is added OR the no complaints flag is set
+        const complaints = form.getValues("complaints");
+        const noComplaintsFlag = form.getValues("no_complaints_flag");
+        return (Array.isArray(complaints) && complaints.length > 0) ||
+               (noComplaintsFlag === true);
+      case "diagnosis":
+        // Validate that either at least one diagnosis is added OR the diagnosis pending flag is set
+        const diagnosis = form.getValues("diagnosis");
+        const diagnosisPendingFlag = form.getValues("diagnosis_pending_flag");
+        return (Array.isArray(diagnosis) && diagnosis.length > 0) ||
+               (diagnosisPendingFlag === true);
+      case "advice":
+        // Validate that at least one medicine or surgery is added
+        const medicines = form.getValues("medicines");
+        const surgeries = form.getValues("surgeries");
+        return (Array.isArray(medicines) && medicines.length > 0) ||
+               (Array.isArray(surgeries) && surgeries.length > 0);
+      default:
+        // For other steps, validate only the fields relevant to the current step
+        // Determine fields to validate based on the current step
+        let fieldsToValidate: string[] = [];
+        switch (stepId) {
+          case "history":
+            fieldsToValidate = ["chief_complaint", "history_present_illness"];
+            break;
+          case "patient-history":
+            fieldsToValidate = ["past_history_treatments", "past_history_medicines"];
+            break;
+          case "vision":
+            fieldsToValidate = [
+              // Visual acuity fields
+              "visual_acuity_unaided_right", "visual_acuity_unaided_left",
+              "pinhole_right", "pinhole_left",
+              "visual_acuity_aided_right", "visual_acuity_aided_left",
+              "near_visual_right", "near_visual_left",
+              // Refraction fields - Distant
+              "refraction_distant_sph_right", "refraction_distant_cyl_right", "refraction_distant_axis_right", "refraction_distant_va_right",
+              "refraction_distant_sph_left", "refraction_distant_cyl_left", "refraction_distant_axis_left", "refraction_distant_va_left",
+              // Refraction fields - Near
+              "refraction_near_sph_right", "refraction_near_cyl_right", "refraction_near_axis_right", "refraction_near_va_right",
+              "refraction_near_sph_left", "refraction_near_cyl_left", "refraction_near_axis_left", "refraction_near_va_left",
+              // Refraction fields - PG (Post Gonioscopy)
+              "refraction_pg_sph_right", "refraction_pg_cyl_right", "refraction_pg_axis_right", "refraction_pg_va_right",
+              "refraction_pg_sph_left", "refraction_pg_cyl_left", "refraction_pg_axis_left", "refraction_pg_va_left",
+              // Refraction general fields
+              "refraction_purpose", "refraction_quality", "refraction_remark"
+            ];
+            break;
+          case "examination":
+            fieldsToValidate = [
+              // Anterior Segment Examination
+              "eyelids_right", "eyelids_left",
+              "conjunctiva_right", "conjunctiva_left",
+              "cornea_right", "cornea_left",
+              "anterior_chamber_right", "anterior_chamber_left",
+              "iris_right", "iris_left",
+              "lens_right", "lens_left",
+              "anterior_remarks",
+              // Posterior Segment Examination
+              "vitreous_right", "vitreous_left",
+              "disc_right", "disc_left",
+              "retina_right", "retina_left",
+              "posterior_remarks"
+            ];
+            break;
+          case "blood":
+            fieldsToValidate = ["blood_tests"];
+            break;
+          case "diagram":
+            fieldsToValidate = ["right_eye_diagram", "left_eye_diagram"];
+            break;
+          default:
+            // If we can't determine the fields for the step, validate nothing
+            fieldsToValidate = [];
+        }
+
+        // Validate only the relevant fields for the current step
+        try {
+          if (fieldsToValidate.length > 0) {
+            const validationResults = await form.trigger(fieldsToValidate);
+
+            // Check if there are any errors for the specific fields we validated
+            const hasErrors = fieldsToValidate.some(field =>
+              form.formState.errors.hasOwnProperty(field)
+            );
+
+            if (hasErrors) {
+              // Build a list of the first few error names
+              const errorFieldNames = fieldsToValidate.filter(field =>
+                form.formState.errors.hasOwnProperty(field)
+              ).slice(0, 3); // Take up to 3 field names to avoid a long message
+
+              // Format the error message
+              const errorFieldsList = errorFieldNames.join(", ");
+              toast({
+                variant: "destructive",
+                title: "Validation Error",
+                description: `Please complete required fields: ${errorFieldsList}`,
+              });
+
+              return false;
+            }
+
+            return validationResults;
+          }
+          return true; // If no fields to validate, consider step valid
+        } catch {
+          toast({
+            variant: "destructive",
+            title: "Validation Error",
+            description: "An error occurred during validation. Please check your entries.",
+          });
+          return false;
+        }
+    }
+  };
+
+  // Track completed steps when user moves to next step
+  const handleStepChange = async (newStep: string) => {
+    // If we're not moving to the same step, validate the current step
+    if (newStep !== currentStep) {
+      const isStepValid = await validateStep(currentStep);
+
+      if (isStepValid) {
+        setCompletedSteps((prev) => new Set([...prev, currentStep]));
+        // Remove from visited steps if it was there (completed takes priority)
+        setVisitedSteps((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(currentStep);
+          return newSet;
+        });
+      } else {
+        // Mark as visited if validation fails
+        setVisitedSteps((prev) => new Set([...prev, currentStep]));
+      }
+    }
+
+    setCurrentStep(newStep);
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{mode === "edit" ? "Edit Case" : "Add New Case"} - Multi-Step Registration</DialogTitle>
-          <DialogDescription>
-            {mode === "edit" ? "Update case information" : "Complete patient case registration with medical examination"}
-          </DialogDescription>
-        </DialogHeader>
-
+      <DialogContent className="max-w-6xl h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col p-0">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <Tabs value={currentStep} onValueChange={(value) => {
-              // Allow free navigation between tabs without validation
-              setCurrentStep(value)
-            }} className="w-full">
-              <TabsList className="h-auto grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-5 w-full p-1 gap-1">
-                {steps.map((step) => (
-                  <TabsTrigger key={step.id} value={step.id} className="text-xs px-2 py-2 whitespace-nowrap">
-                    <span className="hidden lg:inline">{step.number}. </span>{step.label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-              
-              <div className="min-h-[400px] mt-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-full">
+            {/* SECTION 1: Fixed Header (Stepper) */}
+            <div className="flex-shrink-0">
+              <DialogHeader className="px-6 pt-6 pb-3">
+                <DialogTitle>{mode === "edit" ? "Edit Case" : "Add New Case"} - Multi-Step Registration</DialogTitle>
+                <DialogDescription>
+                  {mode === "edit" ? "Update case information" : "Complete patient case registration with medical examination"}
+                </DialogDescription>
+              </DialogHeader>
+              {/* Horizontal Scrollable Stepper Rail */}
+              <div
+                role="tablist"
+                className="flex overflow-x-auto items-center gap-2 p-3 border-b border-gray-200 bg-gray-50/50 no-scrollbar"
+              >
+                {steps.map((step) => {
+                  const isActive = currentStep === step.id
+                  const isCompleted = completedSteps.has(step.id)
+                  const isVisited = visitedSteps.has(step.id)
+                  return (
+                    <button
+                      key={step.id}
+                      type="button"
+                      role="tab"
+                      tabIndex={isActive ? 0 : -1}
+                      aria-selected={isActive}
+                      aria-current={isActive ? "step" : undefined}
+                      aria-label={`Step ${step.number}: ${step.label} ${isActive ? '(current step)' : isCompleted ? '(completed)' : isVisited ? '(visited)' : '(not completed)'}`}
+                      onClick={() => handleStepChange(step.id)}
+                      className={`
+                        flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold uppercase tracking-wide whitespace-nowrap transition-all
+                        ${isActive
+                          ? 'bg-gray-900 text-white shadow-md'
+                          : isCompleted
+                          ? 'bg-white text-emerald-600 border border-emerald-200 hover:bg-gray-50'
+                          : isVisited
+                          ? 'bg-white text-blue-600 border border-blue-200 hover:bg-gray-50'
+                          : 'bg-white text-gray-400 border border-gray-200 hover:bg-gray-50'
+                        }
+                      `}
+                    >
+                      {isCompleted && !isActive && (
+                        <Check className="h-3 w-3 text-emerald-600" />
+                      )}
+                      {!isCompleted && isVisited && !isActive && (
+                        <span className="h-3 w-3 text-blue-600">•</span>
+                      )}
+                      <span>{step.number}. {step.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            
+            {/* SECTION 2: Scrollable Content Body */}
+            <div className="flex-1 overflow-y-auto min-h-0">
+              <Tabs value={currentStep} onValueChange={handleStepChange} className="w-full h-full">
+                <div className="px-6 py-4">
+                  <div className="min-h-[400px]">
                 <TabsContent value="register" className="space-y-4 min-h-[350px]">
                 <h3 className="font-semibold text-lg">1. Register & Patient Selection</h3>
                 
@@ -1429,246 +1670,355 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                 </div>
 
                 {/* Treatment Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm text-muted-foreground">Add patient past treatments</div>
-                    <Button type="button" className="bg-blue-500 hover:bg-blue-600" onClick={() => appendTreatment({ treatment: "", years: "" })}>
+                <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6 shadow-sm">
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Treatments</h4>
+                    <Button 
+                      type="button" 
+                      className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100" 
+                      onClick={() => setShowInlineTreatmentForm(true)}
+                    >
                       Add Treatment
                     </Button>
                   </div>
 
-                  <div className="border rounded-lg">
-                    <table className="w-full">
-                      <thead className="border-b bg-gray-50">
-                        <tr>
-                          <th className="text-left p-3 text-sm font-medium">TREATMENT</th>
-                          <th className="text-left p-3 text-sm font-medium">YEARS</th>
-                          <th className="text-left p-3 text-sm font-medium">ACTION</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {treatmentFields.length === 0 ? (
-                          <tr>
-                            <td colSpan={3} className="text-center p-8 text-muted-foreground text-sm">No treatments added.</td>
-                          </tr>
-                        ) : (
-                          treatmentFields.map((fieldItem, index) => (
-                            <tr key={fieldItem.id}>
-                              <td className="p-3">
-                                <FormField
-                                  control={form.control}
-                                  name={`past_history_treatments.${index}.treatment` as const}
-                                  render={({ field }) => (
-                                    <SearchableSelect
-                                      options={masterData.data.treatments}
-                                      value={field.value}
-                                      onValueChange={field.onChange}
-                                      placeholder="Select treatment"
-                                      searchPlaceholder="Search treatments..."
-                                      emptyText="No treatments found."
-                                      loading={masterData.loading.treatments}
-                                    />
-                                  )}
-                                />
-                              </td>
-                              <td className="p-3">
-                                <Input
-                                  placeholder="e.g. 2 Years"
-                                  {...form.register(`past_history_treatments.${index}.years` as const)}
-                                />
-                              </td>
-                              <td className="p-3">
-                                <Button type="button" variant="outline" onClick={() => removeTreatment(index)}>
-                                  Remove
-                                </Button>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                  {/* Input Row (When Adding) */}
+                  {showInlineTreatmentForm && (
+                    <div className="mb-4 pb-4 border-b border-gray-200">
+                      <div className="grid grid-cols-12 gap-3 items-center">
+                        <div className="col-span-5">
+                          <SearchableSelect
+                            options={masterData.data.treatments}
+                            value={newTreatment}
+                            onValueChange={setNewTreatment}
+                            placeholder="Select treatment"
+                            searchPlaceholder="Search treatments..."
+                            emptyText="No treatments found."
+                            loading={masterData.loading.treatments}
+                            className="h-10 bg-gray-50 border-gray-200 text-sm"
+                          />
+                        </div>
+                        <div className="col-span-5">
+                          <Input
+                            placeholder="e.g. 2 Years"
+                            value={newTreatmentYears}
+                            onChange={(e) => setNewTreatmentYears(e.target.value)}
+                            className="h-10 bg-gray-50 border-gray-200 text-sm"
+                          />
+                        </div>
+                        <div className="col-span-2 flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (newTreatment) {
+                                appendTreatment({
+                                  treatment: newTreatment,
+                                  years: newTreatmentYears
+                                })
+                                setNewTreatment("")
+                                setNewTreatmentYears("")
+                                setShowInlineTreatmentForm(false)
+                              }
+                            }}
+                            className="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
+                            title="Confirm"
+                          >
+                            <Check className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowInlineTreatmentForm(false)
+                              setNewTreatment("")
+                              setNewTreatmentYears("")
+                            }}
+                            className="text-gray-400 hover:text-red-500 w-10 h-10 flex items-center justify-center transition-colors"
+                            title="Cancel"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Added Items List */}
+                  {treatmentFields.length === 0 ? (
+                    <div className="text-center p-6 text-gray-400 text-sm">No treatments added.</div>
+                  ) : (
+                    <div className="space-y-0">
+                      {treatmentFields.map((fieldItem, index) => {
+                        const treatmentValue = form.watch(`past_history_treatments.${index}.treatment` as const)
+                        const treatmentYears = form.watch(`past_history_treatments.${index}.years` as const)
+                        const treatment = masterData.data.treatments?.find(t => t.value === treatmentValue)
+                        
+                        return (
+                          <div 
+                            key={fieldItem.id} 
+                            className={`flex justify-between items-center p-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                          >
+                            <div className="flex-1 grid grid-cols-12 gap-3 items-center">
+                              <div className="col-span-5 text-sm font-medium text-gray-700">
+                                {treatment?.label || treatmentValue || "Unnamed Treatment"}
+                              </div>
+                              <div className="col-span-5 text-sm font-medium text-gray-700">
+                                {treatmentYears || "-"}
+                              </div>
+                              <div className="col-span-2 flex justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() => removeTreatment(index)}
+                                  className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                                  title="Delete treatment"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 {/* Medicine Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-semibold">Medicine</h4>
-                    <Button type="button" className="bg-blue-500 hover:bg-blue-600" onClick={() => appendPastMedicine({ medicine_name: "", type: "", advice: "", duration: "", eye: "R" })}>
+                <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6 shadow-sm">
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Medicine</h4>
+                    <Button 
+                      type="button" 
+                      className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100" 
+                      onClick={() => setShowInlineMedicineForm(true)}
+                    >
                       Add Medicine
                     </Button>
                   </div>
 
-                  {/* Medicines Table */}
-                  <div className="border rounded-lg">
-                    <table className="w-full">
-                      <thead className="border-b bg-gray-50">
-                        <tr>
-                          <th className="text-left p-3 text-sm font-medium">EYE</th>
-                          <th className="text-left p-3 text-sm font-medium">MEDICINE NAME</th>
-                          <th className="text-left p-3 text-sm font-medium">TYPE</th>
-                          <th className="text-left p-3 text-sm font-medium">ADVICE</th>
-                          <th className="text-left p-3 text-sm font-medium">DURATION</th>
-                          <th className="text-left p-3 text-sm font-medium">ACTION</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {medicineFields.length === 0 ? (
-                          <tr>
-                            <td colSpan={6} className="text-center p-8 text-muted-foreground text-sm">No medicines added.</td>
-                          </tr>
-                        ) : (
-                          medicineFields.map((fieldItem, index) => (
-                            <tr key={fieldItem.id}>
-                              <td className="p-3">
-                                <Select
-                                  value={form.watch(`past_history_medicines.${index}.eye` as const)}
-                                  onValueChange={(value) => form.setValue(`past_history_medicines.${index}.eye` as const, value as "R" | "L" | "B")}
+                  {/* Input Row (When Adding) */}
+                  {showInlineMedicineForm && (
+                    <div className="mb-4 pb-4 border-b border-gray-200">
+                      <div className="grid grid-cols-12 gap-3 items-center">
+                        <div className="col-span-3">
+                          <SearchableSelect
+                            options={masterData.data.medicines || []}
+                            value={newPastMedicineName}
+                            onValueChange={setNewPastMedicineName}
+                            placeholder="Medicine Name"
+                            searchPlaceholder="Search medicines..."
+                            emptyText="No medicines found."
+                            loading={masterData.loading.medicines}
+                            className="h-10 bg-gray-50 border-gray-200 text-sm"
+                          />
+                        </div>
+                        <div className="col-span-3">
+                          <SearchableSelect
+                            options={masterData.data.dosages || []}
+                            value={newPastMedicineType}
+                            onValueChange={setNewPastMedicineType}
+                            placeholder="Type/Frequency"
+                            searchPlaceholder="Search dosages..."
+                            emptyText="No dosages found."
+                            loading={masterData.loading.dosages}
+                            className="h-10 bg-gray-50 border-gray-200 text-sm"
+                          />
+                        </div>
+                        <div className="col-span-4">
+                          <Input
+                            placeholder="Duration"
+                            value={newPastMedicineDuration}
+                            onChange={(e) => setNewPastMedicineDuration(e.target.value)}
+                            className="h-10 bg-gray-50 border-gray-200 text-sm"
+                          />
+                        </div>
+                        <div className="col-span-2 flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (newPastMedicineName) {
+                                appendPastMedicine({
+                                  medicine_name: newPastMedicineName,
+                                  type: newPastMedicineType,
+                                  advice: "",
+                                  duration: newPastMedicineDuration,
+                                  eye: newPastMedicineEye
+                                })
+                                setNewPastMedicineName("")
+                                setNewPastMedicineType("")
+                                setNewPastMedicineDuration("")
+                                setNewPastMedicineEye("R")
+                                setShowInlineMedicineForm(false)
+                              }
+                            }}
+                            className="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
+                            title="Confirm"
+                          >
+                            <Check className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowInlineMedicineForm(false)
+                              setNewPastMedicineName("")
+                              setNewPastMedicineType("")
+                              setNewPastMedicineDuration("")
+                              setNewPastMedicineEye("R")
+                            }}
+                            className="text-gray-400 hover:text-red-500 w-10 h-10 flex items-center justify-center transition-colors"
+                            title="Cancel"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Added Items List */}
+                  {medicineFields.length === 0 ? (
+                    <div className="text-center p-6 text-gray-400 text-sm">No medications added.</div>
+                  ) : (
+                    <div className="space-y-0">
+                      {medicineFields.map((fieldItem, index) => {
+                        const medicineName = form.watch(`past_history_medicines.${index}.medicine_name` as const)
+                        const medicineType = form.watch(`past_history_medicines.${index}.type` as const)
+                        const medicineDuration = form.watch(`past_history_medicines.${index}.duration` as const)
+                        
+                        const medicine = masterData.data.medicines?.find(m => m.value === medicineName)
+                        const dosage = masterData.data.dosages?.find(d => d.value === medicineType)
+                        
+                        return (
+                          <div 
+                            key={fieldItem.id} 
+                            className={`flex justify-between items-center p-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                          >
+                            <div className="flex-1 grid grid-cols-12 gap-3 items-center">
+                              <div className="col-span-3 text-sm font-medium text-gray-700">
+                                {medicine?.label || medicineName || "Unnamed Medicine"}
+                              </div>
+                              <div className="col-span-3 text-sm font-medium text-gray-700">
+                                {dosage?.label || medicineType || "N/A"}
+                              </div>
+                              <div className="col-span-4 text-sm font-medium text-gray-700">
+                                {medicineDuration || "No duration"}
+                              </div>
+                              <div className="col-span-2 flex justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() => removePastMedicine(index)}
+                                  className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                                  title="Delete medicine"
                                 >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="R">Right</SelectItem>
-                                    <SelectItem value="L">Left</SelectItem>
-                                    <SelectItem value="B">Both</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </td>
-                              <td className="p-3">
-                                <FormField
-                                  control={form.control}
-                                  name={`past_history_medicines.${index}.medicine_name` as const}
-                                  render={({ field }) => (
-                                    <SearchableSelect
-                                      options={masterData.data.medicines}
-                                      value={field.value}
-                                      onValueChange={field.onChange}
-                                      placeholder="Select medicine"
-                                      searchPlaceholder="Search medicines..."
-                                      emptyText="No medicines found."
-                                      loading={masterData.loading.medicines}
-                                    />
-                                  )}
-                                />
-                              </td>
-                              <td className="p-3">
-                                <FormField
-                                  control={form.control}
-                                  name={`past_history_medicines.${index}.type` as const}
-                                  render={({ field }) => (
-                                    <SearchableSelect
-                                      options={masterData.data.dosages}
-                                      value={field.value}
-                                      onValueChange={field.onChange}
-                                      placeholder="Select dosage"
-                                      searchPlaceholder="Search dosages..."
-                                      emptyText="No dosages found."
-                                      loading={masterData.loading.dosages}
-                                    />
-                                  )}
-                                />
-                              </td>
-                              <td className="p-3">
-                                <Input placeholder="Advice" {...form.register(`past_history_medicines.${index}.advice` as const)} />
-                              </td>
-                              <td className="p-3">
-                                <Input placeholder="Duration" {...form.register(`past_history_medicines.${index}.duration` as const)} />
-                              </td>
-                              <td className="p-3">
-                                <Button type="button" variant="outline" onClick={() => removePastMedicine(index)}>
-                                  Remove
-                                </Button>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               </TabsContent>
 
               <TabsContent value="complaints" className="space-y-6 min-h-[350px]">
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold text-lg">Complaints</h3>
-                </div>
-
-                {/* Add Complaint Form */}
-                <div className="border rounded-lg p-4 space-y-4 bg-gray-50">
-                  <h4 className="text-sm font-semibold">Add New Complaint</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="col-span-2">
-                      <label className="text-sm font-medium block mb-1.5">Complaint *</label>
-                      <GroupedSearchableSelect
-                        groups={complaintGroups}
-                        value={newComplaintId}
-                        onValueChange={(complaintId, categoryId) => {
-                          setNewComplaintId(complaintId)
-                          setNewComplaintCategoryId(categoryId)
-                        }}
-                        placeholder="Select complaint (grouped by category)"
-                        searchPlaceholder="Search complaints..."
-                        emptyText="No complaints found"
-                        loading={complaintGroups.length === 0}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium block mb-1.5">Eye</label>
-                      <SimpleCombobox
-                        options={(masterData.data.eyeSelection || [])}
-                        value={newComplaintEye}
-                        onChange={(value) => setNewComplaintEye(value)}
-                        placeholder="Select eye"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium block mb-1.5">Duration</label>
-                      <Input
-                        placeholder="e.g., 2 days, 1 week"
-                        value={newComplaintDuration}
-                        onChange={(e) => setNewComplaintDuration(e.target.value)}
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="text-sm font-medium block mb-1.5">Notes</label>
-                      <Textarea
-                        placeholder="Additional details about the complaint..."
-                        value={newComplaintNotes}
-                        onChange={(e) => setNewComplaintNotes(e.target.value)}
-                        rows={2}
-                      />
-                    </div>
-                  </div>
                   <Button
                     type="button"
-                    size="sm"
-                    onClick={handleAddComplaint}
-                    disabled={!newComplaintId}
+                    className="text-xs font-bold text-indigo-600 border border-indigo-200 bg-indigo-50 px-3 py-2 rounded-lg hover:bg-indigo-100"
+                    onClick={() => {
+                      // Reset form and toggle visibility
+                      setNewComplaintId("")
+                      setNewComplaintCategoryId(null)
+                      setNewComplaintEye("")
+                      setNewComplaintDuration("")
+                      setNewComplaintNotes("")
+                      setShowComplaintForm(!showComplaintForm)
+                    }}
+                    aria-expanded={showComplaintForm}
+                    aria-controls="complaint-form-section"
                   >
-                    Add Complaint
+                    {showComplaintForm ? "Cancel" : "Add Complaint"}
                   </Button>
                 </div>
 
-                {/* Complaints Table */}
-                <div className="border rounded-lg">
-                  <table className="w-full">
-                    <thead className="border-b bg-gray-50">
-                      <tr>
-                        <th className="text-left p-3 text-sm font-medium">COMPLAINT</th>
-                        <th className="text-left p-3 text-sm font-medium">EYE</th>
-                        <th className="text-left p-3 text-sm font-medium">DURATION</th>
-                        <th className="text-left p-3 text-sm font-medium">NOTES</th>
-                        <th className="text-left p-3 text-sm font-medium">ACTION</th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                {/* Add Complaint Form */}
+                {showComplaintForm && (
+                  <div id="complaint-form-section" className="border rounded-lg p-4 space-y-4 bg-gray-50">
+                    <h4 className="text-sm font-semibold">Add New Complaint</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="col-span-2">
+                        <label className="text-sm font-medium block mb-1.5">Complaint *</label>
+                        <GroupedSearchableSelect
+                          groups={complaintGroups}
+                          value={newComplaintId}
+                          onValueChange={(complaintId, categoryId) => {
+                            setNewComplaintId(complaintId)
+                            setNewComplaintCategoryId(categoryId)
+                          }}
+                          placeholder="Select complaint (grouped by category)"
+                          searchPlaceholder="Search complaints..."
+                          emptyText="No complaints found"
+                          loading={complaintGroups.length === 0}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium block mb-1.5">Eye</label>
+                        <SimpleCombobox
+                          options={(masterData.data.eyeSelection || [])}
+                          value={newComplaintEye}
+                          onChange={(value) => setNewComplaintEye(value)}
+                          placeholder="Select eye"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium block mb-1.5">Duration</label>
+                        <Input
+                          placeholder="e.g., 2 days, 1 week"
+                          value={newComplaintDuration}
+                          onChange={(e) => setNewComplaintDuration(e.target.value)}
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-sm font-medium block mb-1.5">Notes</label>
+                        <Textarea
+                          placeholder="Additional details about the complaint..."
+                          value={newComplaintNotes}
+                          onChange={(e) => setNewComplaintNotes(e.target.value)}
+                          rows={2}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleAddComplaint}
+                        disabled={!newComplaintId}
+                      >
+                        Add Complaint
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setShowComplaintForm(false)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Complaints List */}
+                <div className="space-y-3">
                       {complaintFields.length === 0 ? (
-                        <tr>
-                          <td colSpan={5} className="text-center p-8 text-muted-foreground text-sm">
+                    <div className="text-center p-8 text-muted-foreground text-sm">
                             No complaints added.
-                          </td>
-                        </tr>
+                    </div>
                       ) : (
                         complaintFields.map((field, index) => {
                           // Find complaint name from groups
@@ -1682,30 +2032,68 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                           )
                           
                           return (
-                            <tr key={field.id} className="border-b">
-                              <td className="p-3 text-sm">{complaint?.name || (field as any).complaintId}</td>
-                              <td className="p-3 text-sm">{eyeOption?.label || (field as any).eye || '-'}</td>
-                              <td className="p-3 text-sm">{(field as any).duration || '-'}</td>
-                              <td className="p-3 text-sm max-w-xs truncate" title={(field as any).notes}>
+                        <div key={field.id} className="bg-gray-50 border border-gray-100 rounded-lg p-3 mb-3 flex items-end gap-4">
+                          <div className="flex-1">
+                            <div className="text-xs text-gray-600 mb-1">Complaint</div>
+                            <div className="text-sm font-medium">{complaint?.name || (field as any).complaintId}</div>
+                          </div>
+                          <div className="flex-1">
+                            <div className="text-xs text-gray-600 mb-1">Eye</div>
+                            <div className="text-sm">{eyeOption?.label || (field as any).eye || '-'}</div>
+                          </div>
+                          <div className="flex-1">
+                            <div className="text-xs text-gray-600 mb-1">Duration</div>
+                            <div className="text-sm">{(field as any).duration || '-'}</div>
+                          </div>
+                          <div className="flex-1">
+                            <div className="text-xs text-gray-600 mb-1">Notes</div>
+                            <div className="text-sm truncate" title={(field as any).notes}>
                                 {(field as any).notes || '-'}
-                              </td>
-                              <td className="p-3 text-sm">
-                                <Button
+                            </div>
+                          </div>
+                          <button
                                   type="button"
-                                  variant="ghost"
-                                  size="sm"
                                   onClick={() => removeComplaint(index)}
-                                  className="text-red-600 hover:text-red-700"
-                                >
-                                  Remove
-                                </Button>
-                              </td>
-                            </tr>
+                            className="text-gray-400 hover:text-red-600 transition-colors p-2"
+                            title="Remove complaint"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                           )
                         })
                       )}
-                    </tbody>
-                  </table>
+                </div>
+
+                {/* No Complaints Flag */}
+                <div className="mt-4 border-t pt-4">
+                  <FormField
+                    control={form.control}
+                    name="no_complaints_flag"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <div className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={field.value || false}
+                              onChange={e => field.onChange(e.currentTarget.checked)}
+                              className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                              id="no_complaints_flag"
+                            />
+                          </div>
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel htmlFor="no_complaints_flag" className="font-medium text-sm">
+                            No complaints to record
+                          </FormLabel>
+                          <p className="text-sm text-muted-foreground">
+                            Check this if the patient has no complaints to record
+                          </p>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
                 </div>
 
               </TabsContent>
@@ -1717,118 +2105,106 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                     <h4 className="font-semibold text-md">VISION</h4>
                   </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse border">
-                      <thead>
-                        <tr className="border-b bg-gray-50">
-                          <th className="text-left p-3 w-1/3"></th>
-                          <th className="text-center p-3 border-l font-medium">RIGHT EYE</th>
-                          <th className="text-center p-3 border-l font-medium">LEFT EYE</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr className="border-b">
-                          <td className="p-3 font-medium text-sm">VISUAL ACUITY (UNAIDED) (VP)</td>
-                          <td className="p-3 border-l">
+                  {/* Comparison Layout */}
+                  <div className="space-y-3">
+                    {/* Header Row */}
+                    <div className="grid grid-cols-[150px_1fr_1fr] gap-4 items-center">
+                      <div></div>
+                      <div className="text-center text-xs font-bold text-gray-900 bg-gray-50 py-2 rounded">RIGHT EYE (OD)</div>
+                      <div className="text-center text-xs font-bold text-gray-900 bg-gray-50 py-2 rounded">LEFT EYE (OS)</div>
+                    </div>
+
+                    {/* Visual Acuity (Unaided) */}
+                    <div className="grid grid-cols-[150px_1fr_1fr] gap-4 items-center">
+                      <div className="text-right text-xs font-bold text-gray-500 uppercase">VISUAL ACUITY (UNAIDED) (VP)</div>
                             <FormField control={form.control} name="visual_acuity_unaided_right" render={({ field }) => (
                               <SimpleCombobox
                                 options={masterData.data.visualAcuity || []}
                                 value={field.value || ""}
                                 onChange={(value) => field.onChange(value)}
                                 placeholder="Select VP"
-                                className="h-9"
+                          className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm"
                               />
                             )} />
-                          </td>
-                          <td className="p-3 border-l">
                             <FormField control={form.control} name="visual_acuity_unaided_left" render={({ field }) => (
                               <SimpleCombobox
                                 options={masterData.data.visualAcuity || []}
                                 value={field.value || ""}
                                 onChange={(value) => field.onChange(value)}
                                 placeholder="Select VP"
-                                className="h-9"
+                          className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm"
                               />
                             )} />
-                          </td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="p-3 font-medium text-sm">PIN-HOLE (VP)</td>
-                          <td className="p-3 border-l">
+                    </div>
+
+                    {/* Pin-Hole */}
+                    <div className="grid grid-cols-[150px_1fr_1fr] gap-4 items-center">
+                      <div className="text-right text-xs font-bold text-gray-500 uppercase">PIN-HOLE (VP)</div>
                             <FormField control={form.control} name="pinhole_right" render={({ field }) => (
                               <SimpleCombobox
                                 options={masterData.data.visualAcuity || []}
                                 value={field.value || ""}
                                 onChange={(value) => field.onChange(value)}
                                 placeholder="Select VP"
-                                className="h-9"
+                          className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm"
                               />
                             )} />
-                          </td>
-                          <td className="p-3 border-l">
                             <FormField control={form.control} name="pinhole_left" render={({ field }) => (
                               <SimpleCombobox
                                 options={masterData.data.visualAcuity || []}
                                 value={field.value || ""}
                                 onChange={(value) => field.onChange(value)}
                                 placeholder="Select VP"
-                                className="h-9"
+                          className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm"
                               />
                             )} />
-                          </td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="p-3 font-medium text-sm">VISUAL ACUITY (AIDED) (VP)</td>
-                          <td className="p-3 border-l">
+                    </div>
+
+                    {/* Visual Acuity (Aided) */}
+                    <div className="grid grid-cols-[150px_1fr_1fr] gap-4 items-center">
+                      <div className="text-right text-xs font-bold text-gray-500 uppercase">VISUAL ACUITY (AIDED) (VP)</div>
                             <FormField control={form.control} name="visual_acuity_aided_right" render={({ field }) => (
                               <SimpleCombobox
                                 options={masterData.data.visualAcuity || []}
                                 value={field.value || ""}
                                 onChange={(value) => field.onChange(value)}
                                 placeholder="Select VP"
-                                className="h-9"
+                          className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm"
                               />
                             )} />
-                          </td>
-                          <td className="p-3 border-l">
                             <FormField control={form.control} name="visual_acuity_aided_left" render={({ field }) => (
                               <SimpleCombobox
                                 options={masterData.data.visualAcuity || []}
                                 value={field.value || ""}
                                 onChange={(value) => field.onChange(value)}
                                 placeholder="Select VP"
-                                className="h-9"
+                          className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm"
                               />
                             )} />
-                          </td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="p-3 font-medium text-sm">NEAR VISUAL</td>
-                          <td className="p-3 border-l">
+                    </div>
+
+                    {/* Near Visual */}
+                    <div className="grid grid-cols-[150px_1fr_1fr] gap-4 items-center">
+                      <div className="text-right text-xs font-bold text-gray-500 uppercase">NEAR VISUAL</div>
                             <FormField control={form.control} name="near_visual_right" render={({ field }) => (
                               <SimpleCombobox
                                 options={masterData.data.visualAcuity || []}
                                 value={field.value || ""}
                                 onChange={(value) => field.onChange(value)}
                                 placeholder="Select VP"
-                                className="h-9"
+                          className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm"
                               />
                             )} />
-                          </td>
-                          <td className="p-3 border-l">
                             <FormField control={form.control} name="near_visual_left" render={({ field }) => (
                               <SimpleCombobox
                                 options={masterData.data.visualAcuity || []}
                                 value={field.value || ""}
                                 onChange={(value) => field.onChange(value)}
                                 placeholder="Select VP"
-                                className="h-9"
+                          className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm"
                               />
                             )} />
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
+                    </div>
                   </div>
                 </div>
 
@@ -1838,229 +2214,195 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                     <h4 className="font-semibold text-md">REFRACTION</h4>
                   </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left p-2 w-24"></th>
-                          <th colSpan={4} className="text-center p-2 border-l font-medium">RIGHT EYE</th>
-                          <th colSpan={4} className="text-center p-2 border-l font-medium">LEFT EYE</th>
-                        </tr>
-                        <tr className="border-b text-xs text-muted-foreground">
-                          <th className="text-left p-2"></th>
-                          <th className="text-center p-2 border-l">SPH</th>
-                          <th className="text-center p-2">CYL</th>
-                          <th className="text-center p-2">AXIS</th>
-                          <th className="text-center p-2">VA</th>
-                          <th className="text-center p-2 border-l">SPH</th>
-                          <th className="text-center p-2">CYL</th>
-                          <th className="text-center p-2">AXIS</th>
-                          <th className="text-center p-2">VA</th>
-                        </tr>
-                      </thead>
-                      <tbody>
+                  <div className="space-y-3">
+                    {/* Header Row */}
+                    <div className="grid grid-cols-[150px_1fr_1fr] gap-4 items-center">
+                      <div></div>
+                      <div className="text-center text-xs font-bold text-gray-900 bg-gray-50 py-2 rounded">RIGHT EYE (OD)</div>
+                      <div className="text-center text-xs font-bold text-gray-900 bg-gray-50 py-2 rounded">LEFT EYE (OS)</div>
+                    </div>
+
+                    {/* Sub-header for SPH, CYL, AXIS, VA */}
+                    <div className="grid grid-cols-[150px_1fr_1fr] gap-4 items-center">
+                      <div></div>
+                      <div className="grid grid-cols-4 gap-2 text-center text-xs font-medium text-gray-600">
+                        <div>SPH</div>
+                        <div>CYL</div>
+                        <div>AXIS</div>
+                        <div>VA</div>
+                      </div>
+                      <div className="grid grid-cols-4 gap-2 text-center text-xs font-medium text-gray-600">
+                        <div>SPH</div>
+                        <div>CYL</div>
+                        <div>AXIS</div>
+                        <div>VA</div>
+                      </div>
+                    </div>
+
                         {/* Distant Row */}
-                        <tr className="border-b">
-                          <td className="p-2 font-medium text-sm">Distant</td>
-                          <td className="p-2 border-l">
+                    <div className="grid grid-cols-[150px_1fr_1fr] gap-4 items-center">
+                      <div className="text-right text-xs font-bold text-gray-500 uppercase">DISTANT</div>
+                      <div className="grid grid-cols-4 gap-2">
                             <FormField control={form.control} name="refraction_distant_sph_right" render={({ field }) => (
-                              <FormItem><FormControl><Input placeholder="e.g. -2.25" className="h-8 text-xs" {...field} /></FormControl></FormItem>
+                          <FormItem><FormControl><Input placeholder="e.g. -2.25" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} /></FormControl></FormItem>
                             )} />
-                          </td>
-                          <td className="p-2">
                             <FormField control={form.control} name="refraction_distant_cyl_right" render={({ field }) => (
-                              <FormItem><FormControl><Input placeholder="e.g. -0.5" className="h-8 text-xs" {...field} /></FormControl></FormItem>
+                          <FormItem><FormControl><Input placeholder="e.g. -0.5" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} /></FormControl></FormItem>
                             )} />
-                          </td>
-                          <td className="p-2">
                             <FormField control={form.control} name="refraction_distant_axis_right" render={({ field }) => (
-                              <FormItem><FormControl><Input placeholder="e.g. 180" className="h-8 text-xs" {...field} /></FormControl></FormItem>
+                          <FormItem><FormControl><Input placeholder="e.g. 180" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} /></FormControl></FormItem>
                             )} />
-                          </td>
-                          <td className="p-2">
                             <FormField control={form.control} name="refraction_distant_va_right" render={({ field }) => (
                               <SimpleCombobox
                                 options={masterData.data.visualAcuity || []}
                                 value={field.value || ""}
                                 onChange={(value) => field.onChange(value)}
                                 placeholder="VP"
-                                className="h-8 text-xs"
+                            className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm"
                               />
                             )} />
-                          </td>
-                          <td className="p-2 border-l">
+                      </div>
+                      <div className="grid grid-cols-4 gap-2">
                             <FormField control={form.control} name="refraction_distant_sph_left" render={({ field }) => (
-                              <FormItem><FormControl><Input placeholder="e.g. -2.25" className="h-8 text-xs" {...field} /></FormControl></FormItem>
+                          <FormItem><FormControl><Input placeholder="e.g. -2.25" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} /></FormControl></FormItem>
                             )} />
-                          </td>
-                          <td className="p-2">
                             <FormField control={form.control} name="refraction_distant_cyl_left" render={({ field }) => (
-                              <FormItem><FormControl><Input placeholder="e.g. -0.5" className="h-8 text-xs" {...field} /></FormControl></FormItem>
+                          <FormItem><FormControl><Input placeholder="e.g. -0.5" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} /></FormControl></FormItem>
                             )} />
-                          </td>
-                          <td className="p-2">
                             <FormField control={form.control} name="refraction_distant_axis_left" render={({ field }) => (
-                              <FormItem><FormControl><Input placeholder="e.g. 180" className="h-8 text-xs" {...field} /></FormControl></FormItem>
+                          <FormItem><FormControl><Input placeholder="e.g. 180" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} /></FormControl></FormItem>
                             )} />
-                          </td>
-                          <td className="p-2">
                             <FormField control={form.control} name="refraction_distant_va_left" render={({ field }) => (
                               <SimpleCombobox
                                 options={masterData.data.visualAcuity || []}
                                 value={field.value || ""}
                                 onChange={(value) => field.onChange(value)}
                                 placeholder="VP"
-                                className="h-8 text-xs"
+                            className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm"
                               />
                             )} />
-                          </td>
-                        </tr>
+                      </div>
+                    </div>
 
                         {/* Near Row */}
-                        <tr className="border-b">
-                          <td className="p-2 font-medium text-sm">Near</td>
-                          <td className="p-2 border-l">
+                    <div className="grid grid-cols-[150px_1fr_1fr] gap-4 items-center">
+                      <div className="text-right text-xs font-bold text-gray-500 uppercase">NEAR</div>
+                      <div className="grid grid-cols-4 gap-2">
                             <FormField control={form.control} name="refraction_near_sph_right" render={({ field }) => (
-                              <FormItem><FormControl><Input placeholder="e.g. -2.25" className="h-8 text-xs" {...field} /></FormControl></FormItem>
+                          <FormItem><FormControl><Input placeholder="e.g. -2.25" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} /></FormControl></FormItem>
                             )} />
-                          </td>
-                          <td className="p-2">
                             <FormField control={form.control} name="refraction_near_cyl_right" render={({ field }) => (
-                              <FormItem><FormControl><Input placeholder="e.g. -0.5" className="h-8 text-xs" {...field} /></FormControl></FormItem>
+                          <FormItem><FormControl><Input placeholder="e.g. -0.5" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} /></FormControl></FormItem>
                             )} />
-                          </td>
-                          <td className="p-2">
                             <FormField control={form.control} name="refraction_near_axis_right" render={({ field }) => (
-                              <FormItem><FormControl><Input placeholder="e.g. 180" className="h-8 text-xs" {...field} /></FormControl></FormItem>
+                          <FormItem><FormControl><Input placeholder="e.g. 180" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} /></FormControl></FormItem>
                             )} />
-                          </td>
-                          <td className="p-2">
                             <FormField control={form.control} name="refraction_near_va_right" render={({ field }) => (
                               <SimpleCombobox
                                 options={masterData.data.visualAcuity || []}
                                 value={field.value || ""}
                                 onChange={(value) => field.onChange(value)}
                                 placeholder="VP"
-                                className="h-8 text-xs"
+                            className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm"
                               />
                             )} />
-                          </td>
-                          <td className="p-2 border-l">
+                      </div>
+                      <div className="grid grid-cols-4 gap-2">
                             <FormField control={form.control} name="refraction_near_sph_left" render={({ field }) => (
-                              <FormItem><FormControl><Input placeholder="e.g. -2.25" className="h-8 text-xs" {...field} /></FormControl></FormItem>
+                          <FormItem><FormControl><Input placeholder="e.g. -2.25" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} /></FormControl></FormItem>
                             )} />
-                          </td>
-                          <td className="p-2">
                             <FormField control={form.control} name="refraction_near_cyl_left" render={({ field }) => (
-                              <FormItem><FormControl><Input placeholder="e.g. -0.5" className="h-8 text-xs" {...field} /></FormControl></FormItem>
+                          <FormItem><FormControl><Input placeholder="e.g. -0.5" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} /></FormControl></FormItem>
                             )} />
-                          </td>
-                          <td className="p-2">
                             <FormField control={form.control} name="refraction_near_axis_left" render={({ field }) => (
-                              <FormItem><FormControl><Input placeholder="e.g. 180" className="h-8 text-xs" {...field} /></FormControl></FormItem>
+                          <FormItem><FormControl><Input placeholder="e.g. 180" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} /></FormControl></FormItem>
                             )} />
-                          </td>
-                          <td className="p-2">
                             <FormField control={form.control} name="refraction_near_va_left" render={({ field }) => (
                               <SimpleCombobox
                                 options={masterData.data.visualAcuity || []}
                                 value={field.value || ""}
                                 onChange={(value) => field.onChange(value)}
                                 placeholder="VP"
-                                className="h-8 text-xs"
+                            className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm"
                               />
                             )} />
-                          </td>
-                        </tr>
+                      </div>
+                    </div>
 
                         {/* PG Row */}
-                        <tr className="border-b">
-                          <td className="p-2 font-medium text-sm">PG</td>
-                          <td className="p-2 border-l">
+                    <div className="grid grid-cols-[150px_1fr_1fr] gap-4 items-center">
+                      <div className="text-right text-xs font-bold text-gray-500 uppercase">PG</div>
+                      <div className="grid grid-cols-4 gap-2">
                             <FormField control={form.control} name="refraction_pg_sph_right" render={({ field }) => (
-                              <FormItem><FormControl><Input placeholder="e.g. -2.25" className="h-8 text-xs" {...field} /></FormControl></FormItem>
+                          <FormItem><FormControl><Input placeholder="e.g. -2.25" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} /></FormControl></FormItem>
                             )} />
-                          </td>
-                          <td className="p-2">
                             <FormField control={form.control} name="refraction_pg_cyl_right" render={({ field }) => (
-                              <FormItem><FormControl><Input placeholder="e.g. -0.5" className="h-8 text-xs" {...field} /></FormControl></FormItem>
+                          <FormItem><FormControl><Input placeholder="e.g. -0.5" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} /></FormControl></FormItem>
                             )} />
-                          </td>
-                          <td className="p-2">
                             <FormField control={form.control} name="refraction_pg_axis_right" render={({ field }) => (
-                              <FormItem><FormControl><Input placeholder="e.g. 180" className="h-8 text-xs" {...field} /></FormControl></FormItem>
+                          <FormItem><FormControl><Input placeholder="e.g. 180" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} /></FormControl></FormItem>
                             )} />
-                          </td>
-                          <td className="p-2">
                             <FormField control={form.control} name="refraction_pg_va_right" render={({ field }) => (
                               <SimpleCombobox
                                 options={masterData.data.visualAcuity || []}
                                 value={field.value || ""}
                                 onChange={(value) => field.onChange(value)}
                                 placeholder="VP"
-                                className="h-8 text-xs"
+                            className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm"
                               />
                             )} />
-                          </td>
-                          <td className="p-2 border-l">
+                      </div>
+                      <div className="grid grid-cols-4 gap-2">
                             <FormField control={form.control} name="refraction_pg_sph_left" render={({ field }) => (
-                              <FormItem><FormControl><Input placeholder="e.g. -2.25" className="h-8 text-xs" {...field} /></FormControl></FormItem>
+                          <FormItem><FormControl><Input placeholder="e.g. -2.25" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} /></FormControl></FormItem>
                             )} />
-                          </td>
-                          <td className="p-2">
                             <FormField control={form.control} name="refraction_pg_cyl_left" render={({ field }) => (
-                              <FormItem><FormControl><Input placeholder="e.g. -0.5" className="h-8 text-xs" {...field} /></FormControl></FormItem>
+                          <FormItem><FormControl><Input placeholder="e.g. -0.5" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} /></FormControl></FormItem>
                             )} />
-                          </td>
-                          <td className="p-2">
                             <FormField control={form.control} name="refraction_pg_axis_left" render={({ field }) => (
-                              <FormItem><FormControl><Input placeholder="e.g. 180" className="h-8 text-xs" {...field} /></FormControl></FormItem>
+                          <FormItem><FormControl><Input placeholder="e.g. 180" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} /></FormControl></FormItem>
                             )} />
-                          </td>
-                          <td className="p-2">
                             <FormField control={form.control} name="refraction_pg_va_left" render={({ field }) => (
                               <SimpleCombobox
                                 options={masterData.data.visualAcuity || []}
                                 value={field.value || ""}
                                 onChange={(value) => field.onChange(value)}
                                 placeholder="VP"
-                                className="h-8 text-xs"
+                            className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm"
                               />
                             )} />
-                          </td>
-                        </tr>
+                      </div>
+                    </div>
 
                         {/* Purpose Row */}
-                        <tr className="border-b">
-                          <td className="p-2 font-medium text-sm">Purpose</td>
-                          <td colSpan={8} className="p-2 border-l">
+                    <div className="grid grid-cols-[150px_1fr_1fr] gap-4 items-center">
+                      <div className="text-right text-xs font-bold text-gray-500 uppercase">PURPOSE</div>
+                      <div className="col-span-2">
                             <FormField control={form.control} name="refraction_purpose" render={({ field }) => (
-                              <FormItem><FormControl><Input placeholder="Constant Use" className="h-8 text-xs" {...field} /></FormControl></FormItem>
+                          <FormItem><FormControl><Input placeholder="Constant Use" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} /></FormControl></FormItem>
                             )} />
-                          </td>
-                        </tr>
+                      </div>
+                    </div>
 
                         {/* Quality Row */}
-                        <tr className="border-b">
-                          <td className="p-2 font-medium text-sm">Quality</td>
-                          <td colSpan={8} className="p-2 border-l">
+                    <div className="grid grid-cols-[150px_1fr_1fr] gap-4 items-center">
+                      <div className="text-right text-xs font-bold text-gray-500 uppercase">QUALITY</div>
+                      <div className="col-span-2">
                             <FormField control={form.control} name="refraction_quality" render={({ field }) => (
-                              <FormItem><FormControl><Input placeholder="" className="h-8 text-xs" {...field} /></FormControl></FormItem>
+                          <FormItem><FormControl><Input placeholder="" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} /></FormControl></FormItem>
                             )} />
-                          </td>
-                        </tr>
+                      </div>
+                    </div>
 
                         {/* Remark Row */}
-                        <tr>
-                          <td className="p-2 font-medium text-sm">Remark</td>
-                          <td colSpan={8} className="p-2 border-l">
+                    <div className="grid grid-cols-[150px_1fr_1fr] gap-4 items-center">
+                      <div className="text-right text-xs font-bold text-gray-500 uppercase">REMARK</div>
+                      <div className="col-span-2">
                             <FormField control={form.control} name="refraction_remark" render={({ field }) => (
-                              <FormItem><FormControl><Input placeholder="" className="h-8 text-xs" {...field} /></FormControl></FormItem>
-                            )} />
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
+                          <FormItem><FormControl><Input placeholder="" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} /></FormControl></FormItem>
+                        )} />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </TabsContent>
@@ -2074,15 +2416,24 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                     <h4 className="font-semibold text-md">ANTERIOR SEGMENT</h4>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4 items-center">
-                    <div className="font-medium text-sm">EYELIDS</div>
+                  <div className="space-y-3">
+                    {/* Header Row */}
+                    <div className="grid grid-cols-[150px_1fr_1fr] gap-4 items-center">
+                      <div></div>
+                      <div className="text-center text-xs font-bold text-gray-900 bg-gray-50 py-2 rounded">RIGHT EYE (OD)</div>
+                      <div className="text-center text-xs font-bold text-gray-900 bg-gray-50 py-2 rounded">LEFT EYE (OS)</div>
+                    </div>
+
+                    {/* EYELIDS */}
+                    <div className="grid grid-cols-[150px_1fr_1fr] gap-4 items-center">
+                      <div className="text-right text-xs font-bold text-gray-500 uppercase">EYELIDS</div>
                     <FormField
                       control={form.control}
                       name="eyelids_right"
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input placeholder="Right Eye" {...field} />
+                              <Input placeholder="Right Eye" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} />
                           </FormControl>
                         </FormItem>
                       )}
@@ -2093,20 +2444,23 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input placeholder="Left Eye" {...field} />
+                              <Input placeholder="Left Eye" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} />
                           </FormControl>
                         </FormItem>
                       )}
                     />
+                    </div>
 
-                    <div className="font-medium text-sm">CONJUNCTIVA</div>
+                    {/* CONJUNCTIVA */}
+                    <div className="grid grid-cols-[150px_1fr_1fr] gap-4 items-center">
+                      <div className="text-right text-xs font-bold text-gray-500 uppercase">CONJUNCTIVA</div>
                     <FormField
                       control={form.control}
                       name="conjunctiva_right"
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input placeholder="Right Eye" {...field} />
+                              <Input placeholder="Right Eye" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} />
                           </FormControl>
                         </FormItem>
                       )}
@@ -2117,20 +2471,23 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input placeholder="Left Eye" {...field} />
+                              <Input placeholder="Left Eye" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} />
                           </FormControl>
                         </FormItem>
                       )}
                     />
+                    </div>
 
-                    <div className="font-medium text-sm">CORNEA</div>
+                    {/* CORNEA */}
+                    <div className="grid grid-cols-[150px_1fr_1fr] gap-4 items-center">
+                      <div className="text-right text-xs font-bold text-gray-500 uppercase">CORNEA</div>
                     <FormField
                       control={form.control}
                       name="cornea_right"
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input placeholder="Right Eye" {...field} />
+                              <Input placeholder="Right Eye" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} />
                           </FormControl>
                         </FormItem>
                       )}
@@ -2141,20 +2498,23 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input placeholder="Left Eye" {...field} />
+                              <Input placeholder="Left Eye" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} />
                           </FormControl>
                         </FormItem>
                       )}
                     />
+                    </div>
 
-                    <div className="font-medium text-sm">ANTERIOR CHAMBER</div>
+                    {/* ANTERIOR CHAMBER */}
+                    <div className="grid grid-cols-[150px_1fr_1fr] gap-4 items-center">
+                      <div className="text-right text-xs font-bold text-gray-500 uppercase">ANTERIOR CHAMBER</div>
                     <FormField
                       control={form.control}
                       name="anterior_chamber_right"
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input placeholder="Right Eye" {...field} />
+                              <Input placeholder="Right Eye" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} />
                           </FormControl>
                         </FormItem>
                       )}
@@ -2165,20 +2525,23 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input placeholder="Left Eye" {...field} />
+                              <Input placeholder="Left Eye" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} />
                           </FormControl>
                         </FormItem>
                       )}
                     />
+                    </div>
 
-                    <div className="font-medium text-sm">IRIS</div>
+                    {/* IRIS */}
+                    <div className="grid grid-cols-[150px_1fr_1fr] gap-4 items-center">
+                      <div className="text-right text-xs font-bold text-gray-500 uppercase">IRIS</div>
                     <FormField
                       control={form.control}
                       name="iris_right"
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input placeholder="Right Eye" {...field} />
+                              <Input placeholder="Right Eye" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} />
                           </FormControl>
                         </FormItem>
                       )}
@@ -2189,20 +2552,23 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input placeholder="Left Eye" {...field} />
+                              <Input placeholder="Left Eye" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} />
                           </FormControl>
                         </FormItem>
                       )}
                     />
+                    </div>
 
-                    <div className="font-medium text-sm">LENS</div>
+                    {/* LENS */}
+                    <div className="grid grid-cols-[150px_1fr_1fr] gap-4 items-center">
+                      <div className="text-right text-xs font-bold text-gray-500 uppercase">LENS</div>
                     <FormField
                       control={form.control}
                       name="lens_right"
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input placeholder="Right Eye" {...field} />
+                              <Input placeholder="Right Eye" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} />
                           </FormControl>
                         </FormItem>
                       )}
@@ -2213,25 +2579,31 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input placeholder="Left Eye" {...field} />
+                              <Input placeholder="Left Eye" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} />
                           </FormControl>
                         </FormItem>
                       )}
                     />
                   </div>
 
+                    {/* REMARKS */}
+                    <div className="grid grid-cols-[150px_1fr_1fr] gap-4 items-center">
+                      <div className="text-right text-xs font-bold text-gray-500 uppercase">REMARKS</div>
+                      <div className="col-span-2">
                   <FormField
                     control={form.control}
                     name="anterior_remarks"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>REMARKS</FormLabel>
                         <FormControl>
-                          <Input placeholder="REMARKS" {...field} />
+                                <Input placeholder="REMARKS" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} />
                         </FormControl>
                       </FormItem>
                     )}
                   />
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Posterior Segment */}
@@ -2240,15 +2612,24 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                     <h4 className="font-semibold text-md">POSTERIOR SEGMENT</h4>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4 items-center">
-                    <div className="font-medium text-sm">VITREOUS</div>
+                  <div className="space-y-3">
+                    {/* Header Row */}
+                    <div className="grid grid-cols-[150px_1fr_1fr] gap-4 items-center">
+                      <div></div>
+                      <div className="text-center text-xs font-bold text-gray-900 bg-gray-50 py-2 rounded">RIGHT EYE (OD)</div>
+                      <div className="text-center text-xs font-bold text-gray-900 bg-gray-50 py-2 rounded">LEFT EYE (OS)</div>
+                    </div>
+
+                    {/* VITREOUS */}
+                    <div className="grid grid-cols-[150px_1fr_1fr] gap-4 items-center">
+                      <div className="text-right text-xs font-bold text-gray-500 uppercase">VITREOUS</div>
                     <FormField
                       control={form.control}
                       name="vitreous_right"
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input placeholder="Right Eye" {...field} />
+                              <Input placeholder="Right Eye" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} />
                           </FormControl>
                         </FormItem>
                       )}
@@ -2259,20 +2640,23 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input placeholder="Left Eye" {...field} />
+                              <Input placeholder="Left Eye" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} />
                           </FormControl>
                         </FormItem>
                       )}
                     />
+                    </div>
 
-                    <div className="font-medium text-sm">DISC</div>
+                    {/* DISC */}
+                    <div className="grid grid-cols-[150px_1fr_1fr] gap-4 items-center">
+                      <div className="text-right text-xs font-bold text-gray-500 uppercase">DISC</div>
                     <FormField
                       control={form.control}
                       name="disc_right"
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input placeholder="Right Eye" {...field} />
+                              <Input placeholder="Right Eye" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} />
                           </FormControl>
                         </FormItem>
                       )}
@@ -2283,20 +2667,23 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input placeholder="Left Eye" {...field} />
+                              <Input placeholder="Left Eye" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} />
                           </FormControl>
                         </FormItem>
                       )}
                     />
+                    </div>
 
-                    <div className="font-medium text-sm">RETINA</div>
+                    {/* RETINA */}
+                    <div className="grid grid-cols-[150px_1fr_1fr] gap-4 items-center">
+                      <div className="text-right text-xs font-bold text-gray-500 uppercase">RETINA</div>
                     <FormField
                       control={form.control}
                       name="retina_right"
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input placeholder="Right Eye" {...field} />
+                              <Input placeholder="Right Eye" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} />
                           </FormControl>
                         </FormItem>
                       )}
@@ -2307,126 +2694,138 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input placeholder="Left Eye" {...field} />
+                              <Input placeholder="Left Eye" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} />
                           </FormControl>
                         </FormItem>
                       )}
                     />
                   </div>
 
+                    {/* REMARKS */}
+                    <div className="grid grid-cols-[150px_1fr_1fr] gap-4 items-center">
+                      <div className="text-right text-xs font-bold text-gray-500 uppercase">REMARKS</div>
+                      <div className="col-span-2">
                   <FormField
                     control={form.control}
                     name="posterior_remarks"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>REMARKS</FormLabel>
                         <FormControl>
-                          <Input placeholder="REMARKS" {...field} />
+                                <Input placeholder="REMARKS" className="border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm" {...field} />
                         </FormControl>
                       </FormItem>
                     )}
                   />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </TabsContent>
 
-              <TabsContent value="blood" className="space-y-4 min-h-[350px]">
+              <TabsContent value="blood" className="space-y-6 min-h-[350px]">
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold text-lg">Blood Investigation</h3>
                 </div>
                 
-                          <div className="grid grid-cols-4 gap-4">
-                            {/* Column 1 */}
-                            <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="cbc" className="h-4 w-4" />
-                      <label htmlFor="cbc" className="text-sm">CBC</label>
-                                </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="rbs" className="h-4 w-4" />
-                      <label htmlFor="rbs" className="text-sm">RBS</label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="hbsag" className="h-4 w-4" />
-                      <label htmlFor="hbsag" className="text-sm">HBSAg</label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="canca" className="h-4 w-4" />
-                      <label htmlFor="canca" className="text-sm">C-ANCA</label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="t3t4" className="h-4 w-4" />
-                      <label htmlFor="t3t4" className="text-sm">T3 , T4, TSH, ANTI TPO</label>
-                    </div>
-                            </div>
+                <FormField
+                  control={form.control}
+                  name="blood_tests"
+                  render={({ field }) => {
+                    const selectedTests = field.value || []
 
-                            {/* Column 2 */}
-                            <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="bt" className="h-4 w-4" />
-                      <label htmlFor="bt" className="text-sm">BT</label>
-                                </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="fbs" className="h-4 w-4" />
-                      <label htmlFor="fbs" className="text-sm">FBS</label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="hcv" className="h-4 w-4" />
-                      <label htmlFor="hcv" className="text-sm">HCV</label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="csr" className="h-4 w-4" />
-                      <label htmlFor="csr" className="text-sm">CSR</label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="screatinine" className="h-4 w-4" />
-                      <label htmlFor="screatinine" className="text-sm">S.CREATININE</label>
-                    </div>
-                            </div>
+                    // Group master data blood tests by category (if available)
+                    // If bloodTests don't have categories, we'll use a default structure
+                    let bloodTestCategories;
+                    if (masterData.data.bloodTests && masterData.data.bloodTests.length > 0) {
+                      // Group bloodTests by a category field if available, otherwise use default grouping
+                      // Since the API master data might not have categories, we'll create a default structure
+                      // or group by a property if available in the metadata
+                      const allTests = masterData.data.bloodTests.map(bt => ({
+                        id: bt.value,
+                        label: bt.label
+                      }));
 
-                            {/* Column 3 */}
-                            <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="ct" className="h-4 w-4" />
-                      <label htmlFor="ct" className="text-sm">CT</label>
-                                </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="ppbbs" className="h-4 w-4" />
-                      <label htmlFor="ppbbs" className="text-sm">PPBBS</label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="anaprofile" className="h-4 w-4" />
-                      <label htmlFor="anaprofile" className="text-sm">ANA-PROFILE</label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="crp" className="h-4 w-4" />
-                      <label htmlFor="crp" className="text-sm">CRP</label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="ssodium" className="h-4 w-4" />
-                      <label htmlFor="ssodium" className="text-sm">S. SODIUM LEVELS</label>
-                    </div>
-                            </div>
+                      // For now, use a simple fallback structure if we have master data
+                      bloodTestCategories = [
+                        {
+                          name: "Blood Tests",
+                          tests: allTests
+                        }
+                      ];
+                    } else {
+                      // Fallback to BLOOD_TEST_OPTIONS if master data is not available
+                      // Map the string array to categorized object structure
+                      const allTests = BLOOD_TEST_OPTIONS.map(test => ({ id: test, label: test }));
 
-                            {/* Column 4 */}
-                            <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="ipinr" className="h-4 w-4" />
-                      <label htmlFor="ipinr" className="text-sm">IP-INR</label>
+                      // Group tests by categories based on similar function/type
+                      const generalTests = allTests.filter(t => ["CBC", "BT", "CT", "PT-INR"].includes(t.id));
+                      const sugarTests = allTests.filter(t => ["RBS", "FBS", "PP2BS"].includes(t.id));
+                      const serologyTests = allTests.filter(t => ["HIV", "HBSAG", "HCV"].includes(t.id));
+                      const autoimmuneTests = allTests.filter(t => ["ANA-PROFILE", "P-ANCA", "C-ANCA", "R.A.FACTOR"].includes(t.id));
+                      const hormoneTests = allTests.filter(t => ["T3 , T4, TSH, ANTI TPO", "S CREATININE", "S. SODIUM LEVELS"].includes(t.id));
+                      const otherTests = allTests.filter(t =>
+                        !["CBC", "BT", "CT", "PT-INR", "RBS", "FBS", "PP2BS", "HIV", "HBSAG", "HCV", "ANA-PROFILE", "P-ANCA", "C-ANCA", "R.A.FACTOR", "T3 , T4, TSH, ANTI TPO", "S CREATININE", "S. SODIUM LEVELS"].includes(t.id)
+                      );
+
+                      bloodTestCategories = [
+                        ...(generalTests.length > 0 && [{ name: "General", tests: generalTests }]),
+                        ...(sugarTests.length > 0 && [{ name: "Blood Sugar", tests: sugarTests }]),
+                        ...(serologyTests.length > 0 && [{ name: "Serology", tests: serologyTests }]),
+                        ...(autoimmuneTests.length > 0 && [{ name: "Autoimmune", tests: autoimmuneTests }]),
+                        ...(hormoneTests.length > 0 && [{ name: "Hormones & Biochemistry", tests: hormoneTests }]),
+                        ...(otherTests.length > 0 && [{ name: "Other", tests: otherTests }])
+                      ];
+                    }
+
+                    const handleToggle = (testId: string) => {
+                      const newSelected = selectedTests.includes(testId)
+                        ? selectedTests.filter((id: string) => id !== testId)
+                        : [...selectedTests, testId]
+                      field.onChange(newSelected)
+                    }
+
+                    return (
+                      <div className="space-y-6">
+                        {bloodTestCategories.map((category) => (
+                          <div key={category.name} className="space-y-3">
+                            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                              {category.name}
+                            </h4>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                              {category.tests.map((test) => {
+                                const isSelected = selectedTests.includes(test.id)
+                                return (
+                                  <div
+                                    key={test.id}
+                                    onClick={() => handleToggle(test.id)}
+                                    className={`
+                                      flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all
+                                      ${isSelected
+                                        ? 'bg-gray-900 text-white border-gray-900'
+                                        : 'bg-white border-gray-200 hover:border-gray-400'
+                                      }
+                                    `}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={() => handleToggle(test.id)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="h-4 w-4 cursor-pointer"
+                                    />
+                                    <label className="text-sm font-medium select-none cursor-pointer flex-1">
+                                      {test.label}
+                                    </label>
                                 </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="hiv" className="h-4 w-4" />
-                      <label htmlFor="hiv" className="text-sm">HIV</label>
+                                )
+                              })}
                             </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="panca" className="h-4 w-4" />
-                      <label htmlFor="panca" className="text-sm">P-ANCA</label>
                           </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="rafactor" className="h-4 w-4" />
-                      <label htmlFor="rafactor" className="text-sm">R.A FACTOR</label>
+                        ))}
                     </div>
-                  </div>
-                </div>
+                    )
+                  }}
+                />
               </TabsContent>
 
               <TabsContent value="diagnosis" className="space-y-6 min-h-[350px]">
@@ -2434,22 +2833,88 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                 <FormField
                   control={form.control}
                   name="diagnosis"
-                  render={({ field }) => (
+                  render={({ field }) => {
+                    const selectedDiagnoses = field.value || []
+                    const diagnosisOptions = (masterData.data.diagnosis || []).map(d => ({
+                      value: d.value,
+                      label: d.label
+                    }))
+                    
+                    const selectedOptions = diagnosisOptions.filter(opt => 
+                      selectedDiagnoses.includes(opt.value)
+                    )
+
+                    const handleRemove = (valueToRemove: string) => {
+                      const newValue = selectedDiagnoses.filter((v: string) => v !== valueToRemove)
+                      field.onChange(newValue)
+                    }
+
+                    return (
                     <FormItem>
                       <FormLabel>Diagnosis</FormLabel>
                       <FormControl>
-                        <MultiSelect
-                          options={(masterData.data.diagnosis || []).map(d => ({
-                            value: d.value,
-                            label: d.label
-                          }))}
-                          value={field.value as any}
-                          onValueChange={field.onChange}
-                          placeholder="Search and select diagnosis"
-                          searchPlaceholder="Search diagnoses..."
-                        />
+                          <div className="space-y-4">
+                            {/* Large Search Bar */}
+                            <MultiSelect
+                              options={diagnosisOptions}
+                              value={field.value as any}
+                              onValueChange={field.onChange}
+                              placeholder="Search and select diagnosis"
+                              searchPlaceholder="Search diagnoses..."
+                              className="h-12 text-lg"
+                              searchInputSize="large"
+                            />
+                            
+                            {/* Selected Tags/Chips */}
+                            {selectedOptions.length > 0 && (
+                              <div className="flex flex-wrap gap-2">
+                                {selectedOptions.map((option) => (
+                                  <div
+                                    key={option.value}
+                                    className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full flex items-center gap-2 text-sm"
+                                  >
+                                    <span>{option.label}</span>
+                                    <X
+                                      className="h-4 w-4 hover:text-red-600 cursor-pointer transition-colors"
+                                      onClick={() => handleRemove(option.value)}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                       </FormControl>
                       <FormMessage />
+                    </FormItem>
+                    )
+                  }}
+                />
+
+                {/* Diagnosis Pending Flag */}
+                <FormField
+                  control={form.control}
+                  name="diagnosis_pending_flag"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 mt-4">
+                      <FormControl>
+                        <div className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={field.value || false}
+                            onChange={e => field.onChange(e.currentTarget.checked)}
+                            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                            id="diagnosis_pending_flag"
+                          />
+                        </div>
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel htmlFor="diagnosis_pending_flag" className="font-medium text-sm">
+                          Diagnosis pending
+                        </FormLabel>
+                        <p className="text-sm text-muted-foreground">
+                          Check this if diagnosis is pending and will be added later
+                        </p>
+                      </div>
                     </FormItem>
                   )}
                 />
@@ -2648,6 +3113,28 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                     </div>
                   )}
                 </div>
+
+                {/* Advice/Remarks Section */}
+                <div className="border-t pt-6 mt-6">
+                  <FormField
+                    control={form.control}
+                    name="advice_remarks"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Advice / Remarks</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Enter advice or remarks..."
+                            rows={4}
+                            className="bg-gray-50 w-full"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
                 </div>
               </TabsContent>
 
@@ -2665,124 +3152,162 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
 
               <TabsContent value="advice" className="space-y-6 min-h-[350px]">
                 {/* Advice Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-lg">Advice</h3>
-                  </div>
+                <div className="space-y-6">
+                  {/* Drugs Section */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-lg">Prescription</h3>
+                      <Button
+                        type="button"
+                        className="text-xs font-bold text-indigo-600 border border-indigo-200 bg-indigo-50 px-4 py-2 rounded-lg hover:bg-indigo-100"
+                        onClick={() => setShowMedicineForm(!showMedicineForm)}
+                      >
+                        {showMedicineForm ? "Cancel Drug" : "Add Drug"}
+                      </Button>
+                    </div>
 
-                  {/* Add Drug Form */}
-                  <div className="grid grid-cols-7 gap-3 items-end">
-                    <div className="col-span-2">
-                      <label className="text-sm font-medium mb-1 block">Drug Name</label>
-                      <SimpleCombobox
-                        options={(masterData.data.medicines || [])}
-                        value={newMedicineDrug}
-                        onChange={(value) => setNewMedicineDrug(value)}
-                        placeholder="Select drug"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Eye</label>
-                      <SimpleCombobox
-                        options={(masterData.data.eyeSelection || [])}
-                        value={newMedicineEye}
-                        onChange={(value) => setNewMedicineEye(value)}
-                        placeholder="Select eye"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Dosage</label>
-                      <SimpleCombobox
-                        options={(masterData.data.dosages || [])}
-                        value={newMedicineDosage}
-                        onChange={(value) => setNewMedicineDosage(value)}
-                        placeholder="Select dosage"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Route</label>
-                      <SimpleCombobox
-                        options={(masterData.data.routes || [])}
-                        value={newMedicineRoute}
-                        onChange={(value) => setNewMedicineRoute(value)}
-                        placeholder="Select route"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Duration</label>
-                      <Input
-                        placeholder="Select days"
-                        value={newMedicineDuration}
-                        onChange={(e) => setNewMedicineDuration(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Qty</label>
-                      <Input
-                        placeholder="Select Qty"
-                        value={newMedicineQuantity}
-                        onChange={(e) => setNewMedicineQuantity(e.target.value)}
-                      />
-                    </div>
-                    <Button type="button" onClick={handleAddMedicine}>
-                      Add
-                    </Button>
-                  </div>
+                    {/* Input Row */}
+                    {showMedicineForm && (
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
+                        <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
+                          <div className="col-span-2">
+                            <label className="text-sm font-medium mb-1 block">Drug Name</label>
+                            <SimpleCombobox
+                              options={(masterData.data.medicines || [])}
+                              value={newMedicineDrug}
+                              onChange={(value) => setNewMedicineDrug(value)}
+                              placeholder="Select drug"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium mb-1 block">Eye</label>
+                            <SimpleCombobox
+                              options={(masterData.data.eyeSelection || [])}
+                              value={newMedicineEye}
+                              onChange={(value) => setNewMedicineEye(value)}
+                              placeholder="Select eye"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium mb-1 block">Dosage</label>
+                            <SimpleCombobox
+                              options={(masterData.data.dosages || [])}
+                              value={newMedicineDosage}
+                              onChange={(value) => setNewMedicineDosage(value)}
+                              placeholder="Select dosage"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium mb-1 block">Route</label>
+                            <SimpleCombobox
+                              options={(masterData.data.routes || [])}
+                              value={newMedicineRoute}
+                              onChange={(value) => setNewMedicineRoute(value)}
+                              placeholder="Select route"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium mb-1 block">Duration</label>
+                            <Input
+                              placeholder="Days"
+                              value={newMedicineDuration}
+                              onChange={(e) => setNewMedicineDuration(e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium mb-1 block">Qty</label>
+                            <Input
+                              placeholder="Quantity"
+                              value={newMedicineQuantity}
+                              onChange={(e) => setNewMedicineQuantity(e.target.value)}
+                            />
+                          </div>
+                          <div className="flex items-end">
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  // Add medicine if all required fields are filled
+                                  if (newMedicineDrug) {
+                                    handleAddMedicine({
+                                      drug: newMedicineDrug,
+                                      eye: newMedicineEye || "",
+                                      dosage: newMedicineDosage || "",
+                                      route: newMedicineRoute || "",
+                                      duration: newMedicineDuration || "",
+                                      quantity: newMedicineQuantity || ""
+                                    })
+                                  }
+                                }}
+                                className="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
+                                title="Add Medicine"
+                              >
+                                <Check className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  // Clear all newMedicine* state fields and hide the form
+                                  setNewMedicineDrug("")
+                                  setNewMedicineEye("")
+                                  setNewMedicineDosage("")
+                                  setNewMedicineRoute("")
+                                  setNewMedicineDuration("")
+                                  setNewMedicineQuantity("")
+                                  setShowMedicineForm(false)
+                                }}
+                                className="text-gray-400 hover:text-red-500 w-10 h-10 flex items-center justify-center transition-colors"
+                                title="Cancel"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
-                  {/* Drugs Table */}
-                  <div className="border rounded-lg">
-                    <table className="w-full">
-                      <thead className="border-b bg-gray-50">
-                        <tr>
-                          <th className="text-left p-3 text-sm font-medium">DRUG NAME</th>
-                          <th className="text-left p-3 text-sm font-medium">EYE</th>
-                          <th className="text-left p-3 text-sm font-medium">DOSAGE</th>
-                          <th className="text-left p-3 text-sm font-medium">ROUTE</th>
-                          <th className="text-left p-3 text-sm font-medium">DURATION</th>
-                          <th className="text-left p-3 text-sm font-medium">QTY</th>
-                          <th className="text-left p-3 text-sm font-medium">ACTION</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {medicineAdviceFields.length === 0 ? (
-                          <tr>
-                            <td colSpan={7} className="text-center p-8 text-muted-foreground text-sm">
-                              No medicines added.
-                            </td>
-                          </tr>
-                        ) : (
-                          medicineAdviceFields.map((field, index) => {
-                            // Resolve UUIDs to display names
-                            const drug = masterData.data.medicines?.find(m => m.value === (field as any).drug_name)
-                            const eye = masterData.data.eyeSelection?.find(e => e.value === (field as any).eye)
-                            const dosage = masterData.data.dosages?.find(d => d.value === (field as any).dosage)
-                            const route = masterData.data.routes?.find(r => r.value === (field as any).route)
-                            
-                            return (
-                              <tr key={field.id}>
-                                <td className="p-3 text-sm">{drug?.label || (field as any).drug_name}</td>
-                                <td className="p-3 text-sm">{eye?.label || (field as any).eye}</td>
-                                <td className="p-3 text-sm">{dosage?.label || (field as any).dosage || '-'}</td>
-                                <td className="p-3 text-sm">{route?.label || (field as any).route || '-'}</td>
-                                <td className="p-3 text-sm">{(field as any).duration || '-'}</td>
-                                <td className="p-3 text-sm">{(field as any).quantity || '-'}</td>
-                                <td className="p-3 text-sm">
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => removeMedicine(index)}
-                                    className="text-red-600 hover:text-red-700"
-                                  >
-                                    Remove
-                                  </Button>
-                                </td>
-                              </tr>
-                            )
-                          })
-                        )}
-                      </tbody>
-                    </table>
+                    {/* Cards List */}
+                    {medicineAdviceFields.length === 0 ? (
+                      <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 flex flex-col items-center justify-center text-center">
+                        <Pill className="h-8 w-8 text-gray-300 mb-2" />
+                        <p className="text-gray-400 text-sm">No items added.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {medicineAdviceFields.map((field, index) => {
+                          const drug = masterData.data.medicines?.find(m => m.value === (field as any).drug_name)
+                          const eye = masterData.data.eyeSelection?.find(e => e.value === (field as any).eye)
+                          const dosage = masterData.data.dosages?.find(d => d.value === (field as any).dosage)
+                          const route = masterData.data.routes?.find(r => r.value === (field as any).route)
+                          
+                          return (
+                            <div key={field.id} className="bg-white border border-gray-200 rounded-lg p-3 mb-2 shadow-sm flex justify-between items-center">
+                              <div className="flex-1">
+                                <div className="font-semibold text-gray-900 mb-1">
+                                  {drug?.label || (field as any).drug_name || "Unnamed Drug"}
+                                </div>
+                                <div className="text-xs text-gray-500 space-x-2">
+                                  <span>{eye?.label || (field as any).eye}</span>
+                                  {dosage?.label && <span>• {dosage.label}</span>}
+                                  {route?.label && <span>• {route.label}</span>}
+                                  {(field as any).duration && <span>• {(field as any).duration} days</span>}
+                                  {(field as any).quantity && <span>• Qty: {(field as any).quantity}</span>}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeMedicine(index)}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50 p-2 rounded transition-colors"
+                                title="Remove"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -2790,105 +3315,125 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <h3 className="font-semibold text-lg">Surgery Details</h3>
-                  </div>
-
-                  {/* Add Surgery Form */}
-                  <div className="grid grid-cols-4 gap-3 items-end">
-                    <div>
-                      <label className="text-sm font-medium">Eye</label>
-                      <SimpleCombobox
-                        options={masterData.data.eyeSelection || []}
-                        value={newSurgeryEye}
-                        onChange={(value) => setNewSurgeryEye(value)}
-                        placeholder="Select eye"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Surgery Name</label>
-                      <SimpleCombobox
-                        options={masterData.data.surgeries || []}
-                        value={newSurgeryName}
-                        onChange={(value) => setNewSurgeryName(value)}
-                        placeholder="Select surgery"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Anesthesia</label>
-                      <Input
-                        placeholder="Enter anesthesia"
-                        value={newSurgeryAnesthesia}
-                        onChange={(e) => setNewSurgeryAnesthesia(e.target.value)}
-                      />
-                    </div>
-                    <Button type="button" onClick={handleAddSurgery}>
-                      Add
+                    <Button
+                      type="button"
+                      className="text-xs font-bold text-indigo-600 border border-indigo-200 bg-indigo-50 px-4 py-2 rounded-lg hover:bg-indigo-100"
+                      onClick={() => setShowSurgeryForm(!showSurgeryForm)}
+                    >
+                      {showSurgeryForm ? "Cancel Surgery" : "Add Surgery"}
                     </Button>
                   </div>
 
-                  {/* Surgery Table */}
-                  <div className="border rounded-lg">
-                    <table className="w-full">
-                      <thead className="border-b bg-gray-50">
-                        <tr>
-                          <th className="text-left p-3 text-sm font-medium">EYE</th>
-                          <th className="text-left p-3 text-sm font-medium">SURGERY NAME</th>
-                          <th className="text-left p-3 text-sm font-medium">ANESTHESIA</th>
-                          <th className="text-left p-3 text-sm font-medium">ACTION</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {surgeryFields.length === 0 ? (
-                          <tr>
-                            <td colSpan={4} className="text-center p-8 text-muted-foreground text-sm">
-                              No surgery details added.
-                            </td>
-                          </tr>
-                        ) : (
-                          surgeryFields.map((field, index) => {
-                            // Resolve UUIDs to display names
-                            const eye = masterData.data.eyeSelection?.find(e => e.value === (field as any).eye)
-                            const surgery = masterData.data.surgeries?.find(s => s.value === (field as any).surgery_name)
-                            
-                            return (
-                              <tr key={field.id}>
-                                <td className="p-3 text-sm">{eye?.label || (field as any).eye}</td>
-                                <td className="p-3 text-sm">{surgery?.label || (field as any).surgery_name}</td>
-                                <td className="p-3 text-sm">{(field as any).anesthesia || '-'}</td>
-                                <td className="p-3 text-sm">
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => removeSurgery(index)}
-                                    className="text-red-600 hover:text-red-700"
-                                  >
-                                    Remove
-                                  </Button>
-                                </td>
-                              </tr>
-                            )
-                          })
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                  {/* Input Row */}
+                  {showSurgeryForm && (
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Eye</label>
+                          <SimpleCombobox
+                            options={masterData.data.eyeSelection || []}
+                            value={newSurgeryEye}
+                            onChange={(value) => setNewSurgeryEye(value)}
+                            placeholder="Select eye"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Surgery Name</label>
+                          <SimpleCombobox
+                            options={masterData.data.surgeries || []}
+                            value={newSurgeryName}
+                            onChange={(value) => setNewSurgeryName(value)}
+                            placeholder="Select surgery"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Anesthesia</label>
+                          <Input
+                            placeholder="Enter anesthesia"
+                            value={newSurgeryAnesthesia}
+                            onChange={(e) => setNewSurgeryAnesthesia(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end mt-3 space-x-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                          onClick={() => {
+                            setNewSurgeryEye("");
+                            setNewSurgeryName("");
+                            setNewSurgeryAnesthesia("");
+                            setShowSurgeryForm(false);
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="button"
+                          className="bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                          onClick={handleAddSurgery}
+                        >
+                          <Check className="h-4 w-4 mr-2" />
+                          Add Surgery
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Cards List */}
+                  {surgeryFields.length === 0 ? (
+                    <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 flex flex-col items-center justify-center text-center">
+                      <Pill className="h-8 w-8 text-gray-300 mb-2" />
+                      <p className="text-gray-400 text-sm">No items added.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {surgeryFields.map((field, index) => {
+                        const eye = masterData.data.eyeSelection?.find(e => e.value === (field as any).eye)
+                        const surgery = masterData.data.surgeries?.find(s => s.value === (field as any).surgery_name)
+                        
+                        return (
+                          <div key={field.id} className="bg-white border border-gray-200 rounded-lg p-3 mb-2 shadow-sm flex justify-between items-center">
+                            <div className="flex-1">
+                              <div className="font-semibold text-gray-900 mb-1">
+                                {surgery?.label || (field as any).surgery_name || "Unnamed Surgery"}
+                              </div>
+                              <div className="text-xs text-gray-500 space-x-2">
+                                <span>{eye?.label || (field as any).eye}</span>
+                                {(field as any).anesthesia && <span>• {(field as any).anesthesia}</span>}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeSurgery(index)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 p-2 rounded transition-colors"
+                              title="Remove"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
 
-                {/* Remarks Section */}
+                {/* Surgery Remarks Section */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium">Remarks</label>
+                    <label className="text-sm font-medium">Surgery Remarks</label>
                   </div>
                   <FormField
                     control={form.control}
-                    name="advice_remarks"
+                    name="surgery_remarks"
                     render={({ field }) => (
                       <FormItem>
                         <FormControl>
-                          <Textarea 
-                            rows={4} 
-                            placeholder="Enter remarks..." 
-                            {...field} 
+                          <Textarea
+                            rows={4}
+                            placeholder="Enter surgery remarks..."
+                            {...field}
                           />
                         </FormControl>
                         <FormMessage />
@@ -2897,55 +3442,75 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                   />
                 </div>
               </TabsContent>
-              </div>
-            </Tabs>
+                  </div>
+                </div>
+              </Tabs>
+            </div>
 
-            <DialogFooter className="flex justify-between">
-              <Button
+            {/* SECTION 3: Fixed Footer (Global Navigation) */}
+            <div className="flex-shrink-0 bg-white border-t border-gray-200 p-4 flex justify-between items-center">
+              {/* Left Side - Navigation */}
+              <button
                 type="button"
-                variant="outline"
                 onClick={() => {
                   const currentIndex = steps.findIndex((s) => s.id === currentStep)
                   if (currentIndex > 0) {
-                    setCurrentStep(steps[currentIndex - 1].id)
+                    handleStepChange(steps[currentIndex - 1].id)
                   }
                 }}
                 disabled={currentStep === "register"}
+                className="text-gray-500 hover:text-gray-900 font-medium px-4 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Previous
-              </Button>
-              <div className="flex gap-2">
-                {currentStep !== "advice" ? (
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      const currentIndex = steps.findIndex((s) => s.id === currentStep)
-                      if (currentIndex < steps.length - 1) {
-                        setCurrentStep(steps[currentIndex + 1].id)
-                      }
-                    }}
-                  >
-                    Next
-                  </Button>
-                ) : (
-                  <>
-                    <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isSubmitting}>
-                      Cancel
-                    </Button>
-                    <Button type="submit" disabled={isSubmitting}>
+              </button>
+              
+              {/* Right Side - Actions */}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Cancel
+                </button>
+                {(() => {
+                  const currentStepNumber = steps.find((s) => s.id === currentStep)?.number || 0
+                  return currentStepNumber < 10 ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const currentIndex = steps.findIndex((s) => s.id === currentStep)
+                        if (currentIndex < steps.length - 1) {
+                          handleStepChange(steps[currentIndex + 1].id)
+                        }
+                      }}
+                      className="bg-gray-900 hover:bg-gray-800 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+                    >
+                      Next
+                    </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-2 rounded-lg font-bold shadow-md flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
                       {isSubmitting ? (
                         <>
-                          <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                           {mode === "edit" ? "Updating..." : "Saving..."}
                         </>
                       ) : (
-                        mode === "edit" ? "Update Case" : "Save Case"
+                        <>
+                          <Check className="h-4 w-4" />
+                          Save Case
+                        </>
                       )}
-                    </Button>
-                  </>
-                )}
+                    </button>
+                  )
+                })()}
               </div>
-            </DialogFooter>
+            </div>
           </form>
         </Form>
       </DialogContent>
