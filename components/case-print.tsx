@@ -42,6 +42,7 @@ interface CasePrintProps {
     chief_complaint?: string
     history_of_present_illness?: string
     history_present_illness?: string
+    past_medical_history?: string
     diagnosis?: string | string[]
     status?: string
     follow_up_date?: string
