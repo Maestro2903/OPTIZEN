@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, createServiceClient } from '@/lib/supabase/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+// Force dynamic rendering to prevent static analysis issues with cookies()
+export const dynamic = 'force-dynamic'
+
 /**
  * Type-safe wrappers for database RPC calls not yet in generated types
  */
