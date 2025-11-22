@@ -105,48 +105,50 @@ export const createAuthenticatedClient = async () => {
     throw new Error('Missing Supabase environment variables')
   }
 
-  // During build time, cookies() cannot be called, so use service role as fallback
-  try {
-    const cookieStore = await cookies()
-    
-    return createServerClient<Database>(
+  // During build time (NEXT_PHASE === 'phase-production-build'), cookies() cannot be called
+  // Use service role client as fallback
+  const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build' || 
+                      process.env.NEXT_PHASE === 'phase-development-build' ||
+                      typeof (globalThis as any).Request === 'undefined'
+
+  if (isBuildTime && serviceRoleKey) {
+    return createSupabaseClient<Database>(
       supabaseUrl,
-      supabaseAnonKey,
+      serviceRoleKey,
       {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll()
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              )
-            } catch {
-              // The `setAll` method was called from a Server Component.
-              // This can be ignored if you have middleware refreshing
-              // user sessions.
-            }
-          },
-        },
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        }
       }
     )
-  } catch (error) {
-    // If cookies() fails (e.g., during build), fall back to service role client
-    if (serviceRoleKey) {
-      return createSupabaseClient<Database>(
-        supabaseUrl,
-        serviceRoleKey,
-        {
-          auth: {
-            persistSession: false,
-            autoRefreshToken: false,
-          }
-        }
-      )
-    }
-    throw error
   }
+
+  // Normal runtime: use cookies for authentication
+  const cookieStore = await cookies()
+  
+  return createServerClient<Database>(
+    supabaseUrl,
+    supabaseAnonKey,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            )
+          } catch {
+            // The `setAll` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing
+            // user sessions.
+          }
+        },
+      },
+    }
+  )
 }
 
 /**
