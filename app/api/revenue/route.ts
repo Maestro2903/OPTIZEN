@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createAuthenticatedClient } from '@/lib/supabase/server'
 import * as z from 'zod'
 import { rbacService, requirePermission, hasFinancialAccess } from '@/lib/services/rbac'
 import { auditService, auditApiCall } from '@/lib/services/audit'
@@ -29,7 +29,7 @@ async function authenticate(request: NextRequest) {
     return null
   }
 
-  const supabase = createClient()
+  const supabase = await createAuthenticatedClient()
   const { data: { user }, error } = await supabase.auth.getUser()
 
   if (error || !user || user.id !== sessionValidation.user_id) {
@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const supabase = createClient()
+    const supabase = await createAuthenticatedClient()
     const { searchParams } = new URL(request.url)
 
     // Get and validate query parameters
@@ -295,7 +295,7 @@ export async function POST(request: NextRequest) {
     }
 
     const validatedData = validation.data
-    const supabase = createClient()
+    const supabase = await createAuthenticatedClient()
 
     const { data: transaction, error } = await supabase
       .from('revenue_transactions')
