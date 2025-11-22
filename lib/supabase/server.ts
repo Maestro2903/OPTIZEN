@@ -105,27 +105,26 @@ export const createAuthenticatedClient = async () => {
     throw new Error('Missing Supabase environment variables')
   }
 
-  // During build time (NEXT_PHASE === 'phase-production-build'), cookies() cannot be called
-  // Use service role client as fallback
-  const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build' || 
-                      process.env.NEXT_PHASE === 'phase-development-build' ||
-                      typeof (globalThis as any).Request === 'undefined'
-
-  if (isBuildTime && serviceRoleKey) {
-    return createSupabaseClient<Database>(
-      supabaseUrl,
-      serviceRoleKey,
-      {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
+  // Try to get cookies, but fall back to service role if it fails (e.g., during build)
+  let cookieStore
+  try {
+    cookieStore = await cookies()
+  } catch (error: any) {
+    // If cookies() fails (e.g., during build or outside request context), use service role
+    if (serviceRoleKey && (error?.message?.includes('request scope') || error?.message?.includes('outside'))) {
+      return createSupabaseClient<Database>(
+        supabaseUrl,
+        serviceRoleKey,
+        {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+          }
         }
-      }
-    )
+      )
+    }
+    throw error
   }
-
-  // Normal runtime: use cookies for authentication
-  const cookieStore = await cookies()
   
   return createServerClient<Database>(
     supabaseUrl,
