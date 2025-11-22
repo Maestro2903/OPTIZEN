@@ -412,7 +412,6 @@ export default function CasesPage() {
                             history: caseItem.history_of_present_illness,
                             history_of_present_illness: caseItem.history_of_present_illness,
                             past_medical_history: caseItem.past_medical_history,
-                            examination: caseItem.examination_findings,
                             examination_findings: caseItem.examination_findings,
                             
                             // Diagnosis and treatment
@@ -476,7 +475,6 @@ export default function CasesPage() {
                           chief_complaint: caseItem.chief_complaint,
                           history_of_present_illness: caseItem.history_of_present_illness,
                           past_medical_history: caseItem.past_medical_history,
-                          examination: caseItem.examination_findings,
                           examination_findings: caseItem.examination_findings,
                           
                           // Diagnosis and treatment
