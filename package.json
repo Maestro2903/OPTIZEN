@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "docs": "docsify serve docs --port 3001",
+    "docs:dev": "docsify serve docs --port 3001 --open"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
