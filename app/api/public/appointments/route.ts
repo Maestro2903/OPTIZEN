@@ -179,7 +179,7 @@ export async function POST(request: NextRequest) {
           reason: reason || null,
           notes: appointmentNotes,
           status: 'pending',
-        }
+        } as any
       ])
       .select()
       .single()
