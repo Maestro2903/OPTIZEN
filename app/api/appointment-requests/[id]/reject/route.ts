@@ -8,7 +8,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   // Authorization check
-  const authCheck = await requirePermission('appointments', 'edit')
+  const authCheck = await requirePermission('bookings', 'edit')
   if (!authCheck.authorized) {
     return (authCheck as { authorized: false; response: NextResponse }).response
   }

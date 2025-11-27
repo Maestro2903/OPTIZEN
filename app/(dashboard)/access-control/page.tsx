@@ -101,6 +101,18 @@ const MODULES = [
     description: 'Schedule and manage patient appointments'
   },
   { 
+    key: 'bookings', 
+    label: 'Appointment Requests / Bookings', 
+    category: 'clinical',
+    description: 'Manage public appointment requests and bookings'
+  },
+  { 
+    key: 'doctor_schedule', 
+    label: 'Doctor Schedule', 
+    category: 'clinical',
+    description: 'Manage doctor schedules and availability'
+  },
+  { 
     key: 'cases', 
     label: 'Cases', 
     category: 'clinical',

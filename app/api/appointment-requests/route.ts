@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Otherwise, list requests (requires auth)
-  const authCheck = await requirePermission('appointments', 'view')
+  const authCheck = await requirePermission('bookings', 'view')
   if (!authCheck.authorized) {
     return (authCheck as { authorized: false; response: NextResponse }).response
   }

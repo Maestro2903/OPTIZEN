@@ -20,7 +20,7 @@ export async function createAppointment(data: AppointmentData) {
   
   // Create Supabase client (uses anon key - RLS allows public inserts)
   const supabase = createClient();
-  
+
   // Prepare the data matching the appointment_requests table schema
   const appointmentRequestData = {
     full_name: data.full_name.trim(),
@@ -48,10 +48,10 @@ export async function createAppointment(data: AppointmentData) {
     const { data: appointmentRequest, error } = await supabase
       .from('appointment_requests')
       .insert([appointmentRequestData])
-      .select()
-      .single();
+    .select()
+    .single();
 
-    if (error) {
+  if (error) {
       console.error('[Booking API] Supabase error:', error);
       
       // Provide user-friendly error messages
@@ -69,7 +69,7 @@ export async function createAppointment(data: AppointmentData) {
       }
       
       throw new Error(error.message || 'Failed to create appointment request. Please try again.');
-    }
+  }
 
     if (!appointmentRequest) {
       throw new Error('Failed to create appointment request. No data returned.');

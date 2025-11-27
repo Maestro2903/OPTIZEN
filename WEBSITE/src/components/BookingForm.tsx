@@ -196,14 +196,14 @@ export const BookingForm: React.FC = () => {
       } else {
         console.warn('No appointment ID in response:', appointmentData);
         // Reset form if no redirect
-        setFormData({
+      setFormData({
           full_name: '',
-          email: '',
-          countryCode: '+91',
-          phone: '',
+        email: '',
+        countryCode: '+91',
+        phone: '',
           gender: 'male',
-          date: '',
-        });
+        date: '',
+      });
       }
     } catch (error) {
       console.error('Error submitting appointment:', error);
