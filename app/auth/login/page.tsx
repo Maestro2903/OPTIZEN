@@ -72,7 +72,7 @@ export default function LoginPage() {
         })
         // Small delay to ensure session is fully established
         await new Promise(resolve => setTimeout(resolve, 100))
-        router.push("/cases")
+        router.push("/patients")
         router.refresh()
         // Don't reset loading state here as we're navigating away
       } else {

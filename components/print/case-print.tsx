@@ -193,7 +193,9 @@ interface CasePrintProps {
     // Diagnostic Tests
     iop_right?: string
     iop_left?: string
-    sac_test?: string
+    sac_test_right?: string
+    sac_test_left?: string
+    sac_test?: string // Legacy field for backwards compatibility
     diagnostic_tests?: Array<{
       test_id?: string
       test_name?: string
@@ -335,6 +337,24 @@ export function CasePrint({ caseData, children }: CasePrintProps) {
     const iopValue = caseData.examination_data?.tests?.iop?.[eye]?.value
     if (iopValue) return iopValue
     return eye === 'right' ? (caseData.iop_right || '-') : (caseData.iop_left || '-')
+  }
+
+  // Get SAC test values
+  const getSACTest = (eye: 'right' | 'left'): string => {
+    const sacValue = caseData.examination_data?.tests?.sac_test?.[eye]
+    if (sacValue) {
+      // Try to resolve from master data if it's a UUID
+      if (isUUID(sacValue)) {
+        const sacOption = masterData.data.sacStatus?.find((opt: any) => opt.value === sacValue)
+        return sacOption?.label || sacValue
+      }
+      return sacValue
+    }
+    // Backwards compatibility: check for old single sac_test field
+    if (eye === 'right' && caseData.sac_test) {
+      return caseData.sac_test
+    }
+    return '-'
   }
 
   // Check if refraction data exists
@@ -797,7 +817,7 @@ export function CasePrint({ caseData, children }: CasePrintProps) {
               )}
 
               {/* BLOCK 7: DIAGNOSIS & TESTS */}
-              {(caseData.diagnosis || getIOP('right') !== '-' || getIOP('left') !== '-' || caseData.sac_test || 
+              {(caseData.diagnosis || getIOP('right') !== '-' || getIOP('left') !== '-' || getSACTest('right') !== '-' || getSACTest('left') !== '-' || 
                 (caseData.diagnostic_tests && caseData.diagnostic_tests.length > 0)) && (
                 <div className="mb-6">
                   <div className="text-xs font-bold uppercase text-gray-500 mb-3 tracking-widest">
@@ -815,18 +835,20 @@ export function CasePrint({ caseData, children }: CasePrintProps) {
                   )}
 
                   {/* Tests Grid */}
-                  {(getIOP('right') !== '-' || getIOP('left') !== '-' || caseData.sac_test || 
+                  {(getIOP('right') !== '-' || getIOP('left') !== '-' || getSACTest('right') !== '-' || getSACTest('left') !== '-' || 
                     (caseData.diagnostic_tests && caseData.diagnostic_tests.length > 0)) && (
                     <div className="space-y-3">
                       {/* SAC Syringing */}
-                      {caseData.sac_test && (
+                      {(getSACTest('right') !== '-' || getSACTest('left') !== '-') && (
                         <div className="grid grid-cols-2 gap-4">
                           <div>
                             <div className="text-xs font-bold text-black mb-1">SAC Syringing:</div>
-                            <div className="text-xs text-black">{caseData.sac_test}</div>
-                </div>
-              </div>
-            )}
+                            <div className="text-xs text-black">
+                              Right: {getSACTest('right')} | Left: {getSACTest('left')}
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       {/* IOP */}
                       {(getIOP('right') !== '-' || getIOP('left') !== '-') && (

@@ -33,16 +33,16 @@ export interface RBACContext {
 export async function getUserContext(): Promise<RBACContext | null> {
   try {
     const supabase = await createAuthenticatedClient()
-    const { data: { session } } = await supabase.auth.getSession()
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
 
-    if (!session) {
+    if (authError || !authUser) {
       return null
     }
 
     const { data: user, error } = await supabase
       .from('users')
       .select('id, email, role')
-      .eq('id', session.user.id)
+      .eq('id', authUser.id)
       .eq('is_active', true)
       .single()
 
@@ -53,7 +53,7 @@ export async function getUserContext(): Promise<RBACContext | null> {
 
     // Runtime validation of user role
     if (!isUserRole(user.role)) {
-      console.error('Invalid user role from database - session:', session.user.id.substring(0, 8) + '...')
+      console.error('Invalid user role from database - user:', authUser.id.substring(0, 8) + '...')
       return null
     }
 

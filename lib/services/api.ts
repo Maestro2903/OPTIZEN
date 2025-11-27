@@ -250,7 +250,10 @@ export interface ExaminationData {
       right?: { id: string; value: string }
       left?: { id: string; value: string }
     }
-    sac_test?: string
+    sac_test?: {
+      right?: string
+      left?: string
+    } | string // Support both new structure (object with right/left) and legacy (string)
   }
   blood_investigation?: {
     blood_pressure?: string
@@ -373,6 +376,64 @@ export const appointmentsApi = {
 
   delete: (id: string) =>
     apiService.delete<Appointment>('appointments', id),
+}
+
+// ===============================
+// APPOINTMENT REQUESTS API
+// ===============================
+
+export interface AppointmentRequest {
+  id: string
+  full_name: string
+  email: string | null
+  mobile: string
+  gender: string
+  date_of_birth: string | null
+  appointment_date: string
+  start_time: string
+  end_time: string
+  type: string
+  provider_id: string | null
+  reason: string | null
+  notes: string | null
+  status: 'pending' | 'accepted' | 'rejected'
+  created_at: string
+  updated_at: string
+  processed_by: string | null
+  processed_at: string | null
+  patient_id: string | null
+  appointment_id: string | null
+}
+
+export interface AppointmentRequestFilters extends PaginationParams {
+  status?: string
+  search?: string
+}
+
+export const appointmentRequestsApi = {
+  list: (params: AppointmentRequestFilters = {}) =>
+    apiService.getList<AppointmentRequest>('appointment-requests', params),
+
+  getById: (id: string) =>
+    apiService.getById<AppointmentRequest>('appointment-requests', id),
+
+  accept: (id: string, patientData: any) =>
+    apiService.fetchApi<{ patient: any; appointment: any; request: AppointmentRequest }>(
+      `/appointment-requests/${id}/accept`,
+      {
+        method: 'POST',
+        body: JSON.stringify(patientData),
+      }
+    ),
+
+  reject: (id: string, reason?: string) =>
+    apiService.fetchApi<AppointmentRequest>(
+      `/appointment-requests/${id}/reject`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      }
+    ),
 }
 
 // ===============================

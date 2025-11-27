@@ -17,6 +17,7 @@ import {
   Bed,
   Shield,
   CalendarClock,
+  CalendarCheck,
 } from "lucide-react"
 import { Logo } from "@/components/shared/logo"
 import { cn } from "@/lib/utils"
@@ -48,6 +49,12 @@ const navigationGroups = [
         title: "Appointments",
         url: "/appointments",
         icon: Calendar,
+        requiredPermission: "appointments" as const,
+      },
+      {
+        title: "Bookings",
+        url: "/bookings",
+        icon: CalendarCheck,
         requiredPermission: "appointments" as const,
       },
       {

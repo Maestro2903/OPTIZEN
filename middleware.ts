@@ -35,12 +35,13 @@ export async function middleware(req: NextRequest) {
     session = null
   }
 
-  // Protect dashboard routes (excluding root, auth, portal, and API routes)
+  // Protect dashboard routes (excluding root, auth, portal, landing, and API routes)
   const pathname = req.nextUrl.pathname
   const isProtectedRoute = pathname !== '/' && 
     !pathname.startsWith('/auth') && 
     !pathname.startsWith('/portal') && 
     !pathname.startsWith('/api') &&
+    !pathname.startsWith('/book') &&
     pathname !== '/not-found'
   
   if (isProtectedRoute) {
@@ -68,26 +69,26 @@ export async function middleware(req: NextRequest) {
           if (error) {
             console.error('Error fetching user role in middleware:', error)
             const redirectUrl = req.nextUrl.clone()
-            redirectUrl.pathname = '/cases'
+            redirectUrl.pathname = '/patients'
             redirectUrl.searchParams.set('error', 'db_error')
             return NextResponse.redirect(redirectUrl)
           }
 
           if (!user || user.role !== 'super_admin') {
             const redirectUrl = req.nextUrl.clone()
-            redirectUrl.pathname = '/cases'
+            redirectUrl.pathname = '/patients'
             return NextResponse.redirect(redirectUrl)
           }
         } catch (err) {
           console.error('Middleware: role lookup failed:', err)
           const redirectUrl = req.nextUrl.clone()
-          redirectUrl.pathname = '/cases'
+          redirectUrl.pathname = '/patients'
           redirectUrl.searchParams.set('error', 'db_error')
           return NextResponse.redirect(redirectUrl)
         }
       } else if (userRole !== 'super_admin') {
         const redirectUrl = req.nextUrl.clone()
-        redirectUrl.pathname = '/cases'
+        redirectUrl.pathname = '/patients'
         return NextResponse.redirect(redirectUrl)
       }
     }
@@ -106,7 +107,7 @@ export async function middleware(req: NextRequest) {
   if (req.nextUrl.pathname.startsWith('/auth') && 
       !req.nextUrl.pathname.startsWith('/auth/logout') && 
       session) {
-    return NextResponse.redirect(new URL('/cases', req.url))
+    return NextResponse.redirect(new URL('/patients', req.url))
   }
 
   return res

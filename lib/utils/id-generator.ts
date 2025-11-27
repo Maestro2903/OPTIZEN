@@ -23,24 +23,61 @@ function generateRandomString(length: number = 6): string {
 }
 
 /**
- * Generate a unique patient ID
+ * Generate a unique patient ID with collision detection
  * Format: PAT-YYYYMMDD-XXXXXX
  * Where XXXXXX is a random alphanumeric string
  * 
- * Uses cryptographically secure random generation.
- * Collision probability is extremely low (~1 in 2 billion with 6 chars).
- * 
- * Note: The actual uniqueness is enforced by the database unique constraint
+ * Checks for existing IDs and retries if collision detected.
+ * The actual uniqueness is enforced by the database unique constraint
  * on patients.patient_id, which will cause the insert to fail if a collision
- * occurs (handled by the API route with retry logic).
+ * occurs (the API route should handle this as a fallback).
  */
 export async function generatePatientId(): Promise<string> {
+  const supabase = createClient()
+  const maxAttempts = 10
+  
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const date = new Date()
     const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '')
     const random = generateRandomString(6)
     const patientId = `PAT-${dateStr}-${random}`
     
+    // Check if this patient_id already exists
+    const { data, error } = await supabase
+      .from('patients')
+      .select('patient_id')
+      .eq('patient_id', patientId)
+      .limit(1)
+      .single()
+    
+    // If no data found, the ID is available
+    if (error && error.code === 'PGRST116') {
+      // PGRST116 = no rows returned, which means ID is available
       return patientId
+    }
+    
+    // If we got data, the ID exists - retry
+    if (data) {
+      console.warn(`Patient ID collision detected: ${patientId}, attempt ${attempt + 1}/${maxAttempts}`)
+      // Add small delay to ensure different timestamp/random on retry
+      await new Promise(resolve => setTimeout(resolve, 10))
+      continue
+    }
+    
+    // Other database error - log but continue to retry
+    if (error) {
+      console.warn(`Error checking patient ID existence: ${error.message}, attempt ${attempt + 1}/${maxAttempts}`)
+      // Continue to retry with new ID
+      continue
+    }
+  }
+  
+  // If we exhausted all attempts, generate one final ID
+  // The database unique constraint will catch it if there's still a collision
+  const date = new Date()
+  const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '')
+  const random = generateRandomString(6)
+  return `PAT-${dateStr}-${random}`
 }
 
 /**

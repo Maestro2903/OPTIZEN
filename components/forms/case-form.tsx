@@ -46,7 +46,7 @@ import { Check, Trash2, X, Save, Pill } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import dynamic from "next/dynamic"
 
-const EyeDrawingTool = dynamic(() => import("@/components/eye-drawing-tool").then(m => m.EyeDrawingTool), { ssr: false })
+const EyeDrawingTool = dynamic(() => import("@/components/shared/eye-drawing-tool").then(m => m.EyeDrawingTool), { ssr: false })
 
 // Removed hardcoded COMPLAINT_OPTIONS - now using master data API via useMasterData hook
 
@@ -411,7 +411,8 @@ const caseFormSchema = z.object({
   // 9. Diagnostic Tests
   iop_right: z.string().optional(),
   iop_left: z.string().optional(),
-  sac_test: z.string().optional(),
+  sac_test_right: z.string().optional(),
+  sac_test_left: z.string().optional(),
   diagnostic_tests: z.array(z.object({
     test_id: z.string().min(1, "Test is required"),
     eye: z.string().optional(),
@@ -524,6 +525,8 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
         right_eye_diagram: "",
         left_eye_diagram: "",
         surgery_remarks: "",
+        sac_test_right: "",
+        sac_test_left: "",
     },
   })
 
@@ -586,6 +589,8 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
         treatments: [],
         right_eye_diagram: "",
         left_eye_diagram: "",
+        sac_test_right: "",
+        sac_test_left: "",
       })
       // Clear selected patient
       setSelectedPatient(null)
@@ -964,6 +969,38 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
     }
   }, [mode, caseData, form])
 
+  // Extract IOP and SAC test values from examination_data for edit mode
+  React.useEffect(() => {
+    if (mode === "edit" && caseData && caseData.examination_data) {
+      const examData = caseData.examination_data
+      
+      // Extract IOP values
+      if (examData.tests?.iop) {
+        if (examData.tests.iop.right?.id) {
+          form.setValue('iop_right', examData.tests.iop.right.id)
+        }
+        if (examData.tests.iop.left?.id) {
+          form.setValue('iop_left', examData.tests.iop.left.id)
+        }
+      }
+      
+      // Extract SAC test values (new structure with right/left)
+      if (examData.tests?.sac_test) {
+        if (typeof examData.tests.sac_test === 'object' && examData.tests.sac_test.right) {
+          form.setValue('sac_test_right', examData.tests.sac_test.right)
+        }
+        if (typeof examData.tests.sac_test === 'object' && examData.tests.sac_test.left) {
+          form.setValue('sac_test_left', examData.tests.sac_test.left)
+        }
+        // Backwards compatibility: if sac_test is a string (old format)
+        if (typeof examData.tests.sac_test === 'string') {
+          // For old data, we can't determine which eye, so leave it empty
+          // Or we could put it in both, but that's probably not desired
+        }
+      }
+    }
+  }, [mode, caseData, form])
+
   // Coordinate no_complaints_flag with complaints array
   const noComplaintsFlag = form.watch("no_complaints_flag");
   const complaints = form.watch("complaints");
@@ -1273,6 +1310,16 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
             blood_pressure: values.blood_pressure || undefined,
             blood_sugar: values.blood_sugar || undefined,
             blood_tests: values.blood_tests || []
+          },
+          tests: {
+            iop: values.iop_right || values.iop_left ? {
+              right: values.iop_right ? { id: values.iop_right, value: masterData.data.iopRanges?.find((r: any) => r.value === values.iop_right)?.label || values.iop_right } : undefined,
+              left: values.iop_left ? { id: values.iop_left, value: masterData.data.iopRanges?.find((r: any) => r.value === values.iop_left)?.label || values.iop_left } : undefined
+            } : undefined,
+            sac_test: values.sac_test_right || values.sac_test_left ? {
+              right: values.sac_test_right || undefined,
+              left: values.sac_test_left || undefined
+            } : undefined
           },
           surgeries: values.surgeries?.map((s: any) => ({
             eye: s.eye, // Already a UUID from dropdown
@@ -2934,7 +2981,7 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                       <div className="text-center text-sm font-medium text-muted-foreground">RIGHT EYE</div>
                         <FormField
                           control={form.control}
-                          name="sac_test"
+                          name="sac_test_right"
                           render={({ field }) => (
                             <SimpleCombobox
                               options={(masterData.data.sacStatus || [])}
@@ -2950,7 +2997,7 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                       <div className="text-center text-sm font-medium text-muted-foreground">LEFT EYE</div>
                         <FormField
                           control={form.control}
-                          name="sac_test"
+                          name="sac_test_left"
                           render={({ field }) => (
                             <SimpleCombobox
                               options={(masterData.data.sacStatus || [])}
