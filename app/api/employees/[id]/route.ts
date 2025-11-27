@@ -212,7 +212,7 @@ export async function PUT(
   }
 }
 
-// DELETE /api/employees/[id] - Deactivate an employee (soft delete)
+// DELETE /api/employees/[id] - Delete an employee (soft delete for non-super-admin, hard delete for super_admin)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -228,31 +228,102 @@ export async function DELETE(
     const supabase = createClient()
     const { id } = await params
 
-    // Soft delete by updating is_active to false
-    const { data: employee, error } = await supabase
-      .from('users')
-      .update({
-        is_active: false,
-        updated_at: new Date().toISOString(),
-        updated_by: context.user_id
-      })
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (error) {
-      if (error.code === 'PGRST116') { // Not found
-        return NextResponse.json({ error: 'Employee not found' }, { status: 404 })
-      }
-      console.error('Database error:', error)
-      return NextResponse.json({ error: 'Failed to deactivate employee' }, { status: 500 })
+    // Validate ID parameter
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(id)) {
+      return NextResponse.json({ error: 'Invalid employee ID format' }, { status: 400 })
     }
 
-    return NextResponse.json({
-      success: true,
-      data: employee,
-      message: 'Employee deactivated successfully'
-    })
+    // Prevent users from deleting themselves
+    if (id === context.user_id) {
+      return NextResponse.json({ 
+        error: 'You cannot delete your own account' 
+      }, { status: 400 })
+    }
+
+    // Fetch employee to check their role
+    const { data: employee, error: fetchError } = await supabase
+      .from('users')
+      .select('id, email, role, is_active')
+      .eq('id', id)
+      .single()
+
+    if (fetchError) {
+      if (fetchError.code === 'PGRST116') { // Not found
+        return NextResponse.json({ error: 'Employee not found' }, { status: 404 })
+      }
+      console.error('Database error:', fetchError)
+      return NextResponse.json({ error: 'Failed to fetch employee' }, { status: 500 })
+    }
+
+    if (!employee) {
+      return NextResponse.json({ error: 'Employee not found' }, { status: 404 })
+    }
+
+    // Prevent deleting super_admin accounts (unless the current user is also super_admin)
+    if (employee.role === 'super_admin' && context.role !== 'super_admin') {
+      return NextResponse.json({ 
+        error: 'Only super administrators can delete super administrator accounts' 
+      }, { status: 403 })
+    }
+
+    // Super admin can perform hard delete (permanently remove from database)
+    if (context.role === 'super_admin') {
+      // Delete from auth.users first (will cascade to public.users if CASCADE is set)
+      const { error: authDeleteError } = await supabase.auth.admin.deleteUser(id)
+      
+      if (authDeleteError) {
+        console.error('Auth delete error:', authDeleteError)
+        // If auth delete fails, try to delete from public.users directly
+        const { error: publicDeleteError } = await supabase
+          .from('users')
+          .delete()
+          .eq('id', id)
+
+        if (publicDeleteError) {
+          console.error('Database delete error:', publicDeleteError)
+          return NextResponse.json({ 
+            error: 'Failed to delete employee from database' 
+          }, { status: 500 })
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Employee permanently deleted successfully',
+        deleted_employee: {
+          id: employee.id,
+          email: employee.email,
+          role: employee.role
+        }
+      })
+    } else {
+      // Other roles can only soft delete (deactivate)
+      const { data: updatedEmployee, error } = await supabase
+        .from('users')
+        .update({
+          is_active: false,
+          updated_at: new Date().toISOString(),
+          updated_by: context.user_id
+        })
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (error) {
+        if (error.code === 'PGRST116') { // Not found
+          return NextResponse.json({ error: 'Employee not found' }, { status: 404 })
+        }
+        console.error('Database error:', error)
+        return NextResponse.json({ error: 'Failed to deactivate employee' }, { status: 500 })
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: updatedEmployee,
+        message: 'Employee deactivated successfully'
+      })
+    }
 
   } catch (error) {
     console.error('API error:', error)
