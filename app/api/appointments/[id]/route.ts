@@ -104,10 +104,10 @@ export async function PUT(
     updateData.updated_at = new Date().toISOString()
 
     // If updating time, check for conflicts
-    if (updateData.appointment_date || updateData.appointment_time) {
+    if (updateData.appointment_date || updateData.start_time || updateData.end_time) {
       const { data: currentAppointment, error: fetchError } = await supabase
         .from('appointments')
-        .select('appointment_date, appointment_time')
+        .select('appointment_date, start_time, end_time, provider_id')
         .eq('id', id)
         .single()
 
@@ -124,22 +124,52 @@ export async function PUT(
       }
 
       const newDate = updateData.appointment_date || currentAppointment.appointment_date
-      const newTime = updateData.appointment_time || currentAppointment.appointment_time
+      const newStartTime = updateData.start_time || currentAppointment.start_time
+      const newEndTime = updateData.end_time || currentAppointment.end_time
+      const providerId = updateData.provider_id || currentAppointment.provider_id
 
-      // Check for conflicts with other appointments
-      const { data: conflictingAppointments } = await supabase
-        .from('appointments')
-        .select('id')
-        .eq('appointment_date', newDate)
-        .eq('appointment_time', newTime)
-        .eq('status', 'scheduled')
-        .neq('id', id) // Exclude current appointment
-        .limit(1)
+      // Check for appointment conflicts (overlap detection)
+      if (providerId) {
+        const { data: conflictingAppointments, error: conflictError } = await supabase
+          .from('appointments')
+          .select('id, start_time, end_time')
+          .eq('provider_id', providerId)
+          .eq('appointment_date', newDate)
+          .neq('status', 'cancelled')
+          .neq('id', id) // Exclude current appointment
 
-      if (conflictingAppointments && conflictingAppointments.length > 0) {
-        return NextResponse.json({
-          error: 'Time slot already booked. Please choose a different time.'
-        }, { status: 409 })
+        if (conflictError) {
+          console.error('Error checking conflicts:', conflictError)
+          return NextResponse.json({ error: 'Failed to check appointment conflicts' }, { status: 500 })
+        }
+
+        // Check for time overlaps
+        if (conflictingAppointments && conflictingAppointments.length > 0) {
+          for (const existing of conflictingAppointments) {
+            // Convert times to minutes for comparison
+            const [newStartH, newStartM] = newStartTime.split(':').map(Number)
+            const [newEndH, newEndM] = newEndTime.split(':').map(Number)
+            const [exStartH, exStartM] = existing.start_time.split(':').map(Number)
+            const [exEndH, exEndM] = existing.end_time.split(':').map(Number)
+            
+            const newStartMinutes = newStartH * 60 + newStartM
+            const newEndMinutes = newEndH * 60 + newEndM
+            const exStartMinutes = exStartH * 60 + exStartM
+            const exEndMinutes = exEndH * 60 + exEndM
+
+            // Check for overlap: (start1 < end2 AND start2 < end1)
+            if (newStartMinutes < exEndMinutes && exStartMinutes < newEndMinutes) {
+              return NextResponse.json({
+                error: `Provider has a conflicting appointment from ${existing.start_time} to ${existing.end_time}`,
+                conflict: true,
+                existingAppointment: {
+                  start_time: existing.start_time,
+                  end_time: existing.end_time
+                }
+              }, { status: 409 })
+            }
+          }
+        }
       }
     }
 
@@ -200,7 +230,7 @@ export async function DELETE(
     // Fetch current appointment with all needed fields for validation
     const { data: currentAppointment, error: fetchError } = await supabase
       .from('appointments')
-      .select('id, status, appointment_date, appointment_time, patient_id, doctor_id, created_by')
+      .select('id, status, appointment_date, start_time, end_time, patient_id, provider_id, created_at')
       .eq('id', id)
       .single()
 
@@ -226,13 +256,13 @@ export async function DELETE(
     }
 
     // Optional: Check if appointment is in the past
-    const appointmentDateTime = new Date(`${currentAppointment.appointment_date}T${currentAppointment.appointment_time}`)
+    const appointmentDateTime = new Date(`${currentAppointment.appointment_date}T${currentAppointment.start_time}`)
     const now = new Date()
     if (appointmentDateTime < now) {
       return NextResponse.json({ 
         error: 'Cannot cancel a past appointment',
         appointmentDate: currentAppointment.appointment_date,
-        appointmentTime: currentAppointment.appointment_time
+        appointmentTime: currentAppointment.start_time
       }, { status: 400 })
     }
 
