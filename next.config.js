@@ -29,6 +29,13 @@ const nextConfig = {
         tls: false,
       }
     }
+    
+    // Exclude WEBSITE directory from build (it's a separate Next.js project)
+    config.watchOptions = {
+      ...config.watchOptions,
+      ignored: ['**/node_modules/**', '**/WEBSITE/**'],
+    }
+    
     return config
   },
 }

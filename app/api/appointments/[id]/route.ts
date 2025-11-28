@@ -213,7 +213,7 @@ export async function PUT(
 
 // DELETE /api/appointments/[id] - Cancel an appointment
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   // Authorization check
@@ -221,7 +221,6 @@ export async function DELETE(
   if (!authCheck.authorized) {
     return (authCheck as { authorized: false; response: NextResponse }).response
   }
-  const { context } = authCheck
 
   try {
     const supabase = createClient()

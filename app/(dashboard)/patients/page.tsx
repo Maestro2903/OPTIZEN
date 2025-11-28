@@ -149,12 +149,17 @@ export default function PatientsPage() {
                 title: "Patient Created Successfully",
                 description: `${newPatient.full_name} - ID: ${newPatient.patient_id}`
               })
+              // Close dialog after success
+              setIsDialogOpen(false)
+              setEditingPatient(null)
+            },
+            onError: (errorMessage) => {
+              console.error('Error creating patient:', errorMessage)
+              // Error toast is already shown by useApiForm
             }
           }
         )
-        if (result) {
-          setIsDialogOpen(false)
-        }
+        // Note: Dialog is closed in onSuccess callback above
       }
     } catch (error) {
       console.error('Error submitting patient form:', error)

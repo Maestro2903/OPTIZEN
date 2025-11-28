@@ -4,6 +4,7 @@ import * as React from "react"
 import { createPortal } from "react-dom"
 import { PrintHeader, PrintSection, PrintFooter } from "./print-layout"
 import { PrintModalShell } from "./print-modal-shell"
+import type { ReactNode } from "react"
 
 interface BillingPrintProps {
   billing: {
@@ -81,33 +82,35 @@ export function BillingPrint({ billing, children }: BillingPrintProps) {
       onClose={() => setIsOpen(false)}
       title={invoiceTitle}
     >
-      {/* Header */}
-      <PrintHeader />
-      
-      {/* Document Title */}
-      <div className="text-center mb-6">
-        <h1 className="text-2xl font-bold uppercase tracking-wide">TAX INVOICE</h1>
-      </div>
+      {/* Main Container: Full Height Flex Layout */}
+      <div className="flex flex-col min-h-[250mm] justify-between">
+        {/* Header */}
+        <PrintHeader />
+        
+        {/* Document Title */}
+        <div className="text-center mb-2 -mt-4">
+          <h1 className="text-xl font-bold uppercase tracking-wide">TAX INVOICE</h1>
+        </div>
 
-      <div className="space-y-6">
-        {/* Invoice Meta-Data (Top Right) */}
-        <div className="flex justify-end mb-6">
-          <div className="text-right space-y-2">
-            <div className="text-2xl font-bold">
+        <div className="space-y-3 flex-1">
+        {/* Invoice Meta-Data (Top Right) - Compact */}
+        <div className="flex justify-end mb-2">
+          <div className="text-right space-y-0">
+            <div className="text-base font-bold">
               Invoice #{billing.invoice_no || billing.id}
             </div>
-            <div className="text-sm text-gray-700">
+            <div className="text-[11px] text-gray-700">
               Date: {formatDate(billing.date)}
             </div>
             {billing.due_date && (
-              <div className="text-sm text-gray-700">
+              <div className="text-[11px] text-gray-700">
                 Due Date: {formatDate(billing.due_date)}
               </div>
             )}
-            {/* Status Stamp */}
-            <div className="mt-3">
+            {/* Status Stamp - Compact */}
+            <div className="mt-1">
               <div
-                className={`inline-block px-4 py-2 border-2 font-bold text-sm uppercase ${
+                className={`inline-block px-3 py-1 border-2 font-bold text-xs uppercase ${
                   isPaid
                     ? 'border-green-600 text-green-700 bg-green-50'
                     : 'border-red-600 text-red-700 bg-red-50'
@@ -119,69 +122,65 @@ export function BillingPrint({ billing, children }: BillingPrintProps) {
           </div>
         </div>
 
-        {/* Bill To Section */}
-        <PrintSection title="BILL TO">
-          <div className="space-y-1">
-            <div className="font-bold text-base uppercase">
+        {/* Bill To Section - Compact */}
+        <div className="my-8">
+          <h3 className="text-xs font-bold uppercase tracking-wider mb-1">Bill To</h3>
+          <div className="space-y-0.5">
+            <div className="font-bold text-sm uppercase">
               {billing.patient_name}
             </div>
-            {billing.patient_id && (
-              <div className="text-xs text-gray-600">
-                Patient ID: {billing.patient_id}
-              </div>
-            )}
             {billing.address && (
-              <div className="text-xs text-gray-600">
+              <div className="text-[11px] text-gray-600">
                 {billing.address}
               </div>
             )}
             {billing.contact_number && (
-              <div className="text-xs text-gray-600">
+              <div className="text-[11px] text-gray-600">
                 Contact: {billing.contact_number}
               </div>
             )}
           </div>
-        </PrintSection>
+        </div>
 
-        {/* Line Items Table */}
-        <div className="mt-6">
+        {/* Line Items Table - Increased Breathing Room */}
+        <div className="my-8">
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-100 border-y border-black">
-                <th className="py-2 px-3 text-left text-xs font-bold uppercase">Item Description</th>
-                <th className="py-2 px-3 text-center text-xs font-bold uppercase w-16">Qty</th>
-                <th className="py-2 px-3 text-right text-xs font-bold uppercase w-24">Rate</th>
-                <th className="py-2 px-3 text-right text-xs font-bold uppercase w-24">Amount</th>
+                <th className="py-3 px-2 text-left text-[11px] font-bold uppercase">Item Description</th>
+                <th className="py-3 px-2 text-center text-[11px] font-bold uppercase w-12">Qty</th>
+                <th className="py-3 px-2 text-right text-[11px] font-bold uppercase w-20">Rate</th>
+                <th className="py-3 px-2 text-right text-[11px] font-bold uppercase w-20">Amount</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="min-h-[300px]">
               {invoiceItems.length > 0 ? (
                 invoiceItems.map((item, index) => (
                   <tr key={index} className="border-b border-gray-200">
-                    <td className="py-3 px-3">
-                      <div className="font-medium">
+                    <td className="py-5 px-2">
+                      <div className="font-medium text-[11px]">
                         {item.service || item.description || 'Service'}
                       </div>
                       {item.service && item.description && (
-                        <div className="text-xs text-gray-600 mt-1">
+                        <div className="text-[10px] text-gray-600">
                           {item.description}
                         </div>
                       )}
                     </td>
-                    <td className="py-3 px-3 text-center tabular-nums">
+                    <td className="py-5 px-2 text-center tabular-nums text-[11px]">
                       {item.quantity}
                     </td>
-                    <td className="py-3 px-3 text-right tabular-nums">
+                    <td className="py-5 px-2 text-right tabular-nums text-[11px]">
                       {formatCurrency(item.rate)}
                     </td>
-                    <td className="py-3 px-3 text-right font-bold tabular-nums">
+                    <td className="py-5 px-2 text-right font-bold tabular-nums text-[11px]">
                       {formatCurrency(item.amount)}
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={4} className="py-4 text-center text-gray-500 text-sm">
+                  <td colSpan={4} className="py-4 text-center text-gray-500 text-[11px]">
                     No items in this invoice
                   </td>
                 </tr>
@@ -190,17 +189,17 @@ export function BillingPrint({ billing, children }: BillingPrintProps) {
           </table>
         </div>
 
-        {/* Totals Stack (Bottom Right) */}
-        <div className="flex justify-end mt-6">
-          <div className="w-64 space-y-2">
-            <div className="flex justify-between text-sm">
+        {/* Totals Stack (Bottom Right) - Expanded Spacing */}
+        <div className="flex justify-end my-8">
+          <div className="w-64 space-y-3">
+            <div className="flex justify-between text-[11px]">
               <span className="text-gray-700">Subtotal:</span>
               <span className="text-right tabular-nums font-medium">
                 {formatCurrency(calculatedSubtotal)}
               </span>
             </div>
             {discountAmount > 0 && (
-              <div className="flex justify-between text-sm">
+              <div className="flex justify-between text-[11px]">
                 <span className="text-gray-700">Discount:</span>
                 <span className="text-right tabular-nums font-medium text-red-600">
                   -{formatCurrency(discountAmount)}
@@ -208,17 +207,17 @@ export function BillingPrint({ billing, children }: BillingPrintProps) {
               </div>
             )}
             {taxAmount > 0 && (
-              <div className="flex justify-between text-sm">
+              <div className="flex justify-between text-[11px]">
                 <span className="text-gray-700">Tax (GST):</span>
                 <span className="text-right tabular-nums font-medium">
                   {formatCurrency(taxAmount)}
                 </span>
               </div>
             )}
-            <div className="border-t-2 border-black pt-2 mt-2 bg-gray-50 -mx-2 px-2 py-2">
+            <div className="border-t-2 border-black pt-4 mt-6 bg-gray-50 -mx-2 px-2 py-4">
               <div className="flex justify-between">
                 <span className="text-lg font-black">Total Due:</span>
-                <span className="text-xl font-black text-right tabular-nums">
+                <span className="text-2xl font-black text-right tabular-nums">
                   {formatCurrency(finalTotal)}
                 </span>
               </div>
@@ -226,11 +225,11 @@ export function BillingPrint({ billing, children }: BillingPrintProps) {
           </div>
         </div>
 
-        {/* Footer & Terms */}
-        <div className="mt-12 pt-6 border-t border-gray-200">
-          <div className="grid grid-cols-2 gap-8">
-            {/* Left Side: Payment Info / Bank Details / Terms */}
-            <div className="space-y-3 text-xs text-gray-700">
+        {/* Footer & Terms - Anchored to Bottom with mt-auto */}
+        <div className="mt-auto pt-2 border-t border-gray-200 flex justify-between items-end gap-4">
+          {/* Left (60%): Payment Terms & Bank Details - Visually Distinct Box */}
+          <div className="flex-1 border border-gray-200 rounded-lg p-4 bg-gray-50">
+            <div className="space-y-2 text-[10px] text-gray-700">
               {billing.gst_number && (
                 <div>
                   <strong>GST Number:</strong> {billing.gst_number}
@@ -238,36 +237,32 @@ export function BillingPrint({ billing, children }: BillingPrintProps) {
               )}
               <div>
                 <strong>Payment Terms:</strong>
-                <ul className="list-disc list-inside mt-1 space-y-1">
-                  <li>
-                    Payment is due within{' '}
-                    {billing.due_date ? formatDate(billing.due_date) : '7 days'} of invoice date
-                  </li>
-                  <li>Late payments may incur additional charges</li>
-                  <li>For payment inquiries, contact the billing department</li>
+                <ul className="list-disc list-inside text-[10px] space-y-0.5 ml-2">
+                  <li>Due within {billing.due_date ? formatDate(billing.due_date) : '7 days'}</li>
+                  <li>Late payments incur charges</li>
+                  <li>Contact billing for inquiries</li>
                 </ul>
               </div>
               {billing.notes && (
-                <div className="mt-2">
+                <div>
                   <strong>Notes:</strong>
-                  <div className="mt-1 whitespace-pre-wrap">{billing.notes}</div>
+                  <div className="text-[10px] whitespace-pre-wrap">{billing.notes}</div>
                 </div>
               )}
             </div>
+          </div>
 
-            {/* Right Side: Authorized Signatory */}
-            <div className="text-right">
-              <div className="inline-block text-left">
-                <div className="h-16 border-b border-black mb-2"></div>
-                <div className="font-bold text-sm">Authorized Signatory</div>
-                <div className="text-xs text-gray-600 mt-1">Billing Department</div>
-              </div>
-            </div>
+          {/* Right (30%): Authorized Signatory */}
+          <div className="text-center flex-shrink-0">
+            <div className="h-10 border-b border-black mb-1 w-28"></div>
+            <div className="font-bold text-[10px]">Authorized Signatory</div>
+            <div className="text-[9px] text-gray-600">Billing Dept</div>
           </div>
         </div>
 
         {/* Print Footer with Timestamp */}
         <PrintFooter showTimestamp={true} />
+        </div>
       </div>
     </PrintModalShell>
   )

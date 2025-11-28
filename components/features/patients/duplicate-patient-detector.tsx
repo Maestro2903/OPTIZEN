@@ -39,47 +39,80 @@ export function DuplicatePatientDetector({
 }: DuplicatePatientDetectorProps) {
   const [possibleDuplicates, setPossibleDuplicates] = React.useState<Patient[]>([])
   const [loading, setLoading] = React.useState(false)
+  const [hasChecked, setHasChecked] = React.useState(false)
+  const hasAutoConfirmedRef = React.useRef(false)
 
   React.useEffect(() => {
-    if (isOpen && (mobile || fullName)) {
-      checkForDuplicates()
+    if (isOpen) {
+      setHasChecked(false)
+      hasAutoConfirmedRef.current = false
+      // Clear previous duplicates
+      setPossibleDuplicates([])
+      
+      // Only run duplicate check if we have sufficient data
+      if (mobile || fullName) {
+        checkForDuplicates()
+      } else {
+        // No data to check - proceed immediately
+        setHasChecked(true)
+        setLoading(false)
+      }
     }
   }, [isOpen, mobile, fullName])
+  
+  // Reset auto-confirm flag when dialog closes
+  React.useEffect(() => {
+    if (!isOpen) {
+      hasAutoConfirmedRef.current = false
+      setHasChecked(false)
+      setPossibleDuplicates([])
+    }
+  }, [isOpen])
 
   const checkForDuplicates = async () => {
     setLoading(true)
     try {
+      // Extract digits only from mobile for search (phone inputs might have formatting)
+      const mobileDigits = mobile ? mobile.replace(/\D/g, '') : ''
+      
       // Search by mobile number first (most accurate)
-      if (mobile && mobile.length >= 10) {
+      if (mobileDigits && mobileDigits.length >= 10) {
         const mobileResponse = await patientsApi.list({
-          search: mobile,
+          search: mobileDigits,
           limit: 10
         })
 
         if (mobileResponse.success && mobileResponse.data && mobileResponse.data.length > 0) {
           setPossibleDuplicates(mobileResponse.data)
+          setHasChecked(true)
+          setLoading(false)
           return
         }
       }
 
       // If no match by mobile, search by name
-      if (fullName && fullName.length >= 3) {
+      if (fullName && fullName.trim().length >= 3) {
         const nameResponse = await patientsApi.list({
-          search: fullName,
+          search: fullName.trim(),
           limit: 10
         })
 
         if (nameResponse.success && nameResponse.data && nameResponse.data.length > 0) {
           setPossibleDuplicates(nameResponse.data)
+          setHasChecked(true)
+          setLoading(false)
           return
         }
       }
 
-      // No duplicates found
+      // No duplicates found - proceed with submission
       setPossibleDuplicates([])
+      setHasChecked(true)
     } catch (error) {
       console.error("Error checking for duplicates:", error)
+      // On error, allow submission to proceed (don't block user)
       setPossibleDuplicates([])
+      setHasChecked(true)
     } finally {
       setLoading(false)
     }
@@ -107,8 +140,40 @@ export function DuplicatePatientDetector({
     onOpenChange(false)
   }
 
-  if (possibleDuplicates.length === 0 && !loading) {
-    // Auto-confirm if no duplicates
+  // Auto-confirm if no duplicates found after checking completes
+  React.useEffect(() => {
+    if (isOpen && hasChecked && !loading && possibleDuplicates.length === 0 && !hasAutoConfirmedRef.current) {
+      // Auto-confirm if no duplicates found (only once)
+      hasAutoConfirmedRef.current = true
+      // Small delay to ensure state is stable
+      const timer = setTimeout(() => {
+        onConfirmNew()
+        onOpenChange(false)
+      }, 50)
+      return () => clearTimeout(timer)
+    }
+  }, [isOpen, hasChecked, loading, possibleDuplicates.length, onConfirmNew, onOpenChange])
+  
+  // Fallback: If duplicate check takes too long or dialog stays open, allow submission after 5 seconds
+  React.useEffect(() => {
+    if (isOpen && !hasChecked && loading) {
+      const timeout = setTimeout(() => {
+        if (!hasAutoConfirmedRef.current) {
+          console.warn('Duplicate check timeout - proceeding with submission')
+          hasAutoConfirmedRef.current = true
+          setHasChecked(true)
+          setLoading(false)
+          onConfirmNew()
+          onOpenChange(false)
+        }
+      }, 5000) // 5 second timeout
+      
+      return () => clearTimeout(timeout)
+    }
+  }, [isOpen, hasChecked, loading, onConfirmNew, onOpenChange])
+
+  // Don't render dialog if no duplicates found (auto-confirmed via useEffect above)
+  if (possibleDuplicates.length === 0 && hasChecked && !loading) {
     return null
   }
 

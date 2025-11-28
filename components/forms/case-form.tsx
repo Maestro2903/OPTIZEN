@@ -599,6 +599,144 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
     }
   }, [open, mode, form])
 
+  // Reset form with caseData when dialog opens in edit mode
+  React.useEffect(() => {
+    if (open && mode === "edit" && caseData) {
+      const visionData = caseData.vision_data || {}
+      const examinationData = caseData.examination_data || {}
+      const bloodInvestigation = examinationData.blood_investigation || {}
+      
+      // Map API response fields to form fields
+      const formData: any = {
+        // Basic info
+        case_no: caseData.case_no || "",
+        case_date: caseData.case_date || (caseData.encounter_date ? new Date(caseData.encounter_date).toISOString().split("T")[0] : ""),
+        patient_id: caseData.patient_id || "",
+        visit_type: caseData.visit_type || "First",
+        
+        // Case History
+        chief_complaint: caseData.chief_complaint || "",
+        history_present_illness: caseData.history_of_present_illness || caseData.history || "",
+        
+        // Past History
+        past_history_treatments: caseData.past_history_treatments || [],
+        past_history_medicines: caseData.past_history_medicines || caseData.past_medications || [],
+        
+        // Complaints
+        complaints: caseData.complaints || [],
+        no_complaints_flag: caseData.complaints?.length === 0 || false,
+        
+        // Vision Data
+        visual_acuity_unaided_right: visionData.unaided?.right || "",
+        visual_acuity_unaided_left: visionData.unaided?.left || "",
+        pinhole_right: visionData.pinhole?.right || "",
+        pinhole_left: visionData.pinhole?.left || "",
+        visual_acuity_aided_right: visionData.aided?.right || "",
+        visual_acuity_aided_left: visionData.aided?.left || "",
+        near_visual_right: visionData.near?.right || "",
+        near_visual_left: visionData.near?.left || "",
+        
+        // Refraction Data
+        refraction_distant_sph_right: examinationData.refraction?.distant?.right?.sph || "",
+        refraction_distant_cyl_right: examinationData.refraction?.distant?.right?.cyl || "",
+        refraction_distant_axis_right: examinationData.refraction?.distant?.right?.axis || "",
+        refraction_distant_va_right: examinationData.refraction?.distant?.right?.va || "",
+        refraction_distant_sph_left: examinationData.refraction?.distant?.left?.sph || "",
+        refraction_distant_cyl_left: examinationData.refraction?.distant?.left?.cyl || "",
+        refraction_distant_axis_left: examinationData.refraction?.distant?.left?.axis || "",
+        refraction_distant_va_left: examinationData.refraction?.distant?.left?.va || "",
+        refraction_near_sph_right: examinationData.refraction?.near?.right?.sph || "",
+        refraction_near_cyl_right: examinationData.refraction?.near?.right?.cyl || "",
+        refraction_near_axis_right: examinationData.refraction?.near?.right?.axis || "",
+        refraction_near_va_right: examinationData.refraction?.near?.right?.va || "",
+        refraction_near_sph_left: examinationData.refraction?.near?.left?.sph || "",
+        refraction_near_cyl_left: examinationData.refraction?.near?.left?.cyl || "",
+        refraction_near_axis_left: examinationData.refraction?.near?.left?.axis || "",
+        refraction_near_va_left: examinationData.refraction?.near?.left?.va || "",
+        refraction_pg_sph_right: examinationData.refraction?.pg?.right?.sph || "",
+        refraction_pg_cyl_right: examinationData.refraction?.pg?.right?.cyl || "",
+        refraction_pg_axis_right: examinationData.refraction?.pg?.right?.axis || "",
+        refraction_pg_va_right: examinationData.refraction?.pg?.right?.va || "",
+        refraction_pg_sph_left: examinationData.refraction?.pg?.left?.sph || "",
+        refraction_pg_cyl_left: examinationData.refraction?.pg?.left?.cyl || "",
+        refraction_pg_axis_left: examinationData.refraction?.pg?.left?.axis || "",
+        refraction_pg_va_left: examinationData.refraction?.pg?.left?.va || "",
+        refraction_purpose: examinationData.refraction?.purpose || "",
+        refraction_quality: examinationData.refraction?.quality || "",
+        refraction_remark: examinationData.refraction?.remark || "",
+        
+        // Anterior Segment
+        eyelids_right: examinationData.anterior_segment?.eyelids?.right || "",
+        eyelids_left: examinationData.anterior_segment?.eyelids?.left || "",
+        conjunctiva_right: examinationData.anterior_segment?.conjunctiva?.right || "",
+        conjunctiva_left: examinationData.anterior_segment?.conjunctiva?.left || "",
+        cornea_right: examinationData.anterior_segment?.cornea?.right || "",
+        cornea_left: examinationData.anterior_segment?.cornea?.left || "",
+        anterior_chamber_right: examinationData.anterior_segment?.anterior_chamber?.right || "",
+        anterior_chamber_left: examinationData.anterior_segment?.anterior_chamber?.left || "",
+        iris_right: examinationData.anterior_segment?.iris?.right || "",
+        iris_left: examinationData.anterior_segment?.iris?.left || "",
+        lens_right: examinationData.anterior_segment?.lens?.right || "",
+        lens_left: examinationData.anterior_segment?.lens?.left || "",
+        anterior_remarks: examinationData.anterior_segment?.remarks || "",
+        
+        // Posterior Segment
+        vitreous_right: examinationData.posterior_segment?.vitreous?.right || "",
+        vitreous_left: examinationData.posterior_segment?.vitreous?.left || "",
+        disc_right: examinationData.posterior_segment?.disc?.right || "",
+        disc_left: examinationData.posterior_segment?.disc?.left || "",
+        retina_right: examinationData.posterior_segment?.retina?.right || "",
+        retina_left: examinationData.posterior_segment?.retina?.left || "",
+        posterior_remarks: examinationData.posterior_segment?.remarks || "",
+        
+        // Blood Investigation
+        blood_pressure: bloodInvestigation.blood_pressure || "",
+        blood_sugar: bloodInvestigation.blood_sugar || "",
+        blood_tests: bloodInvestigation.blood_tests || caseData.blood_tests || [],
+        
+        // Diagnosis
+        diagnosis: Array.isArray(caseData.diagnosis) ? caseData.diagnosis : (caseData.diagnosis ? [caseData.diagnosis] : []),
+        diagnosis_pending_flag: !caseData.diagnosis || (Array.isArray(caseData.diagnosis) && caseData.diagnosis.length === 0) || false,
+        
+        // Diagnostic Tests
+        iop_right: examinationData.tests?.iop?.right?.id || caseData.iop_right || "",
+        iop_left: examinationData.tests?.iop?.left?.id || caseData.iop_left || "",
+        sac_test_right: examinationData.tests?.sac_test?.right || caseData.sac_test_right || "",
+        sac_test_left: examinationData.tests?.sac_test?.left || caseData.sac_test_left || "",
+        diagnostic_tests: caseData.diagnostic_tests || [],
+        
+        // Medicines (will be set separately via the existing useEffect)
+        medicines: [],
+        
+        // Surgeries
+        surgeries: examinationData.surgeries || [],
+        
+        // Diagrams
+        right_eye_diagram: examinationData.diagrams?.right || "",
+        left_eye_diagram: examinationData.diagrams?.left || "",
+        
+        // Advice
+        advice_remarks: caseData.advice_remarks || caseData.follow_up_instructions || "",
+        surgery_remarks: caseData.surgery_remarks || "",
+      }
+      
+      // Reset form with mapped data
+      form.reset(formData)
+      
+      // Set selected patient if patient_id exists
+      if (caseData.patient_id) {
+        // Fetch full patient data
+        patientsApi.getById(caseData.patient_id).then(response => {
+          if (response.success && response.data) {
+            setSelectedPatient(response.data)
+          }
+        }).catch(() => {
+          // Silently fail if patient fetch fails
+        })
+      }
+    }
+  }, [open, mode, caseData, form, patients])
+
   // Load master data when dialog opens
   React.useEffect(() => {
     if (open) {
@@ -969,7 +1107,7 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
     }
   }, [mode, caseData, form])
 
-  // Extract IOP and SAC test values from examination_data for edit mode
+  // Extract IOP, SAC test values, and diagrams from examination_data for edit mode
   React.useEffect(() => {
     if (mode === "edit" && caseData && caseData.examination_data) {
       const examData = caseData.examination_data
@@ -996,6 +1134,16 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
         if (typeof examData.tests.sac_test === 'string') {
           // For old data, we can't determine which eye, so leave it empty
           // Or we could put it in both, but that's probably not desired
+        }
+      }
+      
+      // Extract diagram images
+      if (examData.diagrams) {
+        if (examData.diagrams.right) {
+          form.setValue('right_eye_diagram', examData.diagrams.right)
+        }
+        if (examData.diagrams.left) {
+          form.setValue('left_eye_diagram', examData.diagrams.left)
         }
       }
     }
@@ -1547,7 +1695,10 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-6xl h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col p-0">
+      <DialogContent 
+        className="max-w-6xl h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col p-0"
+        onCloseButtonClickOnly={true}
+      >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-full">
             {/* SECTION 1: Fixed Header (Stepper) */}

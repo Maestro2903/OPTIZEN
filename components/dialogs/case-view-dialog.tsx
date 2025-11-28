@@ -28,24 +28,86 @@ export function CaseViewDialog({ children, caseData }: CaseViewDialogProps) {
   const masterData = useMasterData()
   const [dataLoaded, setDataLoaded] = React.useState(false)
 
-  // Load eye selection data when dialog opens (only once)
+  // Load necessary master data when dialog opens
   React.useEffect(() => {
-    if (open && !dataLoaded && masterData.data.eyeSelection.length === 0) {
-      masterData.fetchCategory('eyeSelection')
+    if (open && !dataLoaded) {
+      const categoriesToLoad: Array<keyof typeof masterData.data> = [
+        'eyeSelection',
+        'diagnosis',
+        'medicines',
+        'visualAcuity',
+        'bloodTests',
+      ]
+      
+      categoriesToLoad.forEach(category => {
+        if (masterData.data[category].length === 0) {
+          masterData.fetchCategory(category)
+        }
+      })
       setDataLoaded(true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, dataLoaded])
 
+  // UUID validation regex
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  
+  // Helper to check if a value is a UUID
+  const isUUID = (value: string | undefined | null): boolean => {
+    if (!value || typeof value !== 'string') return false
+    return UUID_REGEX.test(value)
+  }
+
+  // Helper to resolve UUID from master data category
+  const resolveUUID = (uuid: string | undefined | null, category: keyof typeof masterData.data): string => {
+    if (!uuid || !isUUID(uuid)) return uuid || 'N/A'
+    const option = masterData.data[category].find(opt => opt.value === uuid)
+    return option?.label || uuid
+  }
+
+  // Helper to resolve diagnosis (can be string, array, or null)
+  const resolveDiagnosis = (diagnosis: string | string[] | null | undefined): string => {
+    if (!diagnosis) return 'Not recorded'
+    const diagnosisArray = Array.isArray(diagnosis) ? diagnosis : [diagnosis]
+    const resolved = diagnosisArray.map(d => resolveUUID(d, 'diagnosis'))
+    return resolved.join(', ')
+  }
+
   // Helper to resolve eye UUID to label
   const getEyeLabel = (eyeId: string | undefined | null): string => {
     if (!eyeId) return 'N/A'
-    const eyeOption = masterData.data.eyeSelection.find(opt => opt.value === eyeId)
-    return eyeOption?.label || eyeId
+    return resolveUUID(eyeId, 'eyeSelection')
   }
 
-  // Helper to safely access nested data
-  const getNestedValue = (obj: any, path: string, defaultValue: string = 'N/A'): string => {
+  // Helper to resolve medicine name (UUID or string)
+  const resolveMedicineName = (medicineId: string | undefined | null): string => {
+    if (!medicineId) return 'N/A'
+    if (isUUID(medicineId)) {
+      return resolveUUID(medicineId, 'medicines')
+    }
+    return medicineId
+  }
+
+  // Helper to resolve visual acuity UUID
+  const resolveVisualAcuity = (acuity: string | undefined | null): string => {
+    if (!acuity) return 'N/A'
+    if (isUUID(acuity)) {
+      return resolveUUID(acuity, 'visualAcuity')
+    }
+    return acuity
+  }
+
+  // Helper to resolve blood test UUID
+  const resolveBloodTest = (test: string | undefined | null): string => {
+    if (!test) return 'N/A'
+    if (isUUID(test)) {
+      return resolveUUID(test, 'bloodTests')
+    }
+    return test
+  }
+
+  // Helper to safely access nested data and resolve UUIDs
+  const getNestedValue = (obj: any, path: string, defaultValue: string = 'N/A', resolveAsUUID?: keyof typeof masterData.data): string => {
     if (!obj) return defaultValue
     const keys = path.split('.')
     let current = obj
@@ -53,7 +115,11 @@ export function CaseViewDialog({ children, caseData }: CaseViewDialogProps) {
       if (current === null || current === undefined) return defaultValue
       current = current[key]
     }
-    return current !== null && current !== undefined ? String(current) : defaultValue
+    const value = current !== null && current !== undefined ? String(current) : defaultValue
+    if (resolveAsUUID && isUUID(value)) {
+      return resolveUUID(value, resolveAsUUID)
+    }
+    return value
   }
 
   // Extract data from caseData
@@ -62,6 +128,25 @@ export function CaseViewDialog({ children, caseData }: CaseViewDialogProps) {
   const complaints = caseData.complaints || []
   const diagnosticTests = caseData.diagnostic_tests || []
   
+  // Debug diagrams when dialog opens
+  React.useEffect(() => {
+    if (open) {
+      console.log('=== DIAGRAM DEBUG ===')
+      console.log('examinationData:', examinationData)
+      console.log('examinationData.diagrams:', examinationData?.diagrams)
+      console.log('Right diagram exists:', !!examinationData?.diagrams?.right)
+      console.log('Left diagram exists:', !!examinationData?.diagrams?.left)
+      if (examinationData?.diagrams?.right) {
+        console.log('Right diagram length:', examinationData.diagrams.right.length)
+        console.log('Right diagram preview:', examinationData.diagrams.right.substring(0, 100))
+      }
+      if (examinationData?.diagrams?.left) {
+        console.log('Left diagram length:', examinationData.diagrams.left.length)
+        console.log('Left diagram preview:', examinationData.diagrams.left.substring(0, 100))
+      }
+    }
+  }, [open, examinationData])
+  
   const handlePrint = () => {
     window.print()
   }
@@ -69,7 +154,10 @@ export function CaseViewDialog({ children, caseData }: CaseViewDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent 
+        className="max-w-4xl max-h-[90vh] overflow-y-auto"
+        onCloseButtonClickOnly={true}
+      >
         <DialogHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -187,9 +275,7 @@ export function CaseViewDialog({ children, caseData }: CaseViewDialogProps) {
                   <div>
                     <p className="text-muted-foreground font-medium mb-1">Diagnosis</p>
                     <p className="text-foreground">
-                      {caseData.diagnosis ? 
-                        (Array.isArray(caseData.diagnosis) ? caseData.diagnosis.join(', ') : caseData.diagnosis) 
-                        : 'Not recorded'}
+                      {resolveDiagnosis(caseData.diagnosis)}
                     </p>
                   </div>
                   <Separator />
@@ -242,7 +328,7 @@ export function CaseViewDialog({ children, caseData }: CaseViewDialogProps) {
                           <div className="grid grid-cols-2 gap-3">
                             <div>
                               <p className="text-muted-foreground text-xs">Medicine</p>
-                              <p className="font-medium">{med.medicine_name || 'N/A'}</p>
+                              <p className="font-medium">{resolveMedicineName(med.medicine_name || med.medicine_id)}</p>
                             </div>
                             {med.type && (
                               <div>
@@ -343,11 +429,11 @@ export function CaseViewDialog({ children, caseData }: CaseViewDialogProps) {
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <p className="text-muted-foreground">Right Eye (OD)</p>
-                          <p className="font-medium">{getNestedValue(visionData, 'unaided.right')}</p>
+                          <p className="font-medium">{resolveVisualAcuity(getNestedValue(visionData, 'unaided.right', 'N/A'))}</p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">Left Eye (OS)</p>
-                          <p className="font-medium">{getNestedValue(visionData, 'unaided.left')}</p>
+                          <p className="font-medium">{resolveVisualAcuity(getNestedValue(visionData, 'unaided.left', 'N/A'))}</p>
                         </div>
                       </div>
                     </div>
@@ -357,11 +443,11 @@ export function CaseViewDialog({ children, caseData }: CaseViewDialogProps) {
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <p className="text-muted-foreground">Right Eye (OD)</p>
-                          <p className="font-medium">{getNestedValue(visionData, 'pinhole.right')}</p>
+                          <p className="font-medium">{resolveVisualAcuity(getNestedValue(visionData, 'pinhole.right', 'N/A'))}</p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">Left Eye (OS)</p>
-                          <p className="font-medium">{getNestedValue(visionData, 'pinhole.left')}</p>
+                          <p className="font-medium">{resolveVisualAcuity(getNestedValue(visionData, 'pinhole.left', 'N/A'))}</p>
                         </div>
                       </div>
                     </div>
@@ -371,11 +457,11 @@ export function CaseViewDialog({ children, caseData }: CaseViewDialogProps) {
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <p className="text-muted-foreground">Right Eye (OD)</p>
-                          <p className="font-medium">{getNestedValue(visionData, 'aided.right')}</p>
+                          <p className="font-medium">{resolveVisualAcuity(getNestedValue(visionData, 'aided.right', 'N/A'))}</p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">Left Eye (OS)</p>
-                          <p className="font-medium">{getNestedValue(visionData, 'aided.left')}</p>
+                          <p className="font-medium">{resolveVisualAcuity(getNestedValue(visionData, 'aided.left', 'N/A'))}</p>
                         </div>
                       </div>
                     </div>
@@ -385,11 +471,11 @@ export function CaseViewDialog({ children, caseData }: CaseViewDialogProps) {
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <p className="text-muted-foreground">Right Eye (OD)</p>
-                          <p className="font-medium">{getNestedValue(visionData, 'near.right')}</p>
+                          <p className="font-medium">{resolveVisualAcuity(getNestedValue(visionData, 'near.right', 'N/A'))}</p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">Left Eye (OS)</p>
-                          <p className="font-medium">{getNestedValue(visionData, 'near.left')}</p>
+                          <p className="font-medium">{resolveVisualAcuity(getNestedValue(visionData, 'near.left', 'N/A'))}</p>
                         </div>
                       </div>
                     </div>
@@ -615,7 +701,7 @@ export function CaseViewDialog({ children, caseData }: CaseViewDialogProps) {
                         <p className="text-muted-foreground mb-2">Blood Tests Ordered</p>
                         <div className="flex flex-wrap gap-2">
                           {examinationData.blood_investigation.blood_tests.map((test: string, idx: number) => (
-                            <Badge key={idx} variant="secondary">{test}</Badge>
+                            <Badge key={idx} variant="secondary">{resolveBloodTest(test)}</Badge>
                           ))}
                         </div>
                       </div>
@@ -639,9 +725,7 @@ export function CaseViewDialog({ children, caseData }: CaseViewDialogProps) {
                 <CardContent className="space-y-3 text-sm">
                   <div>
                     <p className="text-foreground">
-                      {caseData.diagnosis ? 
-                        (Array.isArray(caseData.diagnosis) ? caseData.diagnosis.join(', ') : caseData.diagnosis) 
-                        : 'No diagnosis recorded'}
+                      {resolveDiagnosis(caseData.diagnosis)}
                     </p>
                   </div>
                 </CardContent>
@@ -837,51 +921,117 @@ export function CaseViewDialog({ children, caseData }: CaseViewDialogProps) {
 
             {/* Diagram Tab */}
             <TabsContent value="diagram" className="space-y-4 mt-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Eye Diagrams</CardTitle>
-                  <CardDescription>Visual representation of eye examination findings</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Right Eye Diagram */}
-                    <div className="space-y-3">
-                      <h4 className="font-medium text-sm">Right Eye (OD)</h4>
-                      {examinationData.diagrams?.right ? (
-                        <div className="border rounded-lg p-4 bg-gray-50">
-                          <img 
-                            src={examinationData.diagrams.right} 
-                            alt="Right Eye Diagram" 
-                            className="w-full h-auto rounded"
-                          />
-                        </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Right Eye Diagram */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Right Eye (OD)</CardTitle>
+                    <CardDescription>Visual representation of right eye examination</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="border rounded-lg bg-gray-50 p-4 flex items-center justify-center" style={{ minHeight: '350px', aspectRatio: '425/350' }}>
+                      {examinationData?.diagrams?.right && examinationData.diagrams.right.trim() ? (
+                        <img 
+                          src={examinationData.diagrams.right} 
+                          alt="Right Eye Diagram"
+                          className="max-w-full max-h-full"
+                          style={{ objectFit: 'contain', display: 'block' }}
+                          onLoad={() => console.log('Right diagram loaded')}
+                          onError={(e) => {
+                            console.error('Right diagram failed to load, showing template')
+                            const target = e.target as HTMLImageElement
+                            target.style.display = 'none'
+                            const container = target.parentElement
+                            if (container && !container.querySelector('img[data-template]')) {
+                              const templateImg = document.createElement('img')
+                              templateImg.src = '/right-eye.png'
+                              templateImg.alt = 'Right Eye Template'
+                              templateImg.className = 'max-w-full max-h-full opacity-50'
+                              templateImg.style.objectFit = 'contain'
+                              templateImg.setAttribute('data-template', 'true')
+                              container.appendChild(templateImg)
+                            }
+                          }}
+                        />
                       ) : (
-                        <div className="border rounded-lg p-8 bg-gray-50 text-center">
-                          <p className="text-sm text-muted-foreground">No diagram available</p>
-                        </div>
+                        <img 
+                          src="/right-eye.png" 
+                          alt="Right Eye Template"
+                          className="max-w-full max-h-full opacity-50"
+                          style={{ objectFit: 'contain', display: 'block' }}
+                          onError={(e) => {
+                            console.error('Template image failed to load')
+                            const target = e.target as HTMLImageElement
+                            target.style.display = 'none'
+                            const container = target.parentElement
+                            if (container) {
+                              const placeholder = document.createElement('div')
+                              placeholder.className = 'text-sm text-muted-foreground text-center'
+                              placeholder.textContent = 'No diagram available'
+                              container.appendChild(placeholder)
+                            }
+                          }}
+                        />
                       )}
                     </div>
+                  </CardContent>
+                </Card>
 
-                    {/* Left Eye Diagram */}
-                    <div className="space-y-3">
-                      <h4 className="font-medium text-sm">Left Eye (OS)</h4>
-                      {examinationData.diagrams?.left ? (
-                        <div className="border rounded-lg p-4 bg-gray-50">
-                          <img 
-                            src={examinationData.diagrams.left} 
-                            alt="Left Eye Diagram" 
-                            className="w-full h-auto rounded"
-                          />
-                        </div>
+                {/* Left Eye Diagram */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Left Eye (OS)</CardTitle>
+                    <CardDescription>Visual representation of left eye examination</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="border rounded-lg bg-gray-50 p-4 flex items-center justify-center" style={{ minHeight: '350px', aspectRatio: '425/350' }}>
+                      {examinationData?.diagrams?.left && examinationData.diagrams.left.trim() ? (
+                        <img 
+                          src={examinationData.diagrams.left} 
+                          alt="Left Eye Diagram"
+                          className="max-w-full max-h-full"
+                          style={{ objectFit: 'contain', display: 'block' }}
+                          onLoad={() => console.log('Left diagram loaded')}
+                          onError={(e) => {
+                            console.error('Left diagram failed to load, showing template')
+                            const target = e.target as HTMLImageElement
+                            target.style.display = 'none'
+                            const container = target.parentElement
+                            if (container && !container.querySelector('img[data-template]')) {
+                              const templateImg = document.createElement('img')
+                              templateImg.src = '/left-eye.png'
+                              templateImg.alt = 'Left Eye Template'
+                              templateImg.className = 'max-w-full max-h-full opacity-50'
+                              templateImg.style.objectFit = 'contain'
+                              templateImg.setAttribute('data-template', 'true')
+                              container.appendChild(templateImg)
+                            }
+                          }}
+                        />
                       ) : (
-                        <div className="border rounded-lg p-8 bg-gray-50 text-center">
-                          <p className="text-sm text-muted-foreground">No diagram available</p>
-                        </div>
+                        <img 
+                          src="/left-eye.png" 
+                          alt="Left Eye Template"
+                          className="max-w-full max-h-full opacity-50"
+                          style={{ objectFit: 'contain', display: 'block' }}
+                          onError={(e) => {
+                            console.error('Template image failed to load')
+                            const target = e.target as HTMLImageElement
+                            target.style.display = 'none'
+                            const container = target.parentElement
+                            if (container) {
+                              const placeholder = document.createElement('div')
+                              placeholder.className = 'text-sm text-muted-foreground text-center'
+                              placeholder.textContent = 'No diagram available'
+                              container.appendChild(placeholder)
+                            }
+                          }}
+                        />
                       )}
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
           </Tabs>
 

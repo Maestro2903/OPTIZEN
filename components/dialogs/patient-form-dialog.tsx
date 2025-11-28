@@ -200,8 +200,19 @@ export function PatientFormDialog({
 
   const handleConfirmNewPatient = async () => {
     if (pendingFormData) {
-      await onSubmit(pendingFormData)
-      setPendingFormData(null)
+      try {
+        // Close duplicate dialog first
+        setShowDuplicateDialog(false)
+        // Submit the form data
+        await onSubmit(pendingFormData)
+        // Clear pending data
+        setPendingFormData(null)
+        // Main dialog will be closed by parent component after successful submission
+      } catch (error) {
+        // Error handling - re-open duplicate dialog if submission fails
+        console.error('Error creating patient:', error)
+        setShowDuplicateDialog(true)
+      }
     }
   }
 

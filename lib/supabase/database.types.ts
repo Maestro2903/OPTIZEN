@@ -53,6 +53,50 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['appointments']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['appointments']['Insert']>
       }
+      appointment_requests: {
+        Row: {
+          id: string
+          created_at: string
+          updated_at: string
+          full_name: string
+          email: string | null
+          mobile: string
+          gender: 'male' | 'female' | 'other'
+          date_of_birth: string | null
+          appointment_date: string
+          start_time: string
+          end_time: string
+          type: 'consult' | 'follow-up' | 'surgery' | 'refraction' | 'other'
+          provider_id: string | null
+          reason: string | null
+          notes: string | null
+          status: 'pending' | 'accepted' | 'rejected'
+          processed_by: string | null
+          processed_at: string | null
+          patient_id: string | null
+          appointment_id: string | null
+        }
+        Insert: {
+          full_name: string
+          email?: string | null
+          mobile: string
+          gender: 'male' | 'female' | 'other'
+          date_of_birth?: string | null
+          appointment_date: string
+          start_time: string
+          end_time: string
+          type: 'consult' | 'follow-up' | 'surgery' | 'refraction' | 'other'
+          provider_id?: string | null
+          reason?: string | null
+          notes?: string | null
+          status?: 'pending' | 'accepted' | 'rejected'
+          processed_by?: string | null
+          processed_at?: string | null
+          patient_id?: string | null
+          appointment_id?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['appointment_requests']['Insert']>
+      }
       encounters: {
         Row: {
           id: string

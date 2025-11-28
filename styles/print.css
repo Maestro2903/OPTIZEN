@@ -1,6 +1,43 @@
 /* Print Styles for Medical Records - Clean A4 Format */
 
 @media print {
+  /* CRITICAL: Global body reset - hide all content by default */
+  html, body {
+    height: auto !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    color: black !important;
+  }
+  
+  /* Hide everything in body by default */
+  body > * {
+    display: none !important;
+  }
+  
+  /* CRITICAL: Make print overlay and descendants visible - must override all other rules */
+  .print-overlay {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    background: white !important;
+    z-index: 9999 !important;
+  }
+  
+  .print-overlay * {
+    display: revert !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  
   /* Hide non-printable elements */
   .print\\:hidden,
   button:not(.print-button),
@@ -9,14 +46,22 @@
     display: none !important;
   }
 
-  /* Hide dialog overlays and backdrops - except certificate print overlay */
+  /* Hide dialog overlays and backdrops - except print overlays */
   [data-radix-dialog-overlay],
-  [data-radix-portal],
-  .fixed.inset-0[class*="bg-black"]:not(.certificate-print-overlay),
-  .fixed.inset-0[class*="bg-background"]:not(.certificate-print-overlay),
-  .fixed.inset-0[class*="bg-gray-900"]:not(.certificate-print-overlay),
-  [class*="backdrop"]:not(.certificate-print-overlay),
-  [class*="overlay"]:not(.certificate-print-overlay) {
+  [data-radix-portal] {
+    display: none !important;
+  }
+  
+  /* Hide generic fixed overlays - except print overlays */
+  .fixed.inset-0[class*="bg-black"]:not(.certificate-print-overlay):not(.print-overlay),
+  .fixed.inset-0[class*="bg-background"]:not(.certificate-print-overlay):not(.print-overlay),
+  .fixed.inset-0[class*="bg-gray-900"]:not(.certificate-print-overlay):not(.print-overlay) {
+    display: none !important;
+  }
+  
+  /* Hide backdrops and overlays - except print overlays */
+  [class*="backdrop"]:not(.certificate-print-overlay):not(.print-overlay),
+  [class*="overlay"]:not(.certificate-print-overlay):not(.print-overlay) {
     display: none !important;
   }
   
@@ -52,6 +97,26 @@
     margin: 0 !important;
     height: auto !important;
     min-height: auto !important;
+  }
+
+  /* Print modal paper - ensure it's visible */
+  .print-modal-paper {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 20mm !important;
+    background: white !important;
+    box-shadow: none !important;
+  }
+
+  /* Ensure all content in print modal paper is visible */
+  .print-modal-paper * {
+    visibility: visible !important;
+    opacity: 1 !important;
   }
   
   /* Hide close button in appointment print dialog */
@@ -160,16 +225,19 @@
     opacity: 1 !important;
   }
 
-  /* Page setup - A4 portrait */
+  /* Page setup - A4 portrait - NO MARGINS (content handles its own padding) */
   @page {
     size: A4 portrait;
-    margin: 15mm 20mm;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   /* Base page styles */
   * {
     -webkit-print-color-adjust: exact !important;
+    -moz-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    color-adjust: exact !important;
     box-sizing: border-box;
   }
 
@@ -989,6 +1057,21 @@
     padding: 8pt;
     margin: 10pt 0;
     background: #f9f9f9 !important;
+  }
+
+  /* FAILSAFE: Ensure print overlay content is visible - override everything */
+  .print-overlay {
+    display: block !important;
+  }
+  
+  .print-modal-paper {
+    display: block !important;
+  }
+  
+  .print-overlay *,
+  .print-modal-paper * {
+    visibility: visible !important;
+    opacity: 1 !important;
   }
 }
 

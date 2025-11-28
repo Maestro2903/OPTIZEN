@@ -19,6 +19,7 @@ export { ExpenseForm } from "./forms/expense-form"
 export { InvoiceForm } from "./forms/invoice-form-new"
 export { MasterDataForm } from "./forms/master-data-form"
 export { OperationForm } from "./forms/operation-form"
+export { OpticalItemForm } from "./forms/optical-item-form"
 export { PharmacyItemForm } from "./forms/pharmacy-item-form"
 
 // Dialogs
@@ -32,6 +33,7 @@ export { FinanceInvoiceDialog } from "./dialogs/finance-invoice-dialog"
 export { InvoiceViewDialog } from "./dialogs/invoice-view-dialog"
 export { PatientDetailModal } from "./dialogs/patient-detail-modal"
 export { PatientFormDialog } from "./dialogs/patient-form-dialog"
+export { OpticalItemViewDialog } from "./dialogs/optical-item-view-dialog"
 export { PharmacyViewDialog } from "./dialogs/pharmacy-view-dialog"
 export { ViewEditDialog } from "./dialogs/view-edit-dialog"
 
@@ -68,9 +70,6 @@ export { DuplicatePatientDetector } from "./features/patients/duplicate-patient-
 export { PatientCaseHistoryTabs } from "./features/patients/patient-case-history-tabs"
 export { PatientSearchSelector } from "./features/patients/patient-search-selector"
 export { PatientSelectorWithHistory } from "./features/patients/patient-selector-with-history"
-
-// Revenue
-export { RevenueCharts } from "./features/revenue/revenue-charts"
 
 // Shared Components
 export { AppSidebar } from "./shared/app-sidebar"

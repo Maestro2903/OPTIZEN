@@ -40,3 +40,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# WEBSITE directory (separate Next.js project, deployed separately)
+WEBSITE/
+

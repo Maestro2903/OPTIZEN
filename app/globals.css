@@ -298,3 +298,68 @@ html {
 
 /* Import print styles */
 @import url('../styles/print.css');
+
+/* ========================================
+   CRITICAL PRINT RESET - Nuclear CSS Fix
+   ======================================== */
+@media print {
+  /* 0. REMOVE BROWSER MARGINS & HEADERS/FOOTERS */
+  @page {
+    margin: 0 !important;
+    padding: 0 !important;
+    size: auto;
+  }
+
+  /* Force exact color rendering (preserve backgrounds & colors) */
+  html, body {
+    -webkit-print-color-adjust: exact !important;
+    -moz-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* 1. RESET THE BODY - Allow scrolling */
+  html, body {
+    height: auto !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    width: 100% !important;
+  }
+
+  /* 2. HIDE EVERYTHING - Kill the sidebar, dashboard, etc. */
+  body > * {
+    display: none !important;
+  }
+
+  /* 3. SHOW ONLY THE PRINT PORTAL */
+  /* We target the ID we just added */
+  #print-portal {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    z-index: 9999 !important;
+    background: white !important;
+    visibility: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    zoom: 100%;
+  }
+
+  /* Ensure children of the portal are visible */
+  #print-portal * {
+    visibility: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    -moz-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* Force no scrollbar issues */
+  body {
+    padding-right: 0 !important;
+    overflow-y: auto !important;
+  }
+}

@@ -18,6 +18,7 @@ import {
   Shield,
   CalendarClock,
   CalendarCheck,
+  Eye,
 } from "lucide-react"
 import { Logo } from "@/components/shared/logo"
 import { cn } from "@/lib/utils"
@@ -92,6 +93,12 @@ const navigationGroups = [
         url: "/certificates",
         icon: Award,
         requiredPermission: "certificates" as const,
+      },
+      {
+        title: "Optical Plan",
+        url: "/optical-plan",
+        icon: Eye,
+        requiredPermission: "optical_plan" as const,
       },
     ],
   },

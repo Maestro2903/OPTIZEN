@@ -34,6 +34,7 @@ const pathToPageName: Record<string, string> = {
   "/finance": "Finance",
   "/doctor-schedule": "My Schedule",
   "/access-control": "Access Control",
+  "/optical-plan": "Optical Plan",
 }
 
 function HeaderContent() {

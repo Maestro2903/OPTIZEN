@@ -220,20 +220,30 @@ export default function AppointmentsPage() {
   const handleDeleteAppointment = async () => {
     if (!selectedAppointment) return
 
-    try {
-      const success = await deleteItem(
-        () => appointmentsApi.delete(selectedAppointment.id),
-        {
-          successMessage: `Appointment has been cancelled successfully.`,
-          onSuccess: () => {
-            removeItem(selectedAppointment.id)
-            setDeleteDialogOpen(false)
-            setSelectedAppointment(null)
-          }
+    const success = await deleteItem(
+      () => appointmentsApi.delete(selectedAppointment.id),
+      {
+        successMessage: `Appointment has been cancelled successfully.`,
+        onSuccess: () => {
+          // Remove from list since it's cancelled
+          removeItem(selectedAppointment.id)
+          setDeleteDialogOpen(false)
+          setSelectedAppointment(null)
+          // Refresh to ensure list is updated
+          refresh()
+        },
+        onError: (errorMessage) => {
+          // Error toast is already shown by deleteItem
+          console.error('Error deleting appointment:', errorMessage)
+          // Dialog stays open so user can see the error and retry
         }
-      )
-    } catch (error) {
-      console.error('Error deleting appointment:', error)
+      }
+    )
+    
+    // Close dialog only if delete was successful
+    if (success) {
+      setDeleteDialogOpen(false)
+      setSelectedAppointment(null)
     }
   }
 
@@ -588,12 +598,13 @@ export default function AppointmentsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteLoading}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteAppointment}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Delete Appointment
+              {deleteLoading ? 'Deleting...' : 'Delete Appointment'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

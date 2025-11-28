@@ -312,6 +312,188 @@ async function resolveExaminationData(examinationData: any, supabase: any) {
   return resolved
 }
 
+// Helper function to resolve diagnosis UUIDs to names
+async function resolveDiagnosis(diagnosis: string | string[] | null | undefined, supabase: any): Promise<string | string[] | null | undefined> {
+  if (!diagnosis) return diagnosis
+  
+  const diagnosisArray = Array.isArray(diagnosis) ? diagnosis : [diagnosis]
+  const diagnosisIds = diagnosisArray.filter(id => id && typeof id === 'string')
+  
+  // Check if any are UUIDs
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  const possibleUuids = diagnosisIds.filter(id => uuidRegex.test(id))
+  
+  if (possibleUuids.length === 0) return diagnosis
+  
+  // Fetch diagnosis names from master_data
+  const { data: diagnosisData } = await supabase
+    .from('master_data')
+    .select('id, name')
+    .in('id', possibleUuids)
+    .eq('category', 'diagnosis')
+  
+  const diagnosisMap: Record<string, string> = {}
+  if (diagnosisData) {
+    diagnosisData.forEach((item: any) => {
+      diagnosisMap[item.id] = item.name
+    })
+  }
+  
+  // Resolve UUIDs to names, keep non-UUIDs as-is
+  const resolved = diagnosisIds.map(id => {
+    if (uuidRegex.test(id)) {
+      return diagnosisMap[id] || id
+    }
+    return id
+  })
+  
+  return Array.isArray(diagnosis) ? resolved : (resolved[0] || diagnosis)
+}
+
+// Helper function to resolve past medications medicine names
+async function resolvePastMedications(pastMedications: any[], supabase: any) {
+  if (!pastMedications || pastMedications.length === 0) return pastMedications
+  
+  const medicineIds = pastMedications
+    .map(m => m.medicine_id || m.medicine_name)
+    .filter(Boolean)
+  
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  const possibleUuids = medicineIds.filter(id => typeof id === 'string' && uuidRegex.test(id))
+  
+  let medicinesMap: Record<string, string> = {}
+  if (possibleUuids.length > 0) {
+    // Try medicines category first
+    const { data: medicineData } = await supabase
+      .from('master_data')
+      .select('id, name')
+      .in('id', possibleUuids)
+      .eq('category', 'medicines')
+    
+    if (medicineData) {
+      medicineData.forEach((med: any) => {
+        medicinesMap[med.id] = med.name
+      })
+    }
+    
+    // Try pharmacy_items as fallback
+    const unresolvedIds = possibleUuids.filter(id => !medicinesMap[id])
+    if (unresolvedIds.length > 0) {
+      const { data: pharmacyItems } = await supabase
+        .from('pharmacy_items')
+        .select('id, name')
+        .in('id', unresolvedIds)
+      
+      if (pharmacyItems) {
+        pharmacyItems.forEach((item: any) => {
+          medicinesMap[item.id] = item.name
+        })
+      }
+    }
+  }
+  
+  return pastMedications.map(med => {
+    const medicineId = med.medicine_id || med.medicine_name
+    const isUuid = medicineId && typeof medicineId === 'string' && uuidRegex.test(medicineId)
+    const resolvedName = isUuid ? (medicinesMap[medicineId] || medicineId) : medicineId
+    
+    return {
+      ...med,
+      medicine_name: resolvedName,
+      medicine_name_original: isUuid ? medicineId : undefined,
+    }
+  })
+}
+
+// Helper function to resolve vision data visual acuity UUIDs
+async function resolveVisionData(visionData: any, supabase: any) {
+  if (!visionData || typeof visionData !== 'object') return visionData
+  
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  const resolved = { ...visionData }
+  
+  // Collect all visual acuity IDs that might be UUIDs
+  const acuityIds: string[] = []
+  const acuityPaths: Array<{ path: string[], value: string }> = []
+  
+  const extractAcuityIds = (obj: any, path: string[] = []) => {
+    if (!obj || typeof obj !== 'object') return
+    for (const [key, value] of Object.entries(obj)) {
+      if (typeof value === 'string' && uuidRegex.test(value)) {
+        acuityIds.push(value)
+        acuityPaths.push({ path: [...path, key], value })
+      } else if (typeof value === 'object' && value !== null) {
+        extractAcuityIds(value, [...path, key])
+      }
+    }
+  }
+  
+  extractAcuityIds(visionData)
+  
+  // Resolve visual acuity UUIDs
+  let acuityMap: Record<string, string> = {}
+  if (acuityIds.length > 0) {
+    const { data: acuityData } = await supabase
+      .from('master_data')
+      .select('id, name')
+      .in('id', acuityIds)
+      .eq('category', 'visual_acuity')
+    
+    if (acuityData) {
+      acuityData.forEach((item: any) => {
+        acuityMap[item.id] = item.name
+      })
+    }
+  }
+  
+  // Apply resolved values
+  acuityPaths.forEach(({ path, value }) => {
+    const resolvedValue = acuityMap[value] || value
+    let current: any = resolved
+    for (let i = 0; i < path.length - 1; i++) {
+      if (!current[path[i]]) {
+        current[path[i]] = {}
+      }
+      current = current[path[i]]
+    }
+    current[path[path.length - 1]] = resolvedValue
+  })
+  
+  return resolved
+}
+
+// Helper function to resolve blood test UUIDs
+async function resolveBloodTests(bloodTests: string[] | undefined, supabase: any): Promise<string[] | undefined> {
+  if (!bloodTests || bloodTests.length === 0) return bloodTests
+  
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  const possibleUuids = bloodTests.filter(id => typeof id === 'string' && uuidRegex.test(id))
+  
+  if (possibleUuids.length === 0) return bloodTests
+  
+  // Fetch blood test names from master_data
+  const { data: bloodTestData } = await supabase
+    .from('master_data')
+    .select('id, name')
+    .in('id', possibleUuids)
+    .eq('category', 'blood_tests')
+  
+  const bloodTestMap: Record<string, string> = {}
+  if (bloodTestData) {
+    bloodTestData.forEach((item: any) => {
+      bloodTestMap[item.id] = item.name
+    })
+  }
+  
+  // Resolve UUIDs to names, keep non-UUIDs as-is
+  return bloodTests.map(id => {
+    if (typeof id === 'string' && uuidRegex.test(id)) {
+      return bloodTestMap[id] || id
+    }
+    return id
+  })
+}
+
 // GET /api/cases/[id] - Get a specific case by ID
 export async function GET(
   request: NextRequest,
@@ -373,6 +555,35 @@ export async function GET(
     }
     if (encounter.examination_data) {
       encounterWithResolvedData.examination_data = await resolveExaminationData(encounter.examination_data, supabase)
+    }
+    
+    // Resolve diagnosis UUIDs
+    if (encounter.diagnosis) {
+      encounterWithResolvedData.diagnosis = await resolveDiagnosis(encounter.diagnosis, supabase)
+    }
+    
+    // Resolve past medications
+    if (encounter.past_history_medicines && Array.isArray(encounter.past_history_medicines) && encounter.past_history_medicines.length > 0) {
+      encounterWithResolvedData.past_history_medicines = await resolvePastMedications(encounter.past_history_medicines, supabase)
+    }
+    if (encounter.past_medications && Array.isArray(encounter.past_medications) && encounter.past_medications.length > 0) {
+      encounterWithResolvedData.past_medications = await resolvePastMedications(encounter.past_medications, supabase)
+    }
+    
+    // Resolve vision data
+    if (encounter.vision_data) {
+      encounterWithResolvedData.vision_data = await resolveVisionData(encounter.vision_data, supabase)
+    }
+    
+    // Resolve blood tests
+    if (encounter.blood_tests && Array.isArray(encounter.blood_tests)) {
+      encounterWithResolvedData.blood_tests = await resolveBloodTests(encounter.blood_tests, supabase)
+    }
+    if (encounter.examination_data?.blood_investigation?.blood_tests && Array.isArray(encounter.examination_data.blood_investigation.blood_tests)) {
+      if (!encounterWithResolvedData.examination_data.blood_investigation) {
+        encounterWithResolvedData.examination_data.blood_investigation = { ...encounter.examination_data.blood_investigation }
+      }
+      encounterWithResolvedData.examination_data.blood_investigation.blood_tests = await resolveBloodTests(encounter.examination_data.blood_investigation.blood_tests, supabase)
     }
 
     // Authorization check - users can only view their own cases
@@ -542,6 +753,35 @@ export async function PUT(
     }
     if (encounter.examination_data) {
       encounterWithResolvedData.examination_data = await resolveExaminationData(encounter.examination_data, supabase)
+    }
+    
+    // Resolve diagnosis UUIDs
+    if (encounter.diagnosis) {
+      encounterWithResolvedData.diagnosis = await resolveDiagnosis(encounter.diagnosis, supabase)
+    }
+    
+    // Resolve past medications
+    if (encounter.past_history_medicines && Array.isArray(encounter.past_history_medicines) && encounter.past_history_medicines.length > 0) {
+      encounterWithResolvedData.past_history_medicines = await resolvePastMedications(encounter.past_history_medicines, supabase)
+    }
+    if (encounter.past_medications && Array.isArray(encounter.past_medications) && encounter.past_medications.length > 0) {
+      encounterWithResolvedData.past_medications = await resolvePastMedications(encounter.past_medications, supabase)
+    }
+    
+    // Resolve vision data
+    if (encounter.vision_data) {
+      encounterWithResolvedData.vision_data = await resolveVisionData(encounter.vision_data, supabase)
+    }
+    
+    // Resolve blood tests
+    if (encounter.blood_tests && Array.isArray(encounter.blood_tests)) {
+      encounterWithResolvedData.blood_tests = await resolveBloodTests(encounter.blood_tests, supabase)
+    }
+    if (encounter.examination_data?.blood_investigation?.blood_tests && Array.isArray(encounter.examination_data.blood_investigation.blood_tests)) {
+      if (!encounterWithResolvedData.examination_data.blood_investigation) {
+        encounterWithResolvedData.examination_data.blood_investigation = { ...encounter.examination_data.blood_investigation }
+      }
+      encounterWithResolvedData.examination_data.blood_investigation.blood_tests = await resolveBloodTests(encounter.examination_data.blood_investigation.blood_tests, supabase)
     }
 
     return NextResponse.json({

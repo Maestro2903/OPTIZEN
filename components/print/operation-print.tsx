@@ -160,15 +160,16 @@ export function OperationPrint({ operation, children, open, onOpenChange }: Oper
       onClose={handleClose}
       title={`Operation_${operation.operation_no || operation.id}`}
     >
-      <PrintHeader />
-      
-      {/* Document Title */}
-      <div className="text-xl font-bold uppercase tracking-widest border-b-2 border-gray-900 pb-2 mb-8 text-center">
-        SURGICAL OPERATION RECORD
-      </div>
-          {/* Section 1: Operation Booking */}
-          <PrintSection title="OPERATION BOOKING">
-            <div className="grid grid-cols-3 gap-x-8 gap-y-2">
+      <div className="text-xs">
+        <PrintHeader compact={true} />
+        
+        {/* Document Title */}
+        <div className="text-lg font-bold uppercase tracking-widest border-b-2 border-gray-900 pb-2 mb-4 text-center">
+          SURGICAL OPERATION RECORD
+        </div>
+            {/* Section 1: Operation Booking */}
+            <PrintSection title="OPERATION BOOKING">
+              <div className="grid grid-cols-3 gap-x-8 gap-y-1">
               {/* Row 1 */}
               <div>
                 <div className="text-[10px] uppercase text-gray-400 font-semibold">Patient Name</div>
@@ -211,88 +212,98 @@ export function OperationPrint({ operation, children, open, onOpenChange }: Oper
                 <div className="text-sm font-bold text-gray-900">{surgeryType}</div>
               </div>
             </div>
-          </PrintSection>
+            </PrintSection>
 
-          {/* Section 2: Clinical & IOL Details */}
-          <PrintSection title="CLINICAL & IOL DETAILS">
+            {/* Section 2: Clinical & IOL Details */}
+            <PrintSection title="CLINICAL & IOL DETAILS">
             {/* Diagnosis - Full width */}
-            <div className="mb-4">
+            <div className="mb-2">
               <div className="text-[10px] uppercase text-gray-400 font-semibold mb-1">Diagnosis</div>
               <div className="text-sm font-bold text-gray-900">{diagnosis}</div>
             </div>
 
             {/* Anesthesia - Full width */}
-            <div className="mb-4">
+            <div className="mb-2">
               <div className="text-[10px] uppercase text-gray-400 font-semibold mb-1">Anesthesia</div>
               <div className="text-sm font-bold text-gray-900">{anesthesia}</div>
             </div>
 
             {/* IOL Table */}
             {(operation.iol_name || operation.iol_power || operation.eye) && (
-              <div className="mt-4">
-                <div className="text-[10px] uppercase text-gray-400 font-semibold mb-2">IOL Details</div>
+              <div className="mt-2">
+                <div className="text-[10px] uppercase text-gray-400 font-semibold mb-1">IOL Details</div>
                 <table className="w-full border border-gray-300">
                   <thead>
                     <tr className="bg-gray-50">
-                      <th className="border border-gray-300 px-3 py-2 text-left text-[10px] uppercase text-gray-600 font-semibold">IOL Name</th>
-                      <th className="border border-gray-300 px-3 py-2 text-left text-[10px] uppercase text-gray-600 font-semibold">Power</th>
-                      <th className="border border-gray-300 px-3 py-2 text-left text-[10px] uppercase text-gray-600 font-semibold">Eye (OD/OS)</th>
+                      <th className="border border-gray-300 px-2 py-1 text-left text-[10px] uppercase text-gray-600 font-semibold">IOL Name</th>
+                      <th className="border border-gray-300 px-2 py-1 text-left text-[10px] uppercase text-gray-600 font-semibold">Power</th>
+                      <th className="border border-gray-300 px-2 py-1 text-left text-[10px] uppercase text-gray-600 font-semibold">Eye (OD/OS)</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      <td className="border border-gray-300 px-3 py-2 text-sm font-medium text-gray-900">{operation.iol_name || '-'}</td>
-                      <td className="border border-gray-300 px-3 py-2 text-sm font-medium text-gray-900">{operation.iol_power || '-'}</td>
-                      <td className="border border-gray-300 px-3 py-2 text-sm font-medium text-gray-900">{formatEye(operation.eye)}</td>
+                      <td className="border border-gray-300 px-2 py-1 text-sm font-medium text-gray-900">{operation.iol_name || '-'}</td>
+                      <td className="border border-gray-300 px-2 py-1 text-sm font-medium text-gray-900">{operation.iol_power || '-'}</td>
+                      <td className="border border-gray-300 px-2 py-1 text-sm font-medium text-gray-900">{formatEye(operation.eye)}</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
             )}
-          </PrintSection>
-
-          {/* Section 3: Financials (Conditional) */}
-          {showFinancials && (
-            <PrintSection title="FINANCIAL ESTIMATE">
-              <PrintGrid
-                items={[
-                  { label: 'Amount', value: formatAmount(operation.amount) },
-                  { label: 'Payment Mode', value: operation.payment_mode || '-' }
-                ]}
-              />
             </PrintSection>
-          )}
 
-          {/* Section 4: Post-OP Instructions */}
-          <PrintSection title="POST-OP INSTRUCTIONS">
-            {/* Operation Notes */}
-            {(operation.operation_notes || operation.notes || operation.procedure_details) && (
-              <div className="mb-4">
-                <div className="text-[10px] uppercase text-gray-400 font-semibold mb-1">Operation Notes</div>
-                <div className="text-sm text-gray-900 leading-relaxed whitespace-pre-wrap">
-                  {operation.operation_notes || operation.notes || operation.procedure_details}
+            {/* Section 3 & 4: Financials + Post-OP Instructions (Side-by-side) */}
+            <div className="grid grid-cols-2 gap-6 mb-3">
+            {/* Left Column: Financials (40% width) */}
+            {showFinancials && (
+              <div>
+                <div className="text-xs font-bold uppercase text-gray-500 mb-2 tracking-widest">FINANCIAL ESTIMATE</div>
+                <div className="text-sm font-medium text-gray-900 leading-snug">
+                  <PrintGrid
+                    items={[
+                      { label: 'Amount', value: formatAmount(operation.amount) },
+                      { label: 'Payment Mode', value: operation.payment_mode || '-' }
+                    ]}
+                  />
                 </div>
               </div>
             )}
 
-            {/* Follow-up Information */}
-            {(operation.follow_up_date || operation.follow_up_visit_type) && (
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <div className="text-[10px] text-gray-500 italic">
-                  {operation.follow_up_date && `Follow-up: ${formatDate(operation.follow_up_date)}`}
-                  {operation.follow_up_date && operation.follow_up_visit_type && ' • '}
-                  {operation.follow_up_visit_type && `Visit Type: ${operation.follow_up_visit_type}`}
-                </div>
-              </div>
-            )}
-          </PrintSection>
+            {/* Right Column: Post-OP Instructions (60% width) */}
+            <div>
+              <div className="text-xs font-bold uppercase text-gray-500 mb-2 tracking-widest">POST-OP INSTRUCTIONS</div>
+              <div className="text-sm font-medium text-gray-900 leading-snug">
+                {/* Operation Notes */}
+                {(operation.operation_notes || operation.notes || operation.procedure_details) && (
+                  <div className="mb-2">
+                    <div className="text-[10px] uppercase text-gray-400 font-semibold mb-1">Notes</div>
+                    <div className="text-sm text-gray-900 leading-relaxed whitespace-pre-wrap line-clamp-4">
+                      {operation.operation_notes || operation.notes || operation.procedure_details}
+                    </div>
+                  </div>
+                )}
 
-      {/* Footer */}
-      <PrintFooter 
-        doctorName={surgeon !== '-' ? surgeon : undefined}
-        showTimestamp={true}
-      />
-    </PrintModalShell>
+                {/* Follow-up Information */}
+                {(operation.follow_up_date || operation.follow_up_visit_type) && (
+                  <div className="pt-1 border-t border-gray-200">
+                    <div className="text-[10px] text-gray-500 italic">
+                      {operation.follow_up_date && `Follow-up: ${formatDate(operation.follow_up_date)}`}
+                      {operation.follow_up_date && operation.follow_up_visit_type && ' • '}
+                      {operation.follow_up_visit_type && `Visit Type: ${operation.follow_up_visit_type}`}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            </div>
+
+            {/* Footer */}
+            <PrintFooter 
+            doctorName={surgeon !== '-' ? surgeon : undefined}
+            showTimestamp={true}
+            />
+            </div>
+            </PrintModalShell>
   ) : null
 
   return (

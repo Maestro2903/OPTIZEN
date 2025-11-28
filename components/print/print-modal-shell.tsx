@@ -43,9 +43,12 @@ export function PrintModalShell({ children, onClose, title, isOpen }: PrintModal
 
   return (
     <>
-      {/* Fixed Overlay - Dark Background */}
+      {/* Fixed Overlay - Dark Background - Enhanced Print Support */}
+      {/* Added id="print-portal" for CSS targeting */}
       <div 
-        className="print-modal-overlay fixed inset-0 bg-gray-900/80 z-50 flex justify-center overflow-y-auto py-10 print:hidden"
+        id="print-portal"
+        className="print-overlay fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-gray-900/90 backdrop-blur-sm p-8 
+          print:p-0 print:m-0 print:fixed print:inset-0 print:bg-white print:z-[10000] print:overflow-visible print:h-auto print:flex print:items-start print:justify-start"
         onClick={(e) => {
           // Close on backdrop click
           if (e.target === e.currentTarget) {
@@ -69,75 +72,22 @@ export function PrintModalShell({ children, onClose, title, isOpen }: PrintModal
           </button>
         </div>
 
-        {/* A4 Paper (The Document) */}
-        <div className="relative bg-white shadow-2xl w-[210mm] min-h-[297mm] p-[20mm] mx-auto print:shadow-none print:w-full print:min-h-0 print:p-0 print:mx-0 print-modal-paper">
+        {/* A4 Paper (The Document) - Enhanced for printing */}
+        <div className="relative bg-white shadow-2xl w-[210mm] min-h-[297mm] p-[20mm] mx-auto print:absolute print:top-0 print:left-0 print:shadow-none print:w-full print:min-h-screen print:p-[20mm] print:mx-0 print:rounded-none print-modal-paper">
           {children}
         </div>
       </div>
 
-      {/* Print Styles */}
+      {/* Enhanced Print Styles - Minimal, letting globals.css handle heavy lifting */}
       <style jsx global>{`
-        @media print {
-          /* Print modal overlay - make visible for print */
-          .print-modal-overlay {
-            position: static !important;
-            background: transparent !important;
-            display: block !important;
-            overflow: visible !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            height: auto !important;
-            min-height: auto !important;
+        @media screen {
+          .print-overlay {
+            background: rgba(17, 24, 39, 0.9);
+            backdrop-filter: blur(12px);
           }
           
-          /* Hide control buttons */
-          .print\\:hidden,
-          button.print\\:hidden,
-          [class*="print:hidden"],
-          button[class*="fixed"] {
-            display: none !important;
-          }
-          
-          /* Print modal paper - always visible */
           .print-modal-paper {
-            width: 100% !important;
-            min-height: 100% !important;
-            margin: 0 !important;
-            padding: 20mm !important;
-            box-shadow: none !important;
-            page-break-after: always;
-            position: relative !important;
-            display: block !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-            background: white !important;
-          }
-          
-          /* Ensure all content inside paper is visible */
-          .print-modal-paper,
-          .print-modal-paper * {
-            visibility: visible !important;
-            opacity: 1 !important;
-            display: revert !important;
-          }
-          
-          /* Force color printing */
-          * {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-          
-          /* Page setup */
-          @page {
-            size: A4 portrait;
-            margin: 0;
-          }
-          
-          html, body {
-            background: white !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            overflow: visible !important;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
           }
         }
       `}</style>

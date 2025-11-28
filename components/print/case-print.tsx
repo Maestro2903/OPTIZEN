@@ -16,7 +16,7 @@ const isUUID = (value: string | undefined | null): boolean => {
   return UUID_REGEX.test(value)
 }
 
-// Helper function to filter out UUIDs from display values
+// Helper function to filter out UUIDs from display values (legacy - use resolveUUID in component instead)
 const filterUUID = (value: string | undefined | null, fallback: string = '-'): string => {
   if (!value) return fallback
   if (isUUID(value)) return fallback
@@ -163,6 +163,14 @@ interface CasePrintProps {
           right?: { id?: string; value?: string }
           left?: { id?: string; value?: string }
         }
+        sac_test?: {
+          right?: string
+          left?: string
+        } | string
+      }
+      diagrams?: {
+        right?: string
+        left?: string
       }
     }
     // Legacy examination fields
@@ -242,23 +250,127 @@ export function CasePrint({ caseData, children }: CasePrintProps) {
   const [dataLoaded, setDataLoaded] = React.useState(false)
   const [isOpen, setIsOpen] = React.useState(false)
 
-  // Load eye selection data when component mounts
+  // Load necessary master data when component mounts
   React.useEffect(() => {
-    if (!dataLoaded && masterData.data.eyeSelection.length === 0) {
-      masterData.fetchCategory('eyeSelection')
+    if (!dataLoaded) {
+      const categoriesToLoad: Array<keyof typeof masterData.data> = [
+        'eyeSelection',
+        'diagnosis',
+        'medicines',
+        'visualAcuity',
+        'bloodTests',
+        'sacStatus',
+        'complaints',
+        'diagnosticTests',
+        'dosages',
+        'routes',
+        'surgeries',
+        'surgeryTypes',
+        'anesthesiaTypes',
+        'treatments',
+      ]
+      
+      categoriesToLoad.forEach(category => {
+        if (masterData.data[category].length === 0) {
+          masterData.fetchCategory(category)
+        }
+      })
       setDataLoaded(true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataLoaded])
 
+  // Helper to resolve UUID from master data category
+  const resolveUUID = (
+    value: string | undefined | null,
+    category: keyof typeof masterData.data | Array<keyof typeof masterData.data>
+  ): string => {
+    if (!value) return '-'
+    if (!isUUID(value)) return value
+    const categories = Array.isArray(category) ? category : [category]
+    for (const cat of categories) {
+      const option = masterData.data[cat].find(opt => opt.value === value)
+      if (option) {
+        return option.label
+      }
+    }
+    return '-'
+  }
+
+  // Helper to resolve diagnosis (can be string, array, or null)
+  const resolveDiagnosis = (diagnosis: string | string[] | null | undefined): string => {
+    if (!diagnosis) return '-'
+    const diagnosisArray = Array.isArray(diagnosis) ? diagnosis : [diagnosis]
+    const resolved = diagnosisArray.map(d => resolveUUID(d, 'diagnosis'))
+    return resolved.join(', ')
+  }
+
   // Helper to resolve eye UUID to label
   const getEyeLabel = (eyeId: string | undefined | null): string => {
     if (!eyeId) return ''
-    // Check if it's already a label (not a UUID)
-    if (!isUUID(eyeId)) return eyeId
-    // Try to resolve from master data
-    const eyeOption = masterData.data.eyeSelection.find(opt => opt.value === eyeId)
-    return eyeOption?.label || eyeId
+    return resolveUUID(eyeId, 'eyeSelection')
+  }
+
+  // Helper to resolve medicine name (UUID or string)
+  const resolveMedicineName = (medicineId: string | undefined | null): string => {
+    if (!medicineId) return '-'
+    if (isUUID(medicineId)) {
+      return resolveUUID(medicineId, 'medicines')
+    }
+    return medicineId
+  }
+
+  // Helper to resolve visual acuity UUID
+  const resolveVisualAcuity = (acuity: string | undefined | null): string => {
+    if (!acuity) return '-'
+    if (isUUID(acuity)) {
+      return resolveUUID(acuity, 'visualAcuity')
+    }
+    return acuity
+  }
+
+  // Helper to resolve blood test UUID
+  const resolveBloodTest = (test: string | undefined | null): string => {
+    if (!test) return '-'
+    if (isUUID(test)) {
+      return resolveUUID(test, 'bloodTests')
+    }
+    return test
+  }
+
+  const resolveComplaintName = (value: string | undefined | null): string => {
+    if (!value) return '-'
+    return resolveUUID(value, 'complaints')
+  }
+
+  const resolveDiagnosticTestName = (value: string | undefined | null): string => {
+    if (!value) return '-'
+    return resolveUUID(value, 'diagnosticTests')
+  }
+
+  const resolveDosage = (value: string | undefined | null): string => {
+    if (!value) return '-'
+    return resolveUUID(value, 'dosages')
+  }
+
+  const resolveRoute = (value: string | undefined | null): string => {
+    if (!value) return '-'
+    return resolveUUID(value, 'routes')
+  }
+
+  const resolveTreatmentName = (value: string | undefined | null): string => {
+    if (!value) return '-'
+    return resolveUUID(value, 'treatments')
+  }
+
+  const resolveSurgeryName = (value: string | undefined | null): string => {
+    if (!value) return '-'
+    return resolveUUID(value, ['surgeries', 'surgeryTypes'])
+  }
+
+  const resolveAnesthesia = (value: string | undefined | null): string => {
+    if (!value) return '-'
+    return resolveUUID(value, 'anesthesiaTypes')
   }
 
   const formatDate = (dateString: string | undefined): string => {
@@ -341,14 +453,31 @@ export function CasePrint({ caseData, children }: CasePrintProps) {
 
   // Get SAC test values
   const getSACTest = (eye: 'right' | 'left'): string => {
-    const sacValue = caseData.examination_data?.tests?.sac_test?.[eye]
-    if (sacValue) {
-      // Try to resolve from master data if it's a UUID
-      if (isUUID(sacValue)) {
-        const sacOption = masterData.data.sacStatus?.find((opt: any) => opt.value === sacValue)
-        return sacOption?.label || sacValue
+    const sacTest = caseData.examination_data?.tests?.sac_test
+    if (sacTest) {
+      // Handle new structure (object with right/left)
+      if (typeof sacTest === 'object' && !Array.isArray(sacTest)) {
+        const sacValue = sacTest[eye]
+        if (sacValue) {
+          // Try to resolve from master data if it's a UUID
+          if (isUUID(sacValue)) {
+            const sacOption = masterData.data.sacStatus?.find((opt: any) => opt.value === sacValue)
+            return sacOption?.label || sacValue
+          }
+          return sacValue
+        }
       }
-      return sacValue
+      // Handle legacy structure (string)
+      else if (typeof sacTest === 'string') {
+        // For legacy data, we can't determine which eye, so only return for right eye
+        if (eye === 'right') {
+          if (isUUID(sacTest)) {
+            const sacOption = masterData.data.sacStatus?.find((opt: any) => opt.value === sacTest)
+            return sacOption?.label || sacTest
+          }
+          return sacTest
+        }
+      }
     }
     // Backwards compatibility: check for old single sac_test field
     if (eye === 'right' && caseData.sac_test) {
@@ -384,17 +513,17 @@ export function CasePrint({ caseData, children }: CasePrintProps) {
       <PrintHeader />
       
       {/* Centered Title */}
-      <div className="text-center mb-6">
-        <h2 className="text-xl font-bold uppercase tracking-widest text-gray-900">
+      <div className="text-center mb-2">
+        <h2 className="text-lg font-bold uppercase tracking-widest text-gray-900">
           OPHTHALMOLOGY CASE RECORD
         </h2>
       </div>
 
-      {/* Main Content */}
-      <div className="print-case-report space-y-6 font-serif">
+      {/* Main Content - Compact Mode with Global Scaling */}
+      <div className="print-case-report space-y-2 font-serif text-[11px] leading-tight">
               
               {/* BLOCK 1: REGISTRATION & HISTORY */}
-              <div className="mb-6">
+              <div className="mb-2 break-inside-avoid">
                 {/* 4-Column Grid: Case No | Case Date | Visit Type | Patient ID */}
                 <div className="grid grid-cols-4 gap-4 mb-4 border-b border-gray-300 pb-3">
                   <div>
@@ -412,8 +541,8 @@ export function CasePrint({ caseData, children }: CasePrintProps) {
                     <div className="text-sm font-bold text-gray-900">{caseData.visit_type || '-'}</div>
                   </div>
                   <div>
-                    <div className="text-[10px] uppercase text-gray-400 font-semibold mb-1">Patient ID</div>
-                    <div className="text-sm font-bold text-gray-900">{caseData.patient_id || '-'}</div>
+                    <div className="text-[10px] uppercase text-gray-400 font-semibold mb-1">Patient Name</div>
+                    <div className="text-sm font-bold text-gray-900">{caseData.patient_name || '-'}</div>
                   </div>
                 </div>
 
@@ -440,7 +569,7 @@ export function CasePrint({ caseData, children }: CasePrintProps) {
               {((caseData.past_history_treatments && caseData.past_history_treatments.length > 0) ||
                 (caseData.past_history_medicines && caseData.past_history_medicines.length > 0) ||
                 (caseData.past_medications && caseData.past_medications.length > 0)) && (
-                <div className="mb-6">
+                <div className="mb-2 break-inside-avoid">
                   <div className="text-xs font-bold uppercase text-gray-500 mb-3 tracking-widest">
                     PAST HISTORY
                   </div>
@@ -450,12 +579,15 @@ export function CasePrint({ caseData, children }: CasePrintProps) {
                       <div>
                         <div className="text-xs font-bold text-black mb-2">Past Treatments:</div>
                         <ul className="text-xs text-black list-disc list-inside space-y-1">
-                          {caseData.past_history_treatments.map((treatment, idx) => (
-                            <li key={idx}>
-                              {treatment.treatment || '-'}
-                              {treatment.years && ` (${treatment.years} years)`}
-                            </li>
-                          ))}
+                          {caseData.past_history_treatments.map((treatment, idx) => {
+                            const treatmentName = resolveTreatmentName(treatment.treatment)
+                            return (
+                              <li key={idx}>
+                                {treatmentName !== '-' ? treatmentName : '-'}
+                                {treatment.years && ` (${treatment.years} years)`}
+                              </li>
+                            )
+                          })}
                         </ul>
                       </div>
                     )}
@@ -467,7 +599,7 @@ export function CasePrint({ caseData, children }: CasePrintProps) {
                         <ul className="text-xs text-black list-disc list-inside space-y-1">
                           {(caseData.past_history_medicines || caseData.past_medications || []).map((med, idx) => {
                             const eyeLabel = getEyeLabel(med.eye)
-                            const medName = filterUUID(med.medicine_name, '-')
+                            const medName = resolveMedicineName(med.medicine_name || (med as any).medicine_id)
                             return (
                               <li key={idx}>
                                 {medName}
@@ -486,7 +618,7 @@ export function CasePrint({ caseData, children }: CasePrintProps) {
 
               {/* BLOCK 3: COMPLAINTS */}
                   {caseData.complaints && caseData.complaints.length > 0 && (
-                <div className="mb-6">
+                <div className="mb-2 break-inside-avoid">
                   <div className="text-xs font-bold uppercase text-gray-500 mb-3 tracking-widest">
                     COMPLAINTS
                   </div>
@@ -502,7 +634,8 @@ export function CasePrint({ caseData, children }: CasePrintProps) {
                     <tbody>
                       {caseData.complaints.map((complaint, idx) => {
                         const eyeLabel = getEyeLabel(complaint.eye)
-                        const complaintName = filterUUID(complaint.complaint_name, complaint.notes || '-')
+                        const resolvedComplaint = resolveComplaintName(complaint.complaint_name || complaint.complaintId)
+                        const complaintName = resolvedComplaint !== '-' ? resolvedComplaint : (complaint.notes || '-')
                         return (
                           <tr key={idx} className={idx % 2 === 0 ? 'bg-gray-50' : ''}>
                             <td className="border border-black p-2">{complaintName}</td>
@@ -519,290 +652,267 @@ export function CasePrint({ caseData, children }: CasePrintProps) {
 
               {/* BLOCK 4: VISION & REFRACTION */}
               {(caseData.vision_data || hasRefractionData()) && (
-                <div className="mb-6">
+                <div className="mb-2 break-inside-avoid">
                   <div className="text-xs font-bold uppercase text-gray-500 mb-3 tracking-widest">
                     VISION & REFRACTION
-                </div>
+                  </div>
                   
-                  {/* Table A: Acuity */}
-                  {caseData.vision_data && (
-                    <div className="mb-4">
-                      <table className="w-full border-collapse border border-black mb-4" style={{ fontSize: '10pt' }}>
-                  <thead>
-                    <tr>
-                            <th className="border border-black p-2 text-left font-bold">Label</th>
-                            <th className="border border-black p-2 text-center font-bold">Right Eye (OD)</th>
-                            <th className="border border-black p-2 text-center font-bold">Left Eye (OS)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                          {(caseData.vision_data.unaided?.right || caseData.vision_data.unaided?.left) && (
+                  <div className="grid grid-cols-12 gap-4">
+                    {/* Left (Col-span-5): Visual Acuity Table */}
+                    {caseData.vision_data && (
+                      <div className="col-span-5">
+                        <table className="w-full border-collapse border border-black" style={{ fontSize: '9pt' }}>
+                          <thead>
                             <tr>
-                              <td className="border border-black p-2">Unaided</td>
-                              <td className="border border-black p-2 text-center">
-                                {caseData.vision_data.unaided?.right || '-'}
-                        </td>
-                              <td className="border border-black p-2 text-center">
-                                {caseData.vision_data.unaided?.left || '-'}
-                        </td>
-                      </tr>
-                    )}
-                          {(caseData.vision_data.pinhole?.right || caseData.vision_data.pinhole?.left) && (
-                            <tr>
-                              <td className="border border-black p-2">Pinhole</td>
-                              <td className="border border-black p-2 text-center">
-                                {caseData.vision_data.pinhole?.right || '-'}
-                        </td>
-                              <td className="border border-black p-2 text-center">
-                                {caseData.vision_data.pinhole?.left || '-'}
-                        </td>
-                      </tr>
-                    )}
-                          {(caseData.vision_data.aided?.right || caseData.vision_data.aided?.left) && (
-                            <tr>
-                              <td className="border border-black p-2">Aided</td>
-                              <td className="border border-black p-2 text-center">
-                                {caseData.vision_data.aided?.right || '-'}
-                        </td>
-                              <td className="border border-black p-2 text-center">
-                                {caseData.vision_data.aided?.left || '-'}
-                        </td>
-                      </tr>
-                    )}
-                          {(caseData.vision_data.near?.right || caseData.vision_data.near?.left) && (
-                            <tr>
-                              <td className="border border-black p-2">Near</td>
-                              <td className="border border-black p-2 text-center">
-                                {caseData.vision_data.near?.right || '-'}
-                        </td>
-                              <td className="border border-black p-2 text-center">
-                                {caseData.vision_data.near?.left || '-'}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-                  {/* Table B: Refraction */}
-                  {hasRefractionData() && (
-                    <div className="mb-4">
-                      <table className="w-full border-collapse border border-black mb-2" style={{ fontSize: '10pt' }}>
-                        <thead>
-                          <tr>
-                            <th className="border border-black p-2 text-left font-bold">Eye</th>
-                            <th className="border border-black p-2 text-center font-bold">SPH</th>
-                            <th className="border border-black p-2 text-center font-bold">CYL</th>
-                            <th className="border border-black p-2 text-center font-bold">AXIS</th>
-                            <th className="border border-black p-2 text-center font-bold">VA</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {/* Right Eye - Distant / Near / PG */}
-                          {(getRefractionValue('distant', 'right', 'sph') !== '-' ||
-                            getRefractionValue('near', 'right', 'sph') !== '-' ||
-                            getRefractionValue('pg', 'right', 'sph') !== '-') && (
-                            <tr>
-                              <td className="border border-black p-2 font-semibold">Right Eye</td>
-                              <td className="border border-black p-2 text-center text-xs">
-                                {[
-                                  getRefractionValue('distant', 'right', 'sph') !== '-' && `D: ${getRefractionValue('distant', 'right', 'sph')}`,
-                                  getRefractionValue('near', 'right', 'sph') !== '-' && `N: ${getRefractionValue('near', 'right', 'sph')}`,
-                                  getRefractionValue('pg', 'right', 'sph') !== '-' && `PG: ${getRefractionValue('pg', 'right', 'sph')}`
-                                ].filter(Boolean).join(' / ') || '-'}
-                              </td>
-                              <td className="border border-black p-2 text-center text-xs">
-                                {[
-                                  getRefractionValue('distant', 'right', 'cyl') !== '-' && `D: ${getRefractionValue('distant', 'right', 'cyl')}`,
-                                  getRefractionValue('near', 'right', 'cyl') !== '-' && `N: ${getRefractionValue('near', 'right', 'cyl')}`,
-                                  getRefractionValue('pg', 'right', 'cyl') !== '-' && `PG: ${getRefractionValue('pg', 'right', 'cyl')}`
-                                ].filter(Boolean).join(' / ') || '-'}
-                              </td>
-                              <td className="border border-black p-2 text-center text-xs">
-                                {[
-                                  getRefractionValue('distant', 'right', 'axis') !== '-' && `D: ${getRefractionValue('distant', 'right', 'axis')}`,
-                                  getRefractionValue('near', 'right', 'axis') !== '-' && `N: ${getRefractionValue('near', 'right', 'axis')}`,
-                                  getRefractionValue('pg', 'right', 'axis') !== '-' && `PG: ${getRefractionValue('pg', 'right', 'axis')}`
-                                ].filter(Boolean).join(' / ') || '-'}
-                              </td>
-                              <td className="border border-black p-2 text-center text-xs">
-                                {[
-                                  getRefractionValue('distant', 'right', 'va') !== '-' && `D: ${getRefractionValue('distant', 'right', 'va')}`,
-                                  getRefractionValue('near', 'right', 'va') !== '-' && `N: ${getRefractionValue('near', 'right', 'va')}`,
-                                  getRefractionValue('pg', 'right', 'va') !== '-' && `PG: ${getRefractionValue('pg', 'right', 'va')}`
-                                ].filter(Boolean).join(' / ') || '-'}
-                              </td>
+                              <th className="border border-black p-1 text-left font-bold">Label</th>
+                              <th className="border border-black p-1 text-center font-bold text-xs">Right</th>
+                              <th className="border border-black p-1 text-center font-bold text-xs">Left</th>
                             </tr>
-                          )}
-                          {/* Left Eye - Distant / Near / PG */}
-                          {(getRefractionValue('distant', 'left', 'sph') !== '-' ||
-                            getRefractionValue('near', 'left', 'sph') !== '-' ||
-                            getRefractionValue('pg', 'left', 'sph') !== '-') && (
-                            <tr>
-                              <td className="border border-black p-2 font-semibold">Left Eye</td>
-                              <td className="border border-black p-2 text-center text-xs">
-                                {[
-                                  getRefractionValue('distant', 'left', 'sph') !== '-' && `D: ${getRefractionValue('distant', 'left', 'sph')}`,
-                                  getRefractionValue('near', 'left', 'sph') !== '-' && `N: ${getRefractionValue('near', 'left', 'sph')}`,
-                                  getRefractionValue('pg', 'left', 'sph') !== '-' && `PG: ${getRefractionValue('pg', 'left', 'sph')}`
-                                ].filter(Boolean).join(' / ') || '-'}
-                              </td>
-                              <td className="border border-black p-2 text-center text-xs">
-                                {[
-                                  getRefractionValue('distant', 'left', 'cyl') !== '-' && `D: ${getRefractionValue('distant', 'left', 'cyl')}`,
-                                  getRefractionValue('near', 'left', 'cyl') !== '-' && `N: ${getRefractionValue('near', 'left', 'cyl')}`,
-                                  getRefractionValue('pg', 'left', 'cyl') !== '-' && `PG: ${getRefractionValue('pg', 'left', 'cyl')}`
-                                ].filter(Boolean).join(' / ') || '-'}
-                              </td>
-                              <td className="border border-black p-2 text-center text-xs">
-                                {[
-                                  getRefractionValue('distant', 'left', 'axis') !== '-' && `D: ${getRefractionValue('distant', 'left', 'axis')}`,
-                                  getRefractionValue('near', 'left', 'axis') !== '-' && `N: ${getRefractionValue('near', 'left', 'axis')}`,
-                                  getRefractionValue('pg', 'left', 'axis') !== '-' && `PG: ${getRefractionValue('pg', 'left', 'axis')}`
-                                ].filter(Boolean).join(' / ') || '-'}
-                              </td>
-                              <td className="border border-black p-2 text-center text-xs">
-                                {[
-                                  getRefractionValue('distant', 'left', 'va') !== '-' && `D: ${getRefractionValue('distant', 'left', 'va')}`,
-                                  getRefractionValue('near', 'left', 'va') !== '-' && `N: ${getRefractionValue('near', 'left', 'va')}`,
-                                  getRefractionValue('pg', 'left', 'va') !== '-' && `PG: ${getRefractionValue('pg', 'left', 'va')}`
-                                ].filter(Boolean).join(' / ') || '-'}
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                      {/* Footer: Purpose, Quality, Remark */}
-                      {(caseData.refraction_data?.purpose || caseData.refraction_data?.quality || caseData.refraction_data?.remark ||
-                        caseData.refraction_purpose || caseData.refraction_quality || caseData.refraction_remark) && (
-                        <div className="text-xs text-black mt-2 space-y-1">
-                          {caseData.refraction_data?.purpose || caseData.refraction_purpose ? (
-                            <div><strong>Purpose:</strong> {caseData.refraction_data?.purpose || caseData.refraction_purpose}</div>
-                          ) : null}
-                          {caseData.refraction_data?.quality || caseData.refraction_quality ? (
-                            <div><strong>Quality:</strong> {caseData.refraction_data?.quality || caseData.refraction_quality}</div>
-                          ) : null}
-                          {caseData.refraction_data?.remark || caseData.refraction_remark ? (
-                            <div><strong>Remark:</strong> {caseData.refraction_data?.remark || caseData.refraction_remark}</div>
-                          ) : null}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
+                          </thead>
+                          <tbody>
+                            {(caseData.vision_data.unaided?.right || caseData.vision_data.unaided?.left) && (
+                              <tr>
+                                <td className="border border-black p-1 text-xs">Unaided</td>
+                                <td className="border border-black p-1 text-center text-xs">{resolveVisualAcuity(caseData.vision_data.unaided?.right)}</td>
+                                <td className="border border-black p-1 text-center text-xs">{resolveVisualAcuity(caseData.vision_data.unaided?.left)}</td>
+                              </tr>
+                            )}
+                            {(caseData.vision_data.pinhole?.right || caseData.vision_data.pinhole?.left) && (
+                              <tr>
+                                <td className="border border-black p-1 text-xs">Pinhole</td>
+                                <td className="border border-black p-1 text-center text-xs">{resolveVisualAcuity(caseData.vision_data.pinhole?.right)}</td>
+                                <td className="border border-black p-1 text-center text-xs">{resolveVisualAcuity(caseData.vision_data.pinhole?.left)}</td>
+                              </tr>
+                            )}
+                            {(caseData.vision_data.aided?.right || caseData.vision_data.aided?.left) && (
+                              <tr>
+                                <td className="border border-black p-1 text-xs">Aided</td>
+                                <td className="border border-black p-1 text-center text-xs">{resolveVisualAcuity(caseData.vision_data.aided?.right)}</td>
+                                <td className="border border-black p-1 text-center text-xs">{resolveVisualAcuity(caseData.vision_data.aided?.left)}</td>
+                              </tr>
+                            )}
+                            {(caseData.vision_data.near?.right || caseData.vision_data.near?.left) && (
+                              <tr>
+                                <td className="border border-black p-1 text-xs">Near</td>
+                                <td className="border border-black p-1 text-center text-xs">{resolveVisualAcuity(caseData.vision_data.near?.right)}</td>
+                                <td className="border border-black p-1 text-center text-xs">{resolveVisualAcuity(caseData.vision_data.near?.left)}</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
 
-              {/* BLOCK 5: EXAMINATION */}
-              {hasExaminationData() && (
-                <div className="mb-6">
-                  <div className="text-xs font-bold uppercase text-gray-500 mb-3 tracking-widest">
+                    {/* Right (Col-span-7): Refraction Table */}
+                      {hasRefractionData() && (
+                        <div className="col-span-7">
+                          <table className="w-full border-collapse border border-black" style={{ fontSize: '8pt' }}>
+                            <thead>
+                              <tr>
+                                <th className="border border-black p-0.5 text-left font-bold text-[9px]">Eye</th>
+                                <th className="border border-black p-0.5 text-center font-bold text-[9px]">SPH</th>
+                                <th className="border border-black p-0.5 text-center font-bold text-[9px]">CYL</th>
+                                <th className="border border-black p-0.5 text-center font-bold text-[9px]">AXIS</th>
+                                <th className="border border-black p-0.5 text-center font-bold text-[9px]">VA</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {/* Right Eye */}
+                              {(getRefractionValue('distant', 'right', 'sph') !== '-' ||
+                                getRefractionValue('near', 'right', 'sph') !== '-' ||
+                                getRefractionValue('pg', 'right', 'sph') !== '-') && (
+                                <tr>
+                                  <td className="border border-black p-0.5 text-[9px] font-semibold">Right Eye</td>
+                                  <td className="border border-black p-0.5 text-center text-[9px]">
+                                  {[
+                                    getRefractionValue('distant', 'right', 'sph') !== '-' && `D: ${getRefractionValue('distant', 'right', 'sph')}`,
+                                    getRefractionValue('near', 'right', 'sph') !== '-' && `N: ${getRefractionValue('near', 'right', 'sph')}`
+                                  ].filter(Boolean).join(' / ') || '-'}
+                                  </td>
+                                  <td className="border border-black p-0.5 text-center text-[9px]">
+                                  {[
+                                    getRefractionValue('distant', 'right', 'cyl') !== '-' && `D: ${getRefractionValue('distant', 'right', 'cyl')}`,
+                                    getRefractionValue('near', 'right', 'cyl') !== '-' && `N: ${getRefractionValue('near', 'right', 'cyl')}`
+                                  ].filter(Boolean).join(' / ') || '-'}
+                                  </td>
+                                  <td className="border border-black p-0.5 text-center text-[9px]">
+                                  {[
+                                    getRefractionValue('distant', 'right', 'axis') !== '-' && `D: ${getRefractionValue('distant', 'right', 'axis')}`,
+                                    getRefractionValue('near', 'right', 'axis') !== '-' && `N: ${getRefractionValue('near', 'right', 'axis')}`
+                                  ].filter(Boolean).join(' / ') || '-'}
+                                  </td>
+                                  <td className="border border-black p-0.5 text-center text-[9px]">
+                                  {[
+                                    getRefractionValue('distant', 'right', 'va') !== '-' && `D: ${getRefractionValue('distant', 'right', 'va')}`,
+                                    getRefractionValue('near', 'right', 'va') !== '-' && `N: ${getRefractionValue('near', 'right', 'va')}`
+                                  ].filter(Boolean).join(' / ') || '-'}
+                                  </td>
+                                  </tr>
+                                  )}
+                                  {/* Left Eye */}
+                                  {(getRefractionValue('distant', 'left', 'sph') !== '-' ||
+                                  getRefractionValue('near', 'left', 'sph') !== '-' ||
+                                  getRefractionValue('pg', 'left', 'sph') !== '-') && (
+                                  <tr>
+                                  <td className="border border-black p-0.5 text-[9px] font-semibold">Left Eye</td>
+                                  <td className="border border-black p-0.5 text-center text-[9px]">
+                                  {[
+                                    getRefractionValue('distant', 'left', 'sph') !== '-' && `D: ${getRefractionValue('distant', 'left', 'sph')}`,
+                                    getRefractionValue('near', 'left', 'sph') !== '-' && `N: ${getRefractionValue('near', 'left', 'sph')}`
+                                  ].filter(Boolean).join(' / ') || '-'}
+                                  </td>
+                                  <td className="border border-black p-0.5 text-center text-[9px]">
+                                  {[
+                                    getRefractionValue('distant', 'left', 'cyl') !== '-' && `D: ${getRefractionValue('distant', 'left', 'cyl')}`,
+                                    getRefractionValue('near', 'left', 'cyl') !== '-' && `N: ${getRefractionValue('near', 'left', 'cyl')}`
+                                  ].filter(Boolean).join(' / ') || '-'}
+                                  </td>
+                                  <td className="border border-black p-0.5 text-center text-[9px]">
+                                  {[
+                                    getRefractionValue('distant', 'left', 'axis') !== '-' && `D: ${getRefractionValue('distant', 'left', 'axis')}`,
+                                    getRefractionValue('near', 'left', 'axis') !== '-' && `N: ${getRefractionValue('near', 'left', 'axis')}`
+                                  ].filter(Boolean).join(' / ') || '-'}
+                                  </td>
+                                  <td className="border border-black p-0.5 text-center text-[9px]">
+                                  {[
+                                    getRefractionValue('distant', 'left', 'va') !== '-' && `D: ${getRefractionValue('distant', 'left', 'va')}`,
+                                    getRefractionValue('near', 'left', 'va') !== '-' && `N: ${getRefractionValue('near', 'left', 'va')}`
+                                  ].filter(Boolean).join(' / ') || '-'}
+                                  </td>
+                                  </tr>
+                                  )}
+                                  </tbody>
+                                  </table>
+                          {/* Footer: Purpose, Quality, Remark */}
+                          {(caseData.refraction_data?.purpose || caseData.refraction_data?.quality || caseData.refraction_data?.remark ||
+                          caseData.refraction_purpose || caseData.refraction_quality || caseData.refraction_remark) && (
+                          <div className="text-xs text-black mt-2 space-y-1">
+                            {caseData.refraction_data?.purpose || caseData.refraction_purpose ? (
+                              <div><strong>Purpose:</strong> {caseData.refraction_data?.purpose || caseData.refraction_purpose}</div>
+                            ) : null}
+                            {caseData.refraction_data?.quality || caseData.refraction_quality ? (
+                              <div><strong>Quality:</strong> {caseData.refraction_data?.quality || caseData.refraction_quality}</div>
+                            ) : null}
+                            {caseData.refraction_data?.remark || caseData.refraction_remark ? (
+                              <div><strong>Remark:</strong> {caseData.refraction_data?.remark || caseData.refraction_remark}</div>
+                            ) : null}
+                          </div>
+                          )}
+                          </div>
+                          )}
+                          </div>
+                          </div>
+                          )}
+
+              {/* BLOCK 5: EXAMINATION & DIAGRAMS - Split Panel Layout */}
+              {(hasExaminationData() || (caseData.examination_data?.diagrams && 
+               (caseData.examination_data.diagrams.right || caseData.examination_data.diagrams.left))) && (
+                <div className="mb-2 break-inside-avoid">
+                  <div className="text-xs font-bold uppercase text-gray-500 mb-1 tracking-widest">
                     EXAMINATION
                   </div>
-                  <div className="grid grid-cols-2 gap-6">
-                  {/* Anterior Segment */}
-                    <div>
-                      <div className="text-xs font-bold text-black mb-2">ANTERIOR SEGMENT</div>
-                      <div className="text-xs text-black space-y-1">
-                        {(() => {
-                          const eyelidsRE = getExaminationField('anterior', 'eyelids', 'right')
-                          const eyelidsLE = getExaminationField('anterior', 'eyelids', 'left')
-                          if (eyelidsRE || eyelidsLE) {
-                            return <div><strong>Eyelids:</strong> {eyelidsRE || '-'} / {eyelidsLE || '-'}</div>
-                          }
-                          return null
-                        })()}
-                        {(() => {
-                          const conjunctivaRE = getExaminationField('anterior', 'conjunctiva', 'right')
-                          const conjunctivaLE = getExaminationField('anterior', 'conjunctiva', 'left')
-                          if (conjunctivaRE || conjunctivaLE) {
-                            return <div><strong>Conjunctiva:</strong> {conjunctivaRE || '-'} / {conjunctivaLE || '-'}</div>
-                          }
-                          return null
-                        })()}
-                        {(() => {
-                          const corneaRE = getExaminationField('anterior', 'cornea', 'right')
-                          const corneaLE = getExaminationField('anterior', 'cornea', 'left')
-                          if (corneaRE || corneaLE) {
-                            return <div><strong>Cornea:</strong> {corneaRE || '-'} / {corneaLE || '-'}</div>
-                          }
-                          return null
-                        })()}
-                        {(() => {
-                          const acRE = getExaminationField('anterior', 'anterior_chamber', 'right')
-                          const acLE = getExaminationField('anterior', 'anterior_chamber', 'left')
-                          if (acRE || acLE) {
-                            return <div><strong>Anterior Chamber:</strong> {acRE || '-'} / {acLE || '-'}</div>
-                          }
-                          return null
-                        })()}
-                        {(() => {
-                          const irisRE = getExaminationField('anterior', 'iris', 'right')
-                          const irisLE = getExaminationField('anterior', 'iris', 'left')
-                          if (irisRE || irisLE) {
-                            return <div><strong>Iris:</strong> {irisRE || '-'} / {irisLE || '-'}</div>
-                          }
-                          return null
-                        })()}
-                        {(() => {
-                          const lensRE = getExaminationField('anterior', 'lens', 'right')
-                          const lensLE = getExaminationField('anterior', 'lens', 'left')
-                          if (lensRE || lensLE) {
-                            return <div><strong>Lens:</strong> {lensRE || '-'} / {lensLE || '-'}</div>
-                          }
-                          return null
-                        })()}
-                        {getExaminationField('anterior', 'remarks') && (
-                          <div><strong>Remarks:</strong> {getExaminationField('anterior', 'remarks')}</div>
-                        )}
+                  
+                  <div className="grid grid-cols-12 gap-4 items-start">
+                    {/* LEFT COLUMN (Col-span-7): Examination Text */}
+                    {hasExaminationData() && (
+                      <div className="col-span-7">
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px]">
+                          {/* Right Eye Fields */}
+                          {(() => {
+                            const eyelidsRE = getExaminationField('anterior', 'eyelids', 'right')
+                            if (eyelidsRE) return <><div className="font-bold text-gray-600">Lids (OD):</div><div>{eyelidsRE}</div></>
+                            return null
+                          })()}
+                          {(() => {
+                            const corneaRE = getExaminationField('anterior', 'cornea', 'right')
+                            if (corneaRE) return <><div className="font-bold text-gray-600">Cornea (OD):</div><div>{corneaRE}</div></>
+                            return null
+                          })()}
+                          {(() => {
+                            const lensRE = getExaminationField('anterior', 'lens', 'right')
+                            if (lensRE) return <><div className="font-bold text-gray-600">Lens (OD):</div><div>{lensRE}</div></>
+                            return null
+                          })()}
+                          {(() => {
+                            const discRE = getExaminationField('posterior', 'disc', 'right')
+                            if (discRE) return <><div className="font-bold text-gray-600">Disc (OD):</div><div>{discRE}</div></>
+                            return null
+                          })()}
+                          
+                          {/* Left Eye Fields */}
+                          {(() => {
+                            const eyelidsLE = getExaminationField('anterior', 'eyelids', 'left')
+                            if (eyelidsLE) return <><div className="font-bold text-gray-600">Lids (OS):</div><div>{eyelidsLE}</div></>
+                            return null
+                          })()}
+                          {(() => {
+                            const corneaLE = getExaminationField('anterior', 'cornea', 'left')
+                            if (corneaLE) return <><div className="font-bold text-gray-600">Cornea (OS):</div><div>{corneaLE}</div></>
+                            return null
+                          })()}
+                          {(() => {
+                            const lensLE = getExaminationField('anterior', 'lens', 'left')
+                            if (lensLE) return <><div className="font-bold text-gray-600">Lens (OS):</div><div>{lensLE}</div></>
+                            return null
+                          })()}
+                          {(() => {
+                            const discLE = getExaminationField('posterior', 'disc', 'left')
+                            if (discLE) return <><div className="font-bold text-gray-600">Disc (OS):</div><div>{discLE}</div></>
+                            return null
+                          })()}
+                        </div>
                       </div>
-                    </div>
-                  {/* Posterior Segment */}
-                    <div>
-                      <div className="text-xs font-bold text-black mb-2">POSTERIOR SEGMENT</div>
-                      <div className="text-xs text-black space-y-1">
-                        {(() => {
-                          const vitreousRE = getExaminationField('posterior', 'vitreous', 'right')
-                          const vitreousLE = getExaminationField('posterior', 'vitreous', 'left')
-                          if (vitreousRE || vitreousLE) {
-                            return <div><strong>Vitreous:</strong> {vitreousRE || '-'} / {vitreousLE || '-'}</div>
-                          }
-                          return null
-                        })()}
-                        {(() => {
-                          const discRE = getExaminationField('posterior', 'disc', 'right')
-                          const discLE = getExaminationField('posterior', 'disc', 'left')
-                          if (discRE || discLE) {
-                            return <div><strong>Disc:</strong> {discRE || '-'} / {discLE || '-'}</div>
-                          }
-                          return null
-                        })()}
-                        {(() => {
-                          const retinaRE = getExaminationField('posterior', 'retina', 'right')
-                          const retinaLE = getExaminationField('posterior', 'retina', 'left')
-                          if (retinaRE || retinaLE) {
-                            return <div><strong>Retina:</strong> {retinaRE || '-'} / {retinaLE || '-'}</div>
-                          }
-                          return null
-                        })()}
-                        {getExaminationField('posterior', 'remarks') && (
-                          <div><strong>Remarks:</strong> {getExaminationField('posterior', 'remarks')}</div>
-                        )}
+                    )}
+                    
+                    {/* RIGHT COLUMN (Col-span-5): Eye Diagrams */}
+                    {caseData.examination_data?.diagrams && 
+                     (caseData.examination_data.diagrams.right || caseData.examination_data.diagrams.left) && (
+                      <div className="col-span-5">
+                        <div className="flex flex-col gap-2">
+                          {/* Right Eye Diagram */}
+                          {caseData.examination_data.diagrams.right && (
+                            <div className="border border-gray-300 rounded bg-gray-50 p-1">
+                              <img 
+                                src={caseData.examination_data.diagrams.right} 
+                                alt="Right Eye Diagram" 
+                                className="w-full h-32 object-contain"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement
+                                  target.style.display = 'none'
+                                }}
+                              />
+                            </div>
+                          )}
+                          {/* Left Eye Diagram */}
+                          {caseData.examination_data.diagrams.left && (
+                            <div className="border border-gray-300 rounded bg-gray-50 p-1">
+                              <img 
+                                src={caseData.examination_data.diagrams.left} 
+                                alt="Left Eye Diagram" 
+                                className="w-full h-32 object-contain"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement
+                                  target.style.display = 'none'
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               )}
 
               {/* BLOCK 6: BLOOD INVESTIGATION */}
               {caseData.blood_tests && caseData.blood_tests.length > 0 && (
-                <div className="mb-6">
+                <div className="mb-2 break-inside-avoid">
                   <div className="text-xs font-bold uppercase text-gray-500 mb-3 tracking-widest">
                     BLOOD INVESTIGATION
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {caseData.blood_tests.map((test, idx) => {
-                      const testName = filterUUID(test, test)
+                      const testName = resolveBloodTest(test)
                       return (
                         <span
                           key={idx}
@@ -819,17 +929,17 @@ export function CasePrint({ caseData, children }: CasePrintProps) {
               {/* BLOCK 7: DIAGNOSIS & TESTS */}
               {(caseData.diagnosis || getIOP('right') !== '-' || getIOP('left') !== '-' || getSACTest('right') !== '-' || getSACTest('left') !== '-' || 
                 (caseData.diagnostic_tests && caseData.diagnostic_tests.length > 0)) && (
-                <div className="mb-6">
-                  <div className="text-xs font-bold uppercase text-gray-500 mb-3 tracking-widest">
+                <div className="mb-2 break-inside-avoid">
+                  <div className="text-xs font-bold uppercase text-gray-500 mb-1 tracking-widest">
                     DIAGNOSIS & TESTS
                   </div>
                   
-                  {/* Provisional Diagnosis */}
+                  {/* Provisional Diagnosis - Prominent Box */}
                   {caseData.diagnosis && (
-                    <div className="mb-4 p-3 border-2 border-black bg-white">
-                      <div className="text-xs font-bold text-black mb-1">Provisional Diagnosis:</div>
-                      <div className="text-sm font-bold text-black">
-                        {Array.isArray(caseData.diagnosis) ? caseData.diagnosis.join(', ') : caseData.diagnosis}
+                    <div className="mb-2 p-2 border-l-4 border-black bg-gray-50">
+                      <div className="text-[10px] font-bold uppercase text-black mb-1">Diagnosis</div>
+                      <div className="text-xs font-medium text-black">
+                        {resolveDiagnosis(caseData.diagnosis)}
                       </div>
                     </div>
                   )}
@@ -837,27 +947,23 @@ export function CasePrint({ caseData, children }: CasePrintProps) {
                   {/* Tests Grid */}
                   {(getIOP('right') !== '-' || getIOP('left') !== '-' || getSACTest('right') !== '-' || getSACTest('left') !== '-' || 
                     (caseData.diagnostic_tests && caseData.diagnostic_tests.length > 0)) && (
-                    <div className="space-y-3">
+                    <div className="space-y-1 text-[11px]">
                       {/* SAC Syringing */}
                       {(getSACTest('right') !== '-' || getSACTest('left') !== '-') && (
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <div className="text-xs font-bold text-black mb-1">SAC Syringing:</div>
-                            <div className="text-xs text-black">
-                              Right: {getSACTest('right')} | Left: {getSACTest('left')}
-                            </div>
+                        <div>
+                          <div className="font-bold text-black">SAC:</div>
+                          <div className="text-black">
+                            Right: {getSACTest('right')} | Left: {getSACTest('left')}
                           </div>
                         </div>
                       )}
 
                       {/* IOP */}
                       {(getIOP('right') !== '-' || getIOP('left') !== '-') && (
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <div className="text-xs font-bold text-black mb-1">IOP:</div>
-                            <div className="text-xs text-black">
-                              Right: {getIOP('right')} | Left: {getIOP('left')}
-                            </div>
+                        <div>
+                          <div className="font-bold text-black">IOP:</div>
+                          <div className="text-black">
+                            Right: {getIOP('right')} | Left: {getIOP('left')}
                           </div>
                         </div>
                       )}
@@ -865,10 +971,11 @@ export function CasePrint({ caseData, children }: CasePrintProps) {
                       {/* Additional Tests */}
                       {caseData.diagnostic_tests && caseData.diagnostic_tests.length > 0 && (
                         <div>
-                          <div className="text-xs font-bold text-black mb-2">Additional Tests:</div>
-                          <ul className="text-xs text-black list-disc list-inside space-y-1">
+                          <div className="font-bold text-black">Additional Tests:</div>
+                          <ul className="text-black list-disc list-inside space-y-0.5">
                             {caseData.diagnostic_tests.map((test, idx) => {
-                              const testName = filterUUID(test.test_name || test.test_id, 'Test')
+                              const resolvedTestName = resolveDiagnosticTestName(test.test_name || test.test_id)
+                              const testName = resolvedTestName !== '-' ? resolvedTestName : (test.notes || 'Test')
                               const eyeLabel = getEyeLabel(test.eye)
                               return (
                                 <li key={idx}>
@@ -893,7 +1000,7 @@ export function CasePrint({ caseData, children }: CasePrintProps) {
                 (caseData.treatments && caseData.treatments.length > 0) ||
                 (caseData.surgeries && caseData.surgeries.length > 0) ||
                 caseData.advice_remarks) && (
-              <div className="mb-6">
+              <div className="mb-2 break-inside-avoid">
                   <div className="text-xs font-bold uppercase text-gray-500 mb-3 tracking-widest">
                     ADVICE
                   </div>
@@ -916,24 +1023,16 @@ export function CasePrint({ caseData, children }: CasePrintProps) {
                     <tbody>
                           {(caseData.medicines || caseData.treatments || []).map((medicine, idx) => {
                         const eyeLabel = getEyeLabel(medicine.eye)
-                        const drugName = filterUUID(
-                          medicine.drug_name,
-                          filterUUID(medicine.drug_id, '-')
-                        )
-                            const dosage = filterUUID(
-                              medicine.dosage || medicine.dosage_name,
-                          filterUUID(medicine.dosage_id, '-')
-                        )
-                            const frequency = medicine.frequency || filterUUID(
-                              medicine.route || medicine.route_name,
-                              filterUUID(medicine.route_id, '-')
-                            )
+                        const drugName = resolveMedicineName(medicine.drug_name || medicine.drug_id)
+                            const dosage = resolveDosage(medicine.dosage || medicine.dosage_name || medicine.dosage_id)
+                            const routeValue = resolveRoute(medicine.route || medicine.route_name || medicine.route_id)
+                            const frequency = medicine.frequency || (routeValue !== '-' ? routeValue : '-')
                         return (
                               <tr key={idx} className={idx % 2 === 0 ? 'bg-gray-50' : ''}>
                                 <td className="border border-black p-2">{drugName}</td>
                                 <td className="border border-black p-2 text-center">{eyeLabel || '-'}</td>
-                                <td className="border border-black p-2 text-center">{dosage || '-'}</td>
-                                <td className="border border-black p-2 text-center">{frequency || '-'}</td>
+                                <td className="border border-black p-2 text-center">{dosage}</td>
+                                <td className="border border-black p-2 text-center">{frequency}</td>
                                 <td className="border border-black p-2 text-center">{medicine.duration || '-'}</td>
                           </tr>
                         )
@@ -958,11 +1057,18 @@ export function CasePrint({ caseData, children }: CasePrintProps) {
                         <tbody>
                           {caseData.surgeries.map((surgery, idx) => {
                             const eyeLabel = getEyeLabel(surgery.eye)
+                            const surgeryName = resolveSurgeryName(
+                              surgery.surgery_name ||
+                              (surgery as any)?.surgery_id ||
+                              (surgery as any)?.surgery_type_id ||
+                              (surgery as any)?.surgery_name_id
+                            )
+                            const anesthesia = resolveAnesthesia(surgery.anesthesia)
                             return (
                               <tr key={idx} className={idx % 2 === 0 ? 'bg-gray-50' : ''}>
-                                <td className="border border-black p-2">{surgery.surgery_name || '-'}</td>
+                                <td className="border border-black p-2">{surgeryName}</td>
                                 <td className="border border-black p-2 text-center">{eyeLabel || '-'}</td>
-                                <td className="border border-black p-2 text-center">{surgery.anesthesia || '-'}</td>
+                                <td className="border border-black p-2 text-center">{anesthesia}</td>
                               </tr>
                             )
                           })}

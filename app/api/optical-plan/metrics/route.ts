@@ -2,26 +2,26 @@ import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { requirePermission } from '@/lib/middleware/rbac'
 
-// GET /api/pharmacy/metrics - Get aggregate pharmacy statistics
+// GET /api/optical-plan/metrics - Get aggregate optical items statistics
 export async function GET(request: NextRequest) {
   try {
     // RBAC check
-    const authCheck = await requirePermission('pharmacy', 'view')
+    const authCheck = await requirePermission('optical_plan', 'view')
     if (!authCheck.authorized) {
       return (authCheck as { authorized: false; response: NextResponse }).response
     }
 
     const supabase = createClient()
 
-    // Fetch all pharmacy items for aggregation
+    // Fetch all optical items for aggregation
     const { data: items, error } = await supabase
-      .from('pharmacy_items')
-      .select('stock_quantity, reorder_level, unit_price, is_low_stock')
+      .from('optical_items')
+      .select('stock_quantity, reorder_level, purchase_price, selling_price, mrp')
 
     if (error) {
       console.error('Database error:', error)
       return NextResponse.json(
-        { success: false, error: 'Failed to fetch pharmacy metrics' },
+        { success: false, error: 'Failed to fetch optical plan metrics' },
         { status: 500 }
       )
     }
@@ -39,21 +39,25 @@ export async function GET(request: NextRequest) {
       item.stock_quantity === 0
     ).length || 0
 
-    // Calculate total inventory value (stock_quantity * unit_price)
+    // Calculate total inventory value (stock_quantity * purchase_price)
     const totalInventoryValue = items?.reduce((sum, item) => {
-      const value = (item.stock_quantity || 0) * (item.unit_price || 0)
+      const value = (item.stock_quantity || 0) * (item.purchase_price || 0)
       return sum + value
     }, 0) || 0
 
-    // Calculate average unit price
-    const averageUnitPrice = totalItems > 0
-      ? items?.reduce((sum, item) => sum + (item.unit_price || 0), 0) / totalItems || 0
+    // Calculate total potential revenue (stock_quantity * selling_price)
+    const totalPotentialRevenue = items?.reduce((sum, item) => {
+      const value = (item.stock_quantity || 0) * (item.selling_price || 0)
+      return sum + value
+    }, 0) || 0
+
+    // Calculate average purchase price
+    const averagePurchasePrice = totalItems > 0
+      ? items?.reduce((sum, item) => sum + (item.purchase_price || 0), 0) / totalItems || 0
       : 0
 
-    // Count items by low stock status (using computed column if available)
-    const lowStockByComputedColumn = items?.filter(item => 
-      item.is_low_stock === true
-    ).length || 0
+    // Count items above reorder level
+    const itemsAboveReorder = totalItems - lowStockCount
 
     return NextResponse.json({
       success: true,
@@ -62,41 +66,18 @@ export async function GET(request: NextRequest) {
         low_stock_count: lowStockCount,
         out_of_stock_count: outOfStockCount,
         total_inventory_value: totalInventoryValue,
-        average_unit_price: averageUnitPrice,
-        // Additional helpful metrics
-        low_stock_by_computed: lowStockByComputedColumn,
-        items_above_reorder: totalItems - lowStockCount
+        total_potential_revenue: totalPotentialRevenue,
+        average_purchase_price: averagePurchasePrice,
+        items_above_reorder: itemsAboveReorder
       }
     })
 
   } catch (error) {
     console.error('API error:', error)
     return NextResponse.json(
-      { success: false, error: 'Internal server error while fetching pharmacy metrics' },
+      { success: false, error: 'Internal server error while fetching optical plan metrics' },
       { status: 500 }
     )
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

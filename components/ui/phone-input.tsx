@@ -5,7 +5,7 @@ import PhoneInput, { type Country } from "react-phone-number-input"
 import "react-phone-number-input/style.css"
 import { cn } from "@/lib/utils"
 
-interface PhoneInputProps {
+interface PhoneInputProps extends Omit<React.ComponentPropsWithoutRef<typeof PhoneInput>, 'inputRef'> {
   value?: string
   onChange: (value: string | undefined) => void
   disabled?: boolean
@@ -15,7 +15,10 @@ interface PhoneInputProps {
   name?: string
 }
 
-export function PhoneNumberInput({
+export const PhoneNumberInput = React.forwardRef<
+  HTMLInputElement,
+  PhoneInputProps
+>(({
   value,
   onChange,
   disabled = false,
@@ -23,7 +26,8 @@ export function PhoneNumberInput({
   defaultCountry = "IN",
   id,
   name,
-}: PhoneInputProps) {
+  ...props
+}, ref) => {
   return (
     <PhoneInput
       international
@@ -33,10 +37,14 @@ export function PhoneNumberInput({
       disabled={disabled}
       id={id}
       name={name}
+      inputRef={ref}
       className={cn(
         "flex h-11 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20 focus-visible:border-ring focus-visible:ring-offset-0 transition-all disabled:cursor-not-allowed disabled:opacity-50",
         className
       )}
+      {...props}
     />
   )
-}
+})
+
+PhoneNumberInput.displayName = "PhoneNumberInput"

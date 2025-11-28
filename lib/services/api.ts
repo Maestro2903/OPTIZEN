@@ -266,8 +266,8 @@ export interface ExaminationData {
     anesthesia: string
   }>
   diagrams?: {
-    right_eye?: string
-    left_eye?: string
+    right?: string
+    left?: string
   }
   remarks?: string
 }
@@ -704,6 +704,75 @@ export const pharmacyApi = {
 
   metrics: (): Promise<ApiResponse<PharmacyMetrics>> => {
     return apiService.fetchApi<PharmacyMetrics>('/pharmacy/metrics')
+  },
+}
+
+// ===============================
+// OPTICAL PLAN API
+// ===============================
+
+export interface OpticalItem {
+  id: string
+  item_type: 'medicine' | 'frames' | 'lenses' | 'accessories' | 'equipment' | 'consumables'
+  name: string
+  brand?: string
+  model?: string
+  sku: string
+  description?: string
+  category: string
+  sub_category?: string
+  size?: string
+  color?: string
+  material?: string
+  gender?: string
+  purchase_price: number
+  selling_price: number
+  mrp: number
+  stock_quantity: number
+  reorder_level: number
+  supplier?: string
+  image_url?: string
+  warranty_months?: number
+  hsn_code?: string
+  gst_percentage?: number
+  created_at: string
+  updated_at: string
+}
+
+export interface OpticalFilters extends PaginationParams {
+  category?: string
+  item_type?: string
+  low_stock?: boolean
+}
+
+export interface OpticalMetrics {
+  total_items: number
+  low_stock_count: number
+  out_of_stock_count: number
+  total_inventory_value: number
+  total_potential_revenue: number
+  average_purchase_price: number
+  items_above_reorder: number
+}
+
+export const opticalPlanApi = {
+  list: (params: OpticalFilters = {}) =>
+    apiService.getList<OpticalItem>('optical-plan', params),
+
+  getById: (id: string) =>
+    apiService.getById<OpticalItem>('optical-plan', id),
+
+  create: (data: Omit<OpticalItem, 'id' | 'created_at' | 'updated_at'>) =>
+    apiService.create<OpticalItem>('optical-plan', data),
+
+  update: (id: string, data: Partial<OpticalItem>) =>
+    apiService.update<OpticalItem>('optical-plan', id, data),
+
+  delete: (id: string) =>
+    apiService.delete<OpticalItem>('optical-plan', id),
+
+  metrics: (): Promise<ApiResponse<OpticalMetrics>> => {
+    return apiService.fetchApi<OpticalMetrics>('/optical-plan/metrics')
   },
 }
 

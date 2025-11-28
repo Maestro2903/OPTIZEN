@@ -120,34 +120,35 @@ interface PrintHeaderProps {
 export function PrintHeader({
   hospitalName = "OptiZen Medical Center",
   hospitalAddress = "123 Medical Plaza, Healthcare District, City - 123456",
-  hospitalPhone = "+91 98765 43210"
-}: PrintHeaderProps) {
+  hospitalPhone = "+91 98765 43210",
+  compact = false
+}: PrintHeaderProps & { compact?: boolean }) {
   // Normalize hospital name - replace EyeCare with OptiZen
   const normalizedHospitalName = hospitalName?.includes('EyeCare') 
     ? hospitalName.replace(/EyeCare/gi, 'OptiZen')
     : hospitalName || "OptiZen Medical Center"
 
   return (
-    <div className="mb-6">
+    <div className={compact ? "mb-2" : "mb-6"}>
       {/* Flex row, justified between */}
       <div className="flex flex-row items-start justify-between">
         {/* Left: Hospital Logo + Hospital Name */}
-        <div className="flex items-center gap-3">
-          <Logo width={48} height={48} className="w-12 h-12" />
-          <div className="text-2xl font-serif font-bold text-gray-900">
+        <div className="flex items-center gap-2">
+          <Logo width={compact ? 40 : 48} height={compact ? 40 : 48} className={compact ? "w-10 h-10" : "w-12 h-12"} />
+          <div className={compact ? "text-lg font-serif font-bold text-gray-900" : "text-2xl font-serif font-bold text-gray-900"}>
             {normalizedHospitalName}
           </div>
         </div>
         
         {/* Right: Address Block */}
-        <div className="text-xs text-gray-500 text-right leading-relaxed">
+        <div className="text-[10px] text-gray-500 text-right leading-relaxed">
           {hospitalAddress}
-          {hospitalPhone && <div className="mt-1">Ph: {hospitalPhone}</div>}
+          {hospitalPhone && <div className={compact ? "mt-0" : "mt-1"}>Ph: {hospitalPhone}</div>}
         </div>
       </div>
       
       {/* Bottom: Thick black divider line */}
-      <div className="border-b-2 border-gray-900 my-6"></div>
+      <div className={compact ? "border-b-2 border-gray-900 my-2" : "border-b-2 border-gray-900 my-6"}></div>
     </div>
   )
 }
@@ -161,7 +162,7 @@ interface PrintSectionProps {
 
 export function PrintSection({ title, children, className = "" }: PrintSectionProps) {
   return (
-    <div className={`mb-6 ${className}`}>
+    <div className={`mb-3 ${className}`}>
       {/* Title: text-xs font-bold uppercase text-gray-500 mb-2 tracking-widest */}
       <div className="text-xs font-bold uppercase text-gray-500 mb-2 tracking-widest">
         {title}
@@ -224,7 +225,7 @@ export function PrintFooter({
   })
 
   return (
-    <div className="flex justify-between items-end mt-12 pt-4 border-t border-gray-200">
+    <div className="flex justify-between items-end mt-4 pt-2 border-t border-gray-200">
       {/* Left: System Generated Timestamp */}
       {showTimestamp && (
         <div className="text-[10px] text-gray-400">
