@@ -47,13 +47,7 @@ export function PatientCaseHistoryTabs({
   const [loading, setLoading] = React.useState(true)
   const [expandedCases, setExpandedCases] = React.useState<Set<string>>(new Set())
 
-  React.useEffect(() => {
-    if (patient) {
-      loadPatientCases()
-    }
-  }, [patient])
-
-  const loadPatientCases = async () => {
+  const loadPatientCases = React.useCallback(async () => {
     setLoading(true)
     try {
       const response = await casesApi.list({
@@ -81,7 +75,15 @@ export function PatientCaseHistoryTabs({
     } finally {
       setLoading(false)
     }
-  }
+  }, [patient.id, toast])
+
+  React.useEffect(() => {
+    if (patient) {
+      loadPatientCases()
+    }
+  }, [patient, loadPatientCases])
+
+
 
   const toggleCaseExpansion = (caseId: string) => {
     setExpandedCases(prev => {

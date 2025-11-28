@@ -9,7 +9,7 @@ import { calculateAge } from "@/lib/utils"
 interface DischargePrintProps {
   discharge: {
     id: string
-    discharge_no: string
+    discharge_no?: string
     discharge_date: string
     patient_name: string
     patient_id?: string
@@ -179,7 +179,7 @@ export function DischargePrint({ discharge, children }: DischargePrintProps) {
     <PrintModalShell
       isOpen={isOpen}
       onClose={() => setIsOpen(false)}
-      title={`Discharge_${discharge.discharge_no}`}
+      title={discharge.discharge_no ? `Discharge_${discharge.discharge_no}` : 'Discharge_Summary'}
     >
       {/* Header & Branding */}
       <PrintHeader />

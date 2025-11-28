@@ -4,10 +4,11 @@ import * as React from "react"
 import { useForm, useFieldArray } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { Plus, Trash2 } from "lucide-react"
+import { Plus, Trash2, Package, Eye as EyeIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { SearchableSelect } from "@/components/ui/searchable-select"
-import { patientsApi, casesApi } from "@/lib/services/api"
+import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
+import { patientsApi, casesApi, pharmacyApi, opticalPlanApi } from "@/lib/services/api"
+import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import {
   Dialog,
@@ -71,10 +72,14 @@ function calculateInvoiceTotals(
 }
 
 const invoiceItemSchema = z.object({
-  service: z.string().min(1, "Service is required"),
+  service: z.string().min(1, "Service/Item is required"),
   description: z.string().optional(),
   quantity: z.string().min(1, "Quantity is required"),
   rate: z.string().min(1, "Rate is required"),
+  // Inventory item fields (optional)
+  item_type: z.enum(['pharmacy', 'optical', 'service']).optional(),
+  item_id: z.string().optional(),
+  item_sku: z.string().optional(),
 })
 
 const invoiceFormSchema = z.object({
@@ -149,8 +154,11 @@ export function InvoiceForm({ children, invoiceData, mode = "add", onFormSubmitA
   const [open, setOpen] = React.useState(false)
   const [patients, setPatients] = React.useState<Array<{ value: string; label: string }>>([])
   const [patientCases, setPatientCases] = React.useState<Array<{ value: string; label: string }>>([])
+  const [pharmacyItems, setPharmacyItems] = React.useState<SearchableSelectOption[]>([])
+  const [opticalItems, setOpticalItems] = React.useState<SearchableSelectOption[]>([])
   const [loadingPatients, setLoadingPatients] = React.useState(false)
   const [loadingCases, setLoadingCases] = React.useState(false)
+  const [loadingInventory, setLoadingInventory] = React.useState(false)
   const [submitting, setSubmitting] = React.useState(false)
 
   const form = useForm<z.infer<typeof invoiceFormSchema>>({
@@ -161,7 +169,7 @@ export function InvoiceForm({ children, invoiceData, mode = "add", onFormSubmitA
       invoice_date: new Date().toISOString().split("T")[0],
       due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
       status: "Draft",
-      items: [{ service: "", description: "", quantity: "1", rate: "" }],
+      items: [{ service: "", description: "", quantity: "1", rate: "", item_type: undefined, item_id: undefined, item_sku: undefined }],
       discount_percent: "0",
       tax_percent: "0",
       amount_paid: "0",
@@ -227,6 +235,53 @@ export function InvoiceForm({ children, invoiceData, mode = "add", onFormSubmitA
       })
       .finally(() => {
         if (!cancelled) setLoadingPatients(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [open, toast])
+
+  // Load inventory items when dialog opens
+  React.useEffect(() => {
+    if (!open) return
+
+    let cancelled = false
+    setLoadingInventory(true)
+
+    Promise.all([
+      pharmacyApi.list({ limit: 1000 }),
+      opticalPlanApi.list({ limit: 1000 })
+    ])
+      .then(([pharmacyResponse, opticalResponse]) => {
+        if (cancelled) return
+
+        if (pharmacyResponse.success && pharmacyResponse.data) {
+          setPharmacyItems(
+            pharmacyResponse.data.map(item => ({
+              value: item.id,
+              label: `${item.name} (Stock: ${item.stock_quantity}) - ₹${item.mrp.toFixed(2)}`,
+              data: item
+            }))
+          )
+        }
+
+        if (opticalResponse.success && opticalResponse.data) {
+          setOpticalItems(
+            opticalResponse.data.map(item => ({
+              value: item.id,
+              label: `${item.name} (Stock: ${item.stock_quantity}) - ₹${item.mrp.toFixed(2)}`,
+              data: item
+            }))
+          )
+        }
+      })
+      .catch(error => {
+        if (cancelled) return
+        console.error("Error loading inventory items:", error)
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingInventory(false)
       })
 
     return () => {
@@ -351,7 +406,7 @@ export function InvoiceForm({ children, invoiceData, mode = "add", onFormSubmitA
       setPatients([])
       setPatientCases([])
     }
-  }, [open])
+  }, [open, form])
 
   const onSubmit = async (values: z.infer<typeof invoiceFormSchema>) => {
     setSubmitting(true)
@@ -378,6 +433,10 @@ export function InvoiceForm({ children, invoiceData, mode = "add", onFormSubmitA
           quantity: parseFloat(item.quantity),
           rate: parseFloat(item.rate),
           amount: parseFloat(item.quantity) * parseFloat(item.rate),
+          // Include inventory item fields if present
+          item_type: item.item_type,
+          item_id: item.item_id,
+          item_sku: item.item_sku,
         })),
       }
 
@@ -537,26 +596,122 @@ export function InvoiceForm({ children, invoiceData, mode = "add", onFormSubmitA
                   const qty = parseFloat(form.watch(`items.${index}.quantity`)) || 0
                   const rate = parseFloat(form.watch(`items.${index}.rate`)) || 0
                   const amount = qty * rate
+                  const itemType = form.watch(`items.${index}.item_type`)
+                  const itemId = form.watch(`items.${index}.item_id`)
+                  
+                  // Get selected item details
+                  const selectedPharmacyItem = itemType === 'pharmacy' && itemId
+                    ? pharmacyItems.find(i => i.value === itemId)?.data
+                    : null
+                  const selectedOpticalItem = itemType === 'optical' && itemId
+                    ? opticalItems.find(i => i.value === itemId)?.data
+                    : null
+                  const selectedItem = selectedPharmacyItem || selectedOpticalItem
+                  const availableStock = selectedItem?.stock_quantity || 0
+                  const isLowStock = selectedItem && availableStock <= (selectedItem.reorder_level || 0)
 
                   return (
                     <div key={field.id} className="border-b border-gray-100 flex gap-4 items-center px-4 hover:bg-gray-50/50">
-                      <div className="flex-1 py-2">
-                        <FormField
-                          control={form.control}
-                          name={`items.${index}.service`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Input
-                                  placeholder="Service name"
-                                  className="border-transparent focus:border-indigo-500 focus:ring-0 bg-transparent h-10 text-sm px-0"
-                                  {...field}
-                                />
-                              </FormControl>
-                              <FormMessage className="text-xs" />
-                            </FormItem>
+                      <div className="flex-1 py-2 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <FormField
+                            control={form.control}
+                            name={`items.${index}.item_type`}
+                            render={({ field: typeField }) => (
+                              <FormItem className="w-24">
+                                <FormControl>
+                                  <Select
+                                    value={typeField.value || 'service'}
+                                    onValueChange={(value) => {
+                                      typeField.onChange(value === 'service' ? undefined : value)
+                                      // Reset item selection when type changes
+                                      form.setValue(`items.${index}.item_id`, undefined)
+                                      form.setValue(`items.${index}.item_sku`, undefined)
+                                      form.setValue(`items.${index}.service`, '')
+                                      form.setValue(`items.${index}.rate`, '')
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-8 text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="service">Service</SelectItem>
+                                      <SelectItem value="pharmacy">Pharmacy</SelectItem>
+                                      <SelectItem value="optical">Optical</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                          {itemType && itemType !== 'service' ? (
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.item_id`}
+                              render={({ field: itemField }) => (
+                                <FormItem className="flex-1">
+                                  <FormControl>
+                                    <SearchableSelect
+                                      options={itemType === 'pharmacy' ? pharmacyItems : opticalItems}
+                                      value={itemField.value || ''}
+                                      onValueChange={(value) => {
+                                        itemField.onChange(value)
+                                        const selected = (itemType === 'pharmacy' ? pharmacyItems : opticalItems)
+                                          .find(i => i.value === value)
+                                        if (selected?.data) {
+                                          form.setValue(`items.${index}.service`, selected.data.name)
+                                          form.setValue(`items.${index}.item_sku`, selected.data.sku || selected.data.batch_number || undefined)
+                                          // Auto-populate rate from selling_price or mrp
+                                          const price = selected.data.selling_price || selected.data.mrp || selected.data.unit_price || 0
+                                          form.setValue(`items.${index}.rate`, price.toString())
+                                        }
+                                      }}
+                                      placeholder={loadingInventory ? "Loading..." : `Search ${itemType} items...`}
+                                      searchPlaceholder={`Search ${itemType} items...`}
+                                      disabled={loadingInventory}
+                                    />
+                                  </FormControl>
+                                  <FormMessage className="text-xs" />
+                                </FormItem>
+                              )}
+                            />
+                          ) : (
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.service`}
+                              render={({ field }) => (
+                                <FormItem className="flex-1">
+                                  <FormControl>
+                                    <Input
+                                      placeholder="Service name"
+                                      className="border-transparent focus:border-indigo-500 focus:ring-0 bg-transparent h-8 text-sm px-0"
+                                      {...field}
+                                    />
+                                  </FormControl>
+                                  <FormMessage className="text-xs" />
+                                </FormItem>
+                              )}
+                            />
                           )}
-                        />
+                        </div>
+                        {selectedItem && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <Badge variant={isLowStock ? "destructive" : "secondary"} className="text-xs">
+                              Stock: {availableStock}
+                            </Badge>
+                            {itemType === 'pharmacy' && selectedPharmacyItem?.batch_number && (
+                              <span className="text-gray-500">Batch: {selectedPharmacyItem.batch_number}</span>
+                            )}
+                            {itemType === 'optical' && selectedOpticalItem?.sku && (
+                              <span className="text-gray-500">SKU: {selectedOpticalItem.sku}</span>
+                            )}
+                            {qty > availableStock && (
+                              <Badge variant="destructive" className="text-xs">
+                                Insufficient Stock
+                              </Badge>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <div className="w-20 py-2">
                         <FormField

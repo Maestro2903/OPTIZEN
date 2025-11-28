@@ -1092,24 +1092,54 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
 
   // Transform caseData treatments to medicines format for edit mode
   React.useEffect(() => {
-    if (mode === "edit" && caseData && caseData.treatments && Array.isArray(caseData.treatments)) {
-      // Transform treatments array to medicines format
-      const transformedMedicines = caseData.treatments.map((treatment: any) => ({
-        drug_name: treatment.drug_id,  // Map drug_id to drug_name (both are UUIDs)
-        eye: treatment.eye,
-        dosage: treatment.dosage_id,   // Map dosage_id to dosage (both are UUIDs)
-        route: treatment.route_id,     // Map route_id to route (both are UUIDs)
-        duration: treatment.duration,
-        quantity: treatment.quantity
-      }))
-      // Set medicines field with transformed data
-      form.setValue('medicines', transformedMedicines)
+    if (open && mode === "edit" && caseData && caseData.treatments && Array.isArray(caseData.treatments) && caseData.treatments.length > 0) {
+      // Filter out treatments with missing drug_id and transform to medicines format
+      const transformedMedicines = caseData.treatments
+        .filter((treatment: any) => treatment.drug_id && treatment.drug_id.trim() !== '')
+        .map((treatment: any) => ({
+          drug_name: treatment.drug_id,  // Map drug_id to drug_name (both are UUIDs)
+          eye: treatment.eye || undefined,
+          dosage: treatment.dosage_id || undefined,   // Map dosage_id to dosage (both are UUIDs)
+          route: treatment.route_id || undefined,     // Map route_id to route (both are UUIDs)
+          duration: treatment.duration || undefined,
+          quantity: treatment.quantity || undefined
+        }))
+      
+      // Only set medicines if we have valid transformed data
+      if (transformedMedicines.length > 0) {
+        form.setValue('medicines', transformedMedicines)
+      }
+    } else if (open && mode === "edit" && (!caseData?.treatments || (Array.isArray(caseData.treatments) && caseData.treatments.length === 0))) {
+      // Clear medicines if there are no treatments
+      form.setValue('medicines', [])
     }
-  }, [mode, caseData, form])
+  }, [open, mode, caseData, form])
+
+  // Transform caseData surgeries to surgeries format for edit mode
+  React.useEffect(() => {
+    if (open && mode === "edit" && caseData && caseData.examination_data?.surgeries && Array.isArray(caseData.examination_data.surgeries) && caseData.examination_data.surgeries.length > 0) {
+      // Filter out surgeries with missing surgery_name and transform to surgeries format
+      const transformedSurgeries = caseData.examination_data.surgeries
+        .filter((surgery: any) => surgery.surgery_name && surgery.surgery_name.trim() !== '')
+        .map((surgery: any) => ({
+          eye: surgery.eye || undefined,
+          surgery_name: surgery.surgery_name, // Can be UUID or string
+          anesthesia: surgery.anesthesia || undefined
+        }))
+      
+      // Only set surgeries if we have valid transformed data
+      if (transformedSurgeries.length > 0) {
+        form.setValue('surgeries', transformedSurgeries)
+      }
+    } else if (open && mode === "edit" && (!caseData?.examination_data?.surgeries || (Array.isArray(caseData.examination_data?.surgeries) && caseData.examination_data.surgeries.length === 0))) {
+      // Clear surgeries if there are no surgeries
+      form.setValue('surgeries', [])
+    }
+  }, [open, mode, caseData, form])
 
   // Extract IOP, SAC test values, and diagrams from examination_data for edit mode
   React.useEffect(() => {
-    if (mode === "edit" && caseData && caseData.examination_data) {
+    if (open && mode === "edit" && caseData && caseData.examination_data) {
       const examData = caseData.examination_data
       
       // Extract IOP values
@@ -1147,7 +1177,7 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
         }
       }
     }
-  }, [mode, caseData, form])
+  }, [open, mode, caseData, form])
 
   // Coordinate no_complaints_flag with complaints array
   const noComplaintsFlag = form.watch("no_complaints_flag");
@@ -1325,23 +1355,34 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
         })) || [],
         
         // Transform complaints array - using new hierarchical structure
-        complaints: values.complaints?.map((c: any) => ({
-          complaintId: c.complaintId, // UUID from grouped dropdown
-          categoryId: c.categoryId || null, // Category UUID from grouped dropdown
-          eye: c.eye || undefined, // UUID from eye dropdown
-          duration: c.duration || undefined,
-          notes: c.notes || undefined
-        })) || [],
+        // Filter out empty complaints before transforming
+        complaints: (values.complaints && Array.isArray(values.complaints))
+          ? values.complaints
+              .filter((c: any) => c.complaintId && c.complaintId.trim() !== '')
+              .map((c: any) => ({
+                complaintId: c.complaintId, // UUID from grouped dropdown
+                categoryId: c.categoryId || null, // Category UUID from grouped dropdown
+                eye: c.eye || undefined, // UUID from eye dropdown
+                duration: c.duration || undefined,
+                notes: c.notes || undefined
+              }))
+          : [],
         
         // Transform medicines (advice) array - values are already UUIDs
-        treatments: values.medicines?.map((m: any) => ({
-          drug_id: m.drug_name, // Already a UUID from dropdown
-          dosage_id: m.dosage || undefined, // Already a UUID from dropdown
-          route_id: m.route || undefined, // Already a UUID from dropdown
-          eye: m.eye || undefined, // Already a UUID from dropdown
-          duration: m.duration || undefined,
-          quantity: m.quantity || undefined
-        })) || [],
+        // Filter out empty medicines before transforming to treatments
+        // Always send treatments array (even if empty) so API can properly save/update
+        treatments: (values.medicines && Array.isArray(values.medicines))
+          ? values.medicines
+              .filter((m: any) => m.drug_name && m.drug_name.trim() !== '')
+              .map((m: any) => ({
+                drug_id: m.drug_name, // Already a UUID from dropdown
+                dosage_id: m.dosage || undefined, // Already a UUID from dropdown
+                route_id: m.route || undefined, // Already a UUID from dropdown
+                eye: m.eye || undefined, // Already a UUID from dropdown
+                duration: m.duration || undefined,
+                quantity: m.quantity || undefined
+              }))
+          : [],
         
         // Transform vision data
         vision_data: {
@@ -1469,11 +1510,15 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
               left: values.sac_test_left || undefined
             } : undefined
           },
-          surgeries: values.surgeries?.map((s: any) => ({
-            eye: s.eye, // Already a UUID from dropdown
-            surgery_name: s.surgery_name, // Already a UUID from dropdown
-            anesthesia: s.anesthesia
-          })) || [],
+          surgeries: (values.surgeries && Array.isArray(values.surgeries))
+            ? values.surgeries
+                .filter((s: any) => s.surgery_name && s.surgery_name.trim() !== '')
+                .map((s: any) => ({
+                  eye: s.eye || undefined, // Already a UUID from dropdown
+                  surgery_name: s.surgery_name, // Already a UUID from dropdown
+                  anesthesia: s.anesthesia || undefined
+                }))
+            : [],
           diagrams: {
             right: values.right_eye_diagram || undefined,
             left: values.left_eye_diagram || undefined
@@ -1481,19 +1526,18 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
         },
         
         // Diagnostic tests - combine manual tests with structured diagnostic_tests
-        diagnostic_tests: [
-          // Include structured diagnostic tests from the form
-          ...(values.diagnostic_tests?.map((t: any) => ({
-            test_id: t.test_id, // UUID from dropdown
-            eye: t.eye || undefined,
-            type: t.type || undefined,
-            problem: t.problem || undefined,
-            notes: t.notes || undefined
-          })) || []),
-          // Note: IOP and SAC tests should be added via the diagnostic_tests form
-          // The fields iop_right, iop_left, and sac_test are deprecated
-          // Remove the backward compatibility code that was adding invalid test_id strings
-        ],
+        // Filter out empty diagnostic tests before transforming
+        diagnostic_tests: (values.diagnostic_tests && Array.isArray(values.diagnostic_tests))
+          ? values.diagnostic_tests
+              .filter((t: any) => t.test_id && t.test_id.trim() !== '')
+              .map((t: any) => ({
+                test_id: t.test_id, // UUID from dropdown
+                eye: t.eye || undefined,
+                type: t.type || undefined,
+                problem: t.problem || undefined,
+                notes: t.notes || undefined
+              }))
+          : [],
         
         // Diagnosis (array of strings or UUIDs depending on how diagnosis dropdown is set up)
         diagnosis: values.diagnosis || [],
@@ -2229,15 +2273,26 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                             e => e.value === (field as any).eye
                           )
                           
+                          // Helper to check if value is UUID
+                          const isUUID = (val: string | undefined | null): boolean => {
+                            if (!val || typeof val !== 'string') return false
+                            return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)
+                          }
+                          
+                          // Get complaint name - never show UUID
+                          const complaintName = complaint?.name || ((field as any).complaintId && !isUUID((field as any).complaintId) ? (field as any).complaintId : 'N/A')
+                          // Get eye label - never show UUID
+                          const eyeLabel = eyeOption?.label || ((field as any).eye && !isUUID((field as any).eye) ? (field as any).eye : 'N/A')
+                          
                           return (
                         <div key={field.id} className="bg-gray-50 border border-gray-100 rounded-lg p-3 mb-3 flex items-end gap-4">
                           <div className="flex-1">
                             <div className="text-xs text-gray-600 mb-1">Complaint</div>
-                            <div className="text-sm font-medium">{complaint?.name || (field as any).complaintId}</div>
+                            <div className="text-sm font-medium">{complaintName}</div>
                           </div>
                           <div className="flex-1">
                             <div className="text-xs text-gray-600 mb-1">Eye</div>
-                            <div className="text-sm">{eyeOption?.label || (field as any).eye || '-'}</div>
+                            <div className="text-sm">{eyeLabel}</div>
                           </div>
                           <div className="flex-1">
                             <div className="text-xs text-gray-600 mb-1">Duration</div>
@@ -3285,10 +3340,21 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                               e => e.value === (field as any).eye
                             )
                             
+                            // Helper to check if value is UUID
+                            const isUUID = (val: string | undefined | null): boolean => {
+                              if (!val || typeof val !== 'string') return false
+                              return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)
+                            }
+                            
+                            // Get test label - never show UUID
+                            const testLabel = test?.label || ((field as any).test_id && !isUUID((field as any).test_id) ? (field as any).test_id : 'N/A')
+                            // Get eye label - never show UUID
+                            const eyeLabel = eyeOption?.label || ((field as any).eye && !isUUID((field as any).eye) ? (field as any).eye : 'N/A')
+                            
                             return (
                               <tr key={field.id} className="border-b">
-                                <td className="p-3 text-sm">{test?.label || (field as any).test_id}</td>
-                                <td className="p-3 text-sm">{eyeOption?.label || (field as any).eye || '-'}</td>
+                                <td className="p-3 text-sm">{testLabel}</td>
+                                <td className="p-3 text-sm">{eyeLabel}</td>
                                 <td className="p-3 text-sm">{(field as any).type || '-'}</td>
                                 <td className="p-3 text-sm">{(field as any).problem || '-'}</td>
                                 <td className="p-3 text-sm">{(field as any).notes || '-'}</td>
@@ -3474,19 +3540,30 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                     ) : (
                       <div className="space-y-2">
                         {medicineAdviceFields.map((field, index) => {
+                          // Helper to check if value is UUID
+                          const isUUID = (val: string | undefined | null): boolean => {
+                            if (!val || typeof val !== 'string') return false
+                            return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)
+                          }
+                          
                           const drug = masterData.data.medicines?.find(m => m.value === (field as any).drug_name)
                           const eye = masterData.data.eyeSelection?.find(e => e.value === (field as any).eye)
                           const dosage = masterData.data.dosages?.find(d => d.value === (field as any).dosage)
                           const route = masterData.data.routes?.find(r => r.value === (field as any).route)
                           
+                          // Get drug name - never show UUID
+                          const drugName = drug?.label || ((field as any).drug_name && !isUUID((field as any).drug_name) ? (field as any).drug_name : "N/A")
+                          // Get eye label - never show UUID
+                          const eyeLabel = eye?.label || ((field as any).eye && !isUUID((field as any).eye) ? (field as any).eye : 'N/A')
+                          
                           return (
                             <div key={field.id} className="bg-white border border-gray-200 rounded-lg p-3 mb-2 shadow-sm flex justify-between items-center">
                               <div className="flex-1">
                                 <div className="font-semibold text-gray-900 mb-1">
-                                  {drug?.label || (field as any).drug_name || "Unnamed Drug"}
+                                  {drugName}
                                 </div>
                                 <div className="text-xs text-gray-500 space-x-2">
-                                  <span>{eye?.label || (field as any).eye}</span>
+                                  <span>{eyeLabel}</span>
                                   {dosage?.label && <span>• {dosage.label}</span>}
                                   {route?.label && <span>• {route.label}</span>}
                                   {(field as any).duration && <span>• {(field as any).duration} days</span>}
@@ -3588,17 +3665,28 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
                   ) : (
                     <div className="space-y-2">
                       {surgeryFields.map((field, index) => {
+                        // Helper to check if value is UUID
+                        const isUUID = (val: string | undefined | null): boolean => {
+                          if (!val || typeof val !== 'string') return false
+                          return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)
+                        }
+                        
                         const eye = masterData.data.eyeSelection?.find(e => e.value === (field as any).eye)
                         const surgery = masterData.data.surgeries?.find(s => s.value === (field as any).surgery_name)
+                        
+                        // Get surgery name - never show UUID
+                        const surgeryName = surgery?.label || ((field as any).surgery_name && !isUUID((field as any).surgery_name) ? (field as any).surgery_name : "N/A")
+                        // Get eye label - never show UUID
+                        const eyeLabel = eye?.label || ((field as any).eye && !isUUID((field as any).eye) ? (field as any).eye : 'N/A')
                         
                         return (
                           <div key={field.id} className="bg-white border border-gray-200 rounded-lg p-3 mb-2 shadow-sm flex justify-between items-center">
                             <div className="flex-1">
                               <div className="font-semibold text-gray-900 mb-1">
-                                {surgery?.label || (field as any).surgery_name || "Unnamed Surgery"}
+                                {surgeryName}
                               </div>
                               <div className="text-xs text-gray-500 space-x-2">
-                                <span>{eye?.label || (field as any).eye}</span>
+                                <span>{eyeLabel}</span>
                                 {(field as any).anesthesia && <span>• {(field as any).anesthesia}</span>}
                               </div>
                             </div>

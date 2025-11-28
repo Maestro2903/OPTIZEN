@@ -42,34 +42,7 @@ export function DuplicatePatientDetector({
   const [hasChecked, setHasChecked] = React.useState(false)
   const hasAutoConfirmedRef = React.useRef(false)
 
-  React.useEffect(() => {
-    if (isOpen) {
-      setHasChecked(false)
-      hasAutoConfirmedRef.current = false
-      // Clear previous duplicates
-      setPossibleDuplicates([])
-      
-      // Only run duplicate check if we have sufficient data
-      if (mobile || fullName) {
-        checkForDuplicates()
-      } else {
-        // No data to check - proceed immediately
-        setHasChecked(true)
-        setLoading(false)
-      }
-    }
-  }, [isOpen, mobile, fullName])
-  
-  // Reset auto-confirm flag when dialog closes
-  React.useEffect(() => {
-    if (!isOpen) {
-      hasAutoConfirmedRef.current = false
-      setHasChecked(false)
-      setPossibleDuplicates([])
-    }
-  }, [isOpen])
-
-  const checkForDuplicates = async () => {
+  const checkForDuplicates = React.useCallback(async () => {
     setLoading(true)
     try {
       // Extract digits only from mobile for search (phone inputs might have formatting)
@@ -116,7 +89,36 @@ export function DuplicatePatientDetector({
     } finally {
       setLoading(false)
     }
-  }
+  }, [mobile, fullName])
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setHasChecked(false)
+      hasAutoConfirmedRef.current = false
+      // Clear previous duplicates
+      setPossibleDuplicates([])
+      
+      // Only run duplicate check if we have sufficient data
+      if (mobile || fullName) {
+        checkForDuplicates()
+      } else {
+        // No data to check - proceed immediately
+        setHasChecked(true)
+        setLoading(false)
+      }
+    }
+  }, [isOpen, mobile, fullName, checkForDuplicates])
+  
+  // Reset auto-confirm flag when dialog closes
+  React.useEffect(() => {
+    if (!isOpen) {
+      hasAutoConfirmedRef.current = false
+      setHasChecked(false)
+      setPossibleDuplicates([])
+    }
+  }, [isOpen])
+
+
 
   const calculateAge = (dob: string | undefined): string => {
     if (!dob) return "N/A"

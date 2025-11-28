@@ -89,7 +89,7 @@ export function AttendancePrint({ attendance, children }: AttendancePrintProps) 
           <PrintSection title="Attendance Information">
             <PrintRow>
               <PrintCol>
-                <PrintField label="Record ID" value={attendance.id} />
+                {/* Record ID removed - UUIDs should not be displayed to users */}
                 <PrintField label="Date" value={formatDate(attendance.date)} />
                 <PrintField label="Status" value={getStatusDisplay(attendance.status)} uppercase />
               </PrintCol>

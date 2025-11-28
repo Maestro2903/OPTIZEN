@@ -17,6 +17,8 @@ const pathToPageName: Record<string, string> = {
   "/": "Overview",
   "/patients": "Patients",
   "/cases": "Cases",
+  "/medical-records": "Medical Records",
+  "/old-patient-records": "Old Patient Records",
   "/billing": "Billing & Invoices",
   "/documents": "Documents",
   "/certificates": "Certificates",

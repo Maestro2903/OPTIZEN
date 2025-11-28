@@ -265,7 +265,6 @@ export default function OperationsPage() {
   const handleOperationPrintClick = React.useCallback((operation: Operation) => {
     const operationForPrint: OperationPrintData = {
       id: operation.id,
-      operation_no: operation.id.substring(0, 8).toUpperCase(),
       patient_name: operation.patients?.full_name || "Unknown Patient",
       patient_id: operation.patients?.patient_id || operation.patient_id,
       case_id: operation.case_id,

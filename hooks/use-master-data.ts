@@ -152,16 +152,33 @@ export function useMasterData() {
   })
   const [loading, setLoading] = React.useState<Partial<Record<CategoryKey, boolean>>>({})
   const [errors, setErrors] = React.useState<Partial<Record<CategoryKey, string>>>({})
+  // Track which categories have been attempted to prevent infinite retry loops
+  const attemptedCategoriesRef = React.useRef<Set<CategoryKey>>(new Set())
 
   const fetchCategory = React.useCallback(async (category: CategoryKey) => {
+    // Prevent fetching if already loading or if we have data (unless explicitly refreshing)
+    const isCurrentlyLoading = loading[category]
+    const hasData = data[category].length > 0
+    
+    // Skip if already loading to prevent duplicate requests
+    if (isCurrentlyLoading) {
+      return
+    }
+
     const apiCategory = CATEGORY_MAP[category]
+    if (!apiCategory) {
+      console.error(`No API category mapping found for: ${category}`)
+      return
+    }
+
     setLoading(prev => ({ ...prev, [category]: true }))
     setErrors(prev => ({ ...prev, [category]: undefined }))
 
     try {
       const response = await fetch(`/api/master-data?category=${apiCategory}&limit=1000`)
       if (!response.ok) {
-        throw new Error(`Failed to fetch ${category}`)
+        const errorText = await response.text().catch(() => 'Unknown error')
+        throw new Error(`Failed to fetch ${category}: ${response.status} ${errorText}`)
       }
 
       const result = await response.json()
@@ -185,23 +202,44 @@ export function useMasterData() {
         })
 
         setData(prev => ({ ...prev, [category]: options }))
+        // Mark as successfully attempted
+        attemptedCategoriesRef.current.add(category)
       }
     } catch (error: any) {
       console.error(`Error fetching ${category}:`, error)
-      setErrors(prev => ({ ...prev, [category]: error.message }))
-      toastRef.current({
-        title: `Failed to load ${category}`,
-        description: error.message || "Please try again",
-        variant: "destructive",
-      })
+      const errorMessage = error.message || "Please try again"
+      setErrors(prev => ({ ...prev, [category]: errorMessage }))
+      
+      // Only show toast if this is the first attempt or if it's a critical error
+      // This prevents toast spam from retry loops
+      if (!attemptedCategoriesRef.current.has(category)) {
+        toastRef.current({
+          title: `Failed to load ${category}`,
+          description: errorMessage,
+          variant: "destructive",
+        })
+        attemptedCategoriesRef.current.add(category)
+      }
     } finally {
       setLoading(prev => ({ ...prev, [category]: false }))
     }
-  }, []) // No dependencies - stable function
+  }, [loading, data]) // Include loading and data to check current state
 
   const fetchMultiple = React.useCallback(async (categories: CategoryKey[]) => {
-    await Promise.all(categories.map(category => fetchCategory(category)))
-  }, [fetchCategory])
+    // Filter out categories that are already loaded or currently loading
+    const categoriesToFetch = categories.filter(category => {
+      const isCurrentlyLoading = loading[category]
+      const hasData = data[category].length > 0
+      return !isCurrentlyLoading && !hasData
+    })
+
+    if (categoriesToFetch.length === 0) {
+      return // All categories already loaded or loading
+    }
+
+    // Fetch only categories that need loading
+    await Promise.all(categoriesToFetch.map(category => fetchCategory(category)))
+  }, [fetchCategory, loading, data])
 
   const refresh = React.useCallback(async (category?: CategoryKey) => {
     if (category) {

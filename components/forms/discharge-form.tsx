@@ -165,7 +165,7 @@ export function DischargeForm({ children, dischargeData, mode = "add", onSuccess
         variant: "destructive",
       });
     }
-  }, [medicationResult.warning]);
+  }, [medicationResult.warning, toast]);
 
   const form = useForm<z.infer<typeof dischargeFormSchema>>({
     resolver: zodResolver(dischargeFormSchema),

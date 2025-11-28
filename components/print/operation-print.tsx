@@ -158,7 +158,7 @@ export function OperationPrint({ operation, children, open, onOpenChange }: Oper
     <PrintModalShell
       isOpen={isOpen}
       onClose={handleClose}
-      title={`Operation_${operation.operation_no || operation.id}`}
+      title={operation.operation_no ? `Operation_${operation.operation_no}` : 'Operation_Summary'}
     >
       <div className="text-xs">
         <PrintHeader compact={true} />

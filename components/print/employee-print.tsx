@@ -91,7 +91,7 @@ export function EmployeePrint({ employee, children }: EmployeePrintProps) {
           <PrintSection title="Employee Information">
             <PrintRow>
               <PrintCol>
-                <PrintField label="Employee ID" value={employee.employee_id || employee.id} uppercase />
+                <PrintField label="Employee ID" value={employee.employee_id || 'N/A'} uppercase />
                 <PrintField label="Full Name" value={employee.full_name} uppercase />
                 <PrintField label="Status" value={getStatusDisplay(employee.status)} uppercase />
               </PrintCol>

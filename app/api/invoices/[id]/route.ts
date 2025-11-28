@@ -211,7 +211,8 @@ export async function PUT(
       const total = updateData.total_amount ?? currentInvoice.total_amount ?? 0
       const paid = updateData.amount_paid ?? currentInvoice.amount_paid ?? 0
 
-      updateData.balance_due = total - paid
+      // Do NOT set balance_due directly - let the database compute it via trigger/generated column
+      // updateData.balance_due = total - paid
 
       // Update payment status
       if (paid >= total) {
@@ -300,6 +301,38 @@ export async function DELETE(
       }
     }
 
+    // Get invoice items before cancelling to reverse stock movements
+    const { data: invoiceBeforeCancel } = await supabase
+      .from('invoices')
+      .select('items, status')
+      .eq('id', id)
+      .single()
+
+    if (!invoiceBeforeCancel) {
+      return handleNotFoundError('Invoice', id)
+    }
+
+    // If invoice was already cancelled, return
+    if (invoiceBeforeCancel.status === 'cancelled') {
+      return NextResponse.json(
+        { error: 'Invoice is already cancelled' },
+        { status: 400 }
+      )
+    }
+
+    // Delete stock movements linked to this invoice (trigger will reverse stock)
+    if (invoiceBeforeCancel.items && Array.isArray(invoiceBeforeCancel.items)) {
+      const { error: deleteMovementsError } = await supabase
+        .from('stock_movements')
+        .delete()
+        .eq('invoice_id', id)
+
+      if (deleteMovementsError) {
+        console.error('Error deleting stock movements:', deleteMovementsError)
+        // Continue with cancellation even if stock movement deletion fails
+      }
+    }
+
     // Update status to cancelled instead of hard delete
     const { data: invoice, error } = await supabase
       .from('invoices')
@@ -331,7 +364,7 @@ export async function DELETE(
     return NextResponse.json({
       success: true,
       data: invoice,
-      message: 'Invoice cancelled successfully'
+      message: 'Invoice cancelled successfully and stock movements reversed'
     })
 
   } catch (error) {

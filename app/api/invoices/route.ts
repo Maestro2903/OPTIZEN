@@ -186,6 +186,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Validate each invoice item has required fields
+    const invalidItems = items.filter((item: any) => 
+      !item.service || item.quantity === undefined || item.quantity === null || item.quantity === '' || !item.rate || item.rate === undefined || item.rate === null || item.rate === ''
+    )
+
+    if (invalidItems.length > 0) {
+      return NextResponse.json(
+        { error: 'Invalid invoice items: each item must have service, quantity, and rate' },
+        { status: 400 }
+      )
+    }
+
     // Verify patient exists
     const { data: patient, error: patientError } = await supabase
       .from('patients')
@@ -206,6 +218,86 @@ export async function POST(request: NextRequest) {
       payment_status = 'paid'
     } else if (amount_paid > 0) {
       payment_status = 'partial'
+    }
+
+    // Validate stock availability for inventory items and prepare stock movements
+    const stockMovements: any[] = []
+    const inventoryItems: any[] = []
+
+    for (const item of items) {
+      // Check if this is an inventory item (pharmacy or optical)
+      if (item.item_type && item.item_id && (item.item_type === 'pharmacy' || item.item_type === 'optical')) {
+        const itemQuantity = item.quantity || 1
+
+        // Validate stock availability
+        const { data: stockAvailable, error: stockError } = await supabase
+          .rpc('validate_stock_availability', {
+            p_item_type: item.item_type,
+            p_item_id: item.item_id,
+            p_quantity: itemQuantity
+          })
+
+        if (stockError) {
+          return NextResponse.json(
+            { error: `Error validating stock for ${item.service || item.description || 'item'}: ${stockError.message}` },
+            { status: 400 }
+          )
+        }
+
+        if (!stockAvailable) {
+          // Get current stock for error message
+          const tableName = item.item_type === 'pharmacy' ? 'pharmacy_items' : 'optical_items'
+          const { data: inventoryItem } = await supabase
+            .from(tableName)
+            .select('stock_quantity, name')
+            .eq('id', item.item_id)
+            .single()
+
+          return NextResponse.json(
+            {
+              error: `Insufficient stock for ${item.service || item.description || inventoryItem?.name || 'item'}. Available: ${inventoryItem?.stock_quantity || 0}, Requested: ${itemQuantity}`,
+              item_name: item.service || item.description || inventoryItem?.name,
+              available_stock: inventoryItem?.stock_quantity || 0,
+              requested_quantity: itemQuantity
+            },
+            { status: 400 }
+          )
+        }
+
+        // Get item details for stock movement
+        const tableName = item.item_type === 'pharmacy' ? 'pharmacy_items' : 'optical_items'
+        const { data: inventoryItem } = await supabase
+          .from(tableName)
+          .select('name, stock_quantity, unit_price, selling_price, mrp, sku')
+          .eq('id', item.item_id)
+          .single()
+
+        if (inventoryItem) {
+          inventoryItems.push({
+            ...item,
+            item_name: inventoryItem.name,
+            item_sku: inventoryItem.sku || null,
+            current_stock: inventoryItem.stock_quantity
+          })
+
+          // Prepare stock movement (will be created after invoice is created)
+          const { data: { user } } = await supabase.auth.getUser()
+          stockMovements.push({
+            movement_date: invoice_date,
+            movement_type: 'sale',
+            item_type: item.item_type,
+            item_id: item.item_id,
+            item_name: inventoryItem.name,
+            quantity: itemQuantity,
+            unit_price: item.unit_price || inventoryItem.selling_price || inventoryItem.mrp || inventoryItem.unit_price,
+            total_value: (item.unit_price || inventoryItem.selling_price || inventoryItem.mrp || 0) * itemQuantity,
+            invoice_id: null, // Will be set after invoice creation
+            user_id: user?.id || null,
+            customer_name: null, // Will be populated with patient name
+            notes: `Sale via invoice ${invoice_number}`
+          })
+        }
+      }
     }
 
     // Create invoice with items stored as JSONB
@@ -234,6 +326,36 @@ export async function POST(request: NextRequest) {
 
     if (invoiceError) {
       return handleDatabaseError(invoiceError, 'create', 'invoice')
+    }
+
+    // Get patient name for stock movements
+    const { data: patientData } = await supabase
+      .from('patients')
+      .select('full_name')
+      .eq('id', patient_id)
+      .single()
+
+    const customerName = patientData?.full_name || null
+
+    // Create stock movements for inventory items
+    if (stockMovements.length > 0) {
+      // Update stock movements with invoice_id and customer_name
+      const movementsToInsert = stockMovements.map(movement => ({
+        ...movement,
+        invoice_id: invoice.id,
+        customer_name: customerName
+      }))
+
+      const { error: movementsError } = await supabase
+        .from('stock_movements')
+        .insert(movementsToInsert)
+
+      if (movementsError) {
+        // If stock movement creation fails, we should ideally rollback the invoice
+        // For now, log the error and continue (stock movements can be created manually)
+        console.error('Error creating stock movements:', movementsError)
+        // Note: In production, you might want to delete the invoice here or use a transaction
+      }
     }
 
     // Return invoice with patient info

@@ -106,7 +106,7 @@ async function resetPasswords() {
 
   for (const user of testUsers) {
     try {
-      const existingUser = usersData.users.find(u => u.email === user.email)
+      const existingUser = usersData?.users?.find((u: any) => u.email === user.email)
 
       if (!existingUser) {
         console.log(`⚠️  User ${user.email} not found, skipping...`)

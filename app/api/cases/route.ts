@@ -688,10 +688,18 @@ export async function POST(request: NextRequest) {
       insertData.examination_data = validatedData.examination_data
     }
 
+    if (validatedData.past_medications && Array.isArray(validatedData.past_medications) && validatedData.past_medications.length > 0) {
+      insertData.past_medications = validatedData.past_medications
+    }
+
+    if (validatedData.past_history_medicines && Array.isArray(validatedData.past_history_medicines) && validatedData.past_history_medicines.length > 0) {
+      insertData.past_history_medicines = validatedData.past_history_medicines
+    }
+
     // Add any other fields that were passed but not explicitly handled
-    const { complaints, treatments, diagnostic_tests, vision_data, examination_data, ...rest } = body
+    const { complaints, treatments, diagnostic_tests, vision_data, examination_data, past_medications, past_history_medicines, ...rest } = body
     Object.keys(rest).forEach(key => {
-      if (!insertData.hasOwnProperty(key) && key !== 'complaints' && key !== 'treatments' && key !== 'diagnostic_tests' && key !== 'vision_data' && key !== 'examination_data') {
+      if (!insertData.hasOwnProperty(key) && key !== 'complaints' && key !== 'treatments' && key !== 'diagnostic_tests' && key !== 'vision_data' && key !== 'examination_data' && key !== 'past_medications' && key !== 'past_history_medicines') {
         insertData[key] = rest[key]
       }
     })

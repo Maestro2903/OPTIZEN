@@ -159,7 +159,7 @@ export async function GET(
       ...resolvedOperation,
       cases: resolvedOperation.encounters ? {
         ...resolvedOperation.encounters,
-        case_no: resolvedOperation.encounters.id ? `ENC-${resolvedOperation.encounters.id.substring(0, 8).toUpperCase()}` : undefined
+        case_no: resolvedOperation.encounters?.case_no || undefined
       } : resolvedOperation.cases || null
     }
 
@@ -323,7 +323,7 @@ export async function PUT(
       ...resolvedOperation,
       cases: resolvedOperation.encounters ? {
         ...resolvedOperation.encounters,
-        case_no: resolvedOperation.encounters.id ? `ENC-${resolvedOperation.encounters.id.substring(0, 8).toUpperCase()}` : undefined
+        case_no: resolvedOperation.encounters?.case_no || undefined
       } : resolvedOperation.cases || null
     }
 

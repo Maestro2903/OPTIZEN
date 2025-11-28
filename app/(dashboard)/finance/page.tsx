@@ -16,8 +16,6 @@ import {
   Printer,
   ArrowUpRight,
   ArrowDownRight,
-  Calendar,
-  Filter,
   ChevronRight,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -245,14 +243,35 @@ export default function FinancePage() {
     }
   }, [toast])
 
+  // Track if master data has been loaded to prevent infinite loops
+  const masterDataLoadedRef = React.useRef(false)
+
   // Load dashboard and master data when tab is active
   React.useEffect(() => {
     if (activeTab === "dashboard") {
       loadDashboardData()
     }
-    // Load master data for finance forms
-    masterData.fetchMultiple(['expenseCategories', 'paymentMethods'])
-  }, [activeTab, loadDashboardData])
+    // Load master data for finance forms only once
+    if (!masterDataLoadedRef.current) {
+      // Only fetch if data is empty to avoid redundant requests
+      const needsExpenseCategories = masterData.data.expenseCategories.length === 0
+      const needsPaymentMethods = masterData.data.paymentMethods.length === 0
+      
+      if (needsExpenseCategories || needsPaymentMethods) {
+        const categoriesToLoad: Array<'expenseCategories' | 'paymentMethods'> = []
+        if (needsExpenseCategories) categoriesToLoad.push('expenseCategories')
+        if (needsPaymentMethods) categoriesToLoad.push('paymentMethods')
+        
+        if (categoriesToLoad.length > 0) {
+          masterData.fetchMultiple(categoriesToLoad).catch((error) => {
+            console.error('Error loading master data:', error)
+            // Don't show toast here as fetchCategory already handles it
+          })
+        }
+      }
+      masterDataLoadedRef.current = true
+    }
+  }, [activeTab, loadDashboardData, masterData.fetchMultiple, masterData.data.expenseCategories.length, masterData.data.paymentMethods.length])
 
   // Revenue search with debouncing
   React.useEffect(() => {

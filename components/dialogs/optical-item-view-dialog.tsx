@@ -11,8 +11,10 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
+import { Button } from "@/components/ui/button"
 import { OpticalItem } from "@/lib/services/api"
-import { AlertTriangle, DollarSign, Building2, Hash, FileText, Eye, Package } from "lucide-react"
+import { AlertTriangle, DollarSign, Building2, Hash, FileText, Eye, Package, History } from "lucide-react"
+import { StockHistoryDialog } from "./stock-history-dialog"
 
 interface OpticalItemViewDialogProps {
   item: OpticalItem
@@ -280,6 +282,21 @@ export function OpticalItemViewDialog({ item, children }: OpticalItemViewDialogP
             <div>
               <p>Last Updated: {new Date(item.updated_at).toLocaleString('en-GB')}</p>
             </div>
+          </div>
+
+          {/* Stock History Button */}
+          <Separator />
+          <div className="flex justify-end">
+            <StockHistoryDialog
+              itemType="optical"
+              itemId={item.id}
+              itemName={item.name}
+            >
+              <Button variant="outline" className="gap-2">
+                <History className="h-4 w-4" />
+                View Stock History
+              </Button>
+            </StockHistoryDialog>
           </div>
         </div>
       </DialogContent>

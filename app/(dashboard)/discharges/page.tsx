@@ -66,7 +66,7 @@ export default function DischargesPage() {
     }
 
     fetchDischarges()
-  }, [])
+  }, [toast])
 
   // Function to refresh discharge list
   const refreshDischarges = async () => {
@@ -391,7 +391,6 @@ export default function DischargesPage() {
                               <DischargePrint
                                 discharge={{
                                   id: discharge.id,
-                                  discharge_no: discharge.id.slice(0, 8).toUpperCase(),
                                   discharge_date: discharge.discharge_date,
                                   patient_name: discharge.patients?.full_name || 'N/A',
                                   patient_id: discharge.patients?.patient_id,

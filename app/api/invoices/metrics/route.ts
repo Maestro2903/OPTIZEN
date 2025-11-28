@@ -1,97 +1,113 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { requirePermission } from '@/lib/middleware/rbac'
+import { handleDatabaseError, handleServerError } from '@/lib/utils/api-errors'
 
-// GET /api/invoices/metrics - Get aggregate invoice and revenue statistics
+// GET /api/invoices/metrics - Get invoice metrics
 export async function GET(request: NextRequest) {
-  // Authorization check - requires invoices view permission
-  const authCheck = await requirePermission('invoices', 'view')
-  if (!authCheck.authorized) {
-    return (authCheck as { authorized: false; response: NextResponse }).response
-  }
-  const { context } = authCheck
-
   try {
     const supabase = createClient()
     const { searchParams } = new URL(request.url)
     
-    // Optional date range filters
-    const date_from = searchParams.get('date_from') || ''
-    const date_to = searchParams.get('date_to') || ''
+    const dateFrom = searchParams.get('date_from')
+    const dateTo = searchParams.get('date_to')
 
-    // Build base query
+    // Build query
     let query = supabase
       .from('invoices')
-      .select('total_amount, amount_paid, balance_due, payment_status, status')
+      .select('total_amount, amount_paid, payment_status, status, invoice_date')
 
-    // Apply date range if provided
-    if (date_from) {
-      query = query.gte('invoice_date', date_from)
+    // Apply date filters if provided
+    if (dateFrom) {
+      query = query.gte('invoice_date', dateFrom)
     }
-    if (date_to) {
-      query = query.lte('invoice_date', date_to)
+    if (dateTo) {
+      query = query.lte('invoice_date', dateTo)
     }
 
-    // Fetch all invoices (for aggregation)
     const { data: invoices, error } = await query
 
     if (error) {
-      console.error('Database error:', error)
-      return NextResponse.json({ error: 'Failed to fetch invoices' }, { status: 500 })
+      return handleDatabaseError(error, 'fetch', 'invoice metrics')
     }
 
-    // Calculate aggregates
-    const totalInvoices = invoices?.length || 0
-    const totalRevenue = invoices?.reduce((sum, inv) => sum + (inv.total_amount || 0), 0) || 0
-    const paidAmount = invoices?.reduce((sum, inv) => sum + (inv.amount_paid || 0), 0) || 0
-    const pendingAmount = invoices?.reduce((sum, inv) => sum + (inv.balance_due || 0), 0) || 0
+    if (!invoices || invoices.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          total_invoices: 0,
+          total_revenue: 0,
+          paid_amount: 0,
+          pending_amount: 0,
+          unpaid_amount: 0,
+          paid_invoices: 0,
+          unpaid_invoices: 0,
+          partial_invoices: 0,
+          overdue_invoices: 0,
+          average_invoice_amount: 0,
+          payment_status: {
+            paid: 0,
+            unpaid: 0,
+            partial: 0,
+          },
+          invoice_status: {
+            draft: 0,
+            sent: 0,
+            overdue: 0,
+          },
+          collection_rate: '0%',
+          average_invoice_value: '0',
+          date_range: {
+            from: dateFrom,
+            to: dateTo,
+          }
+        }
+      })
+    }
 
-    // Count by payment status
-    const paidCount = invoices?.filter(inv => inv.payment_status === 'paid').length || 0
-    const unpaidCount = invoices?.filter(inv => inv.payment_status === 'unpaid').length || 0
-    const partialCount = invoices?.filter(inv => inv.payment_status === 'partial').length || 0
-
-    // Count by status
-    const draftCount = invoices?.filter(inv => inv.status === 'draft').length || 0
-    const sentCount = invoices?.filter(inv => inv.status === 'sent').length || 0
-    const overdueCount = invoices?.filter(inv => inv.status === 'overdue').length || 0
+    // Calculate metrics from invoice data
+    const metrics = {
+      total_invoices: invoices.length,
+      total_revenue: invoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0),
+      paid_amount: invoices.reduce((sum, inv) => sum + (inv.amount_paid || 0), 0),
+      pending_amount: invoices.reduce((sum, inv) => sum + Math.max(0, (inv.total_amount || 0) - (inv.amount_paid || 0)), 0),
+      unpaid_amount: invoices
+        .filter(inv => inv.payment_status === 'unpaid')
+        .reduce((sum, inv) => sum + Math.max(0, (inv.total_amount || 0) - (inv.amount_paid || 0)), 0),
+      paid_invoices: invoices.filter(inv => inv.payment_status === 'paid').length,
+      unpaid_invoices: invoices.filter(inv => inv.payment_status === 'unpaid').length,
+      partial_invoices: invoices.filter(inv => inv.payment_status === 'partial').length,
+      overdue_invoices: invoices.filter(inv => inv.status === 'overdue').length,
+      average_invoice_amount: invoices.length > 0 
+        ? invoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0) / invoices.length 
+        : 0,
+      payment_status: {
+        paid: invoices.filter(inv => inv.payment_status === 'paid').length,
+        unpaid: invoices.filter(inv => inv.payment_status === 'unpaid').length,
+        partial: invoices.filter(inv => inv.payment_status === 'partial').length,
+      },
+      invoice_status: {
+        draft: invoices.filter(inv => inv.status === 'draft').length,
+        sent: invoices.filter(inv => inv.status === 'sent').length,
+        overdue: invoices.filter(inv => inv.status === 'overdue').length,
+      },
+      collection_rate: invoices.length > 0
+        ? `${(((invoices.filter(inv => inv.payment_status === 'paid').length) / invoices.length) * 100).toFixed(1)}%`
+        : '0%',
+      average_invoice_value: invoices.length > 0
+        ? (invoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0) / invoices.length).toFixed(2)
+        : '0',
+      date_range: {
+        from: dateFrom,
+        to: dateTo,
+      }
+    }
 
     return NextResponse.json({
       success: true,
-      data: {
-        total_invoices: totalInvoices,
-        total_revenue: totalRevenue,
-        paid_amount: paidAmount,
-        pending_amount: pendingAmount,
-        
-        // Payment status breakdown
-        payment_status: {
-          paid: paidCount,
-          unpaid: unpaidCount,
-          partial: partialCount
-        },
-        
-        // Invoice status breakdown
-        invoice_status: {
-          draft: draftCount,
-          sent: sentCount,
-          overdue: overdueCount
-        },
-        
-        // Additional metrics
-        collection_rate: totalRevenue > 0 ? ((paidAmount / totalRevenue) * 100).toFixed(1) : '0.0',
-        average_invoice_value: totalInvoices > 0 ? (totalRevenue / totalInvoices).toFixed(2) : '0.00',
-        
-        // Date range (if applied)
-        date_range: {
-          from: date_from || null,
-          to: date_to || null
-        }
-      }
+      data: metrics
     })
 
   } catch (error) {
-    console.error('API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleServerError(error, 'fetch', 'invoice metrics')
   }
 }

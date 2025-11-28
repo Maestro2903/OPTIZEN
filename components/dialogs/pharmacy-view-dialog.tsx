@@ -11,8 +11,10 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
+import { Button } from "@/components/ui/button"
 import { PharmacyItem } from "@/lib/services/api"
-import { Package, Calendar, AlertTriangle, DollarSign, Building2, Hash, FileText, Pill } from "lucide-react"
+import { Package, Calendar, AlertTriangle, DollarSign, Building2, Hash, FileText, Pill, History } from "lucide-react"
+import { StockHistoryDialog } from "./stock-history-dialog"
 
 interface PharmacyViewDialogProps {
   item: PharmacyItem
@@ -255,6 +257,21 @@ export function PharmacyViewDialog({ item, children }: PharmacyViewDialogProps) 
             <div>
               <p>Last Updated: {new Date(item.updated_at).toLocaleString('en-GB')}</p>
             </div>
+          </div>
+
+          {/* Stock History Button */}
+          <Separator />
+          <div className="flex justify-end">
+            <StockHistoryDialog
+              itemType="pharmacy"
+              itemId={item.id}
+              itemName={item.name}
+            >
+              <Button variant="outline" className="gap-2">
+                <History className="h-4 w-4" />
+                View Stock History
+              </Button>
+            </StockHistoryDialog>
           </div>
         </div>
       </DialogContent>

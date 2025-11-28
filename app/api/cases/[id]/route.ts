@@ -499,15 +499,15 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Authorization check
+  const authCheck = await requirePermission('cases', 'view')
+  if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
+
   try {
     const supabase = createClient()
     const { id } = await params
-
-    // Check authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
 
     // Fetch case with patient information
     const { data: encounter, error } = await supabase
@@ -606,20 +606,21 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Authorization check
+  const authCheck = await requirePermission('cases', 'edit')
+  if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
+  const { context } = authCheck
+
   try {
     const supabase = createClient()
     const { id } = await params
 
-    // Check authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Authorization check - fetch case first (only fields needed for authorization)
+    // Fetch case first to check ownership (optional - can be removed if all authenticated users should be able to edit)
     const { data: existingCase, error: fetchError } = await supabase
       .from('encounters')
-      .select('created_by')
+      .select('created_by, provider_id')
       .eq('id', id)
       .single()
 
@@ -631,14 +632,17 @@ export async function PUT(
       return NextResponse.json({ error: 'Failed to fetch case' }, { status: 500 })
     }
 
-    // Check authorization - user must own the case or have appropriate role
-    // TODO: Also check for admin role or assigned doctor role
-    if (existingCase.created_by !== session.user.id) {
-      return NextResponse.json({ 
-        error: 'Forbidden: You do not have permission to update this case' 
-      }, { status: 403 })
-    }
-    // For now, any authenticated user can update cases
+    // Optional: Check ownership - user must own the case, be the provider, or be an admin
+    // This is optional since requirePermission already checks RBAC permissions
+    // Uncomment if you want additional ownership checks:
+    // const isOwner = existingCase.created_by === context.user_id
+    // const isProvider = existingCase.provider_id === context.user_id
+    // const isAdminUser = isAdmin(context.role)
+    // if (!isOwner && !isProvider && !isAdminUser) {
+    //   return NextResponse.json({ 
+    //     error: 'Forbidden: You do not have permission to update this case' 
+    //   }, { status: 403 })
+    // }
 
     let body
     try {
@@ -664,7 +668,9 @@ export async function PUT(
       'treatments',
       'diagnostic_tests',
       'vision_data',
-      'examination_data'
+      'examination_data',
+      'past_medications',
+      'past_history_medicines'
     ]
 
     const updateData: Record<string, any> = {}
@@ -707,6 +713,14 @@ export async function PUT(
 
     if (updateData.examination_data !== undefined && (typeof updateData.examination_data !== 'object' || Array.isArray(updateData.examination_data))) {
       return NextResponse.json({ error: 'examination_data must be an object' }, { status: 400 })
+    }
+
+    if (updateData.past_medications !== undefined && !Array.isArray(updateData.past_medications)) {
+      return NextResponse.json({ error: 'past_medications must be an array' }, { status: 400 })
+    }
+
+    if (updateData.past_history_medicines !== undefined && !Array.isArray(updateData.past_history_medicines)) {
+      return NextResponse.json({ error: 'past_history_medicines must be an array' }, { status: 400 })
     }
 
     // Add updated_at timestamp

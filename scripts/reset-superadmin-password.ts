@@ -51,7 +51,7 @@ async function resetSuperAdminPassword() {
       process.exit(1)
     }
 
-    const user = users.users.find(u => u.email === email)
+    const user = users?.users?.find((u: any) => u.email === email)
 
     if (!user) {
       console.error(`❌ User with email ${email} not found`)

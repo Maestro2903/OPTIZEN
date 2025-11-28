@@ -37,6 +37,7 @@ export function CaseViewDialog({ children, caseData }: CaseViewDialogProps) {
         'medicines',
         'visualAcuity',
         'bloodTests',
+        'dosages', // For resolving medication types
       ]
       
       categoriesToLoad.forEach(category => {
@@ -59,10 +60,12 @@ export function CaseViewDialog({ children, caseData }: CaseViewDialogProps) {
   }
 
   // Helper to resolve UUID from master data category
+  // NEVER return UUID - always return human-readable label or 'N/A'
   const resolveUUID = (uuid: string | undefined | null, category: keyof typeof masterData.data): string => {
     if (!uuid || !isUUID(uuid)) return uuid || 'N/A'
     const option = masterData.data[category].find(opt => opt.value === uuid)
-    return option?.label || uuid
+    // NEVER return UUID - return label or 'N/A' if not found
+    return option?.label || 'N/A'
   }
 
   // Helper to resolve diagnosis (can be string, array, or null)
@@ -80,11 +83,13 @@ export function CaseViewDialog({ children, caseData }: CaseViewDialogProps) {
   }
 
   // Helper to resolve medicine name (UUID or string)
+  // NEVER return UUID - always return human-readable name or 'N/A'
   const resolveMedicineName = (medicineId: string | undefined | null): string => {
     if (!medicineId) return 'N/A'
     if (isUUID(medicineId)) {
       return resolveUUID(medicineId, 'medicines')
     }
+    // If it's not a UUID, it should be a readable name, but check just in case
     return medicineId
   }
 
@@ -106,7 +111,17 @@ export function CaseViewDialog({ children, caseData }: CaseViewDialogProps) {
     return test
   }
 
+  // Helper to resolve dosage UUID
+  const resolveDosage = (dosageId: string | undefined | null): string => {
+    if (!dosageId) return 'N/A'
+    if (isUUID(dosageId)) {
+      return resolveUUID(dosageId, 'dosages')
+    }
+    return dosageId
+  }
+
   // Helper to safely access nested data and resolve UUIDs
+  // NEVER return UUID - always return human-readable value or 'N/A'
   const getNestedValue = (obj: any, path: string, defaultValue: string = 'N/A', resolveAsUUID?: keyof typeof masterData.data): string => {
     if (!obj) return defaultValue
     const keys = path.split('.')
@@ -116,8 +131,13 @@ export function CaseViewDialog({ children, caseData }: CaseViewDialogProps) {
       current = current[key]
     }
     const value = current !== null && current !== undefined ? String(current) : defaultValue
+    // If value is a UUID and we have a resolver, use it
     if (resolveAsUUID && isUUID(value)) {
       return resolveUUID(value, resolveAsUUID)
+    }
+    // If value looks like a UUID but no resolver, return 'N/A' instead of UUID
+    if (isUUID(value)) {
+      return 'N/A'
     }
     return value
   }
@@ -306,7 +326,28 @@ export function CaseViewDialog({ children, caseData }: CaseViewDialogProps) {
                 <CardContent className="space-y-3 text-sm">
                   {caseData.past_medical_history ? (
                     <div>
-                      <p className="text-foreground">{caseData.past_medical_history}</p>
+                      {/* Check if past_medical_history contains UUIDs and remove them */}
+                      <p className="text-foreground">
+                        {(() => {
+                          const history = caseData.past_medical_history
+                          // If it's a string, check if it contains UUIDs
+                          if (typeof history === 'string') {
+                            // Check if the entire string is a UUID
+                            if (isUUID(history.trim())) {
+                              return 'N/A'
+                            }
+                            // Check if it contains UUID patterns and remove them
+                            const uuidPattern = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
+                            if (uuidPattern.test(history)) {
+                              // Remove UUIDs and clean up extra spaces
+                              const cleaned = history.replace(uuidPattern, '').replace(/\s+/g, ' ').trim()
+                              return cleaned || 'N/A'
+                            }
+                            return history
+                          }
+                          return String(history)
+                        })()}
+                      </p>
                     </div>
                   ) : (
                     <p className="text-muted-foreground">No past medical history recorded</p>
@@ -333,13 +374,15 @@ export function CaseViewDialog({ children, caseData }: CaseViewDialogProps) {
                             {med.type && (
                               <div>
                                 <p className="text-muted-foreground text-xs">Type</p>
-                                <p className="font-medium">{med.type}</p>
+                                <p className="font-medium">
+                                  {resolveDosage(med.type)}
+                                </p>
                               </div>
                             )}
                             {med.eye && (
                               <div>
                                 <p className="text-muted-foreground text-xs">Eye</p>
-                                <p className="font-medium">{med.eye}</p>
+                                <p className="font-medium">{getEyeLabel(med.eye)}</p>
                               </div>
                             )}
                             {med.advice && (
@@ -384,7 +427,9 @@ export function CaseViewDialog({ children, caseData }: CaseViewDialogProps) {
                             )}
                             <div>
                               <p className="text-muted-foreground text-xs">Complaint</p>
-                              <p className="font-medium">{complaint.complaint_name || complaint.complaintId || 'N/A'}</p>
+                              <p className="font-medium">
+                                {complaint.complaint_name || (complaint.complaintId && !isUUID(complaint.complaintId) ? complaint.complaintId : 'N/A')}
+                              </p>
                             </div>
                             {complaint.eye_name && (
                               <div>
@@ -745,7 +790,9 @@ export function CaseViewDialog({ children, caseData }: CaseViewDialogProps) {
                           <div className="grid grid-cols-2 gap-3">
                             <div>
                               <p className="text-muted-foreground text-xs">Test</p>
-                              <p className="font-medium">{test.test_name || test.test_id || 'N/A'}</p>
+                              <p className="font-medium">
+                                {test.test_name || (test.test_id && !isUUID(test.test_id) ? test.test_id : 'N/A')}
+                              </p>
                             </div>
                             {test.eye_name && (
                               <div>
@@ -817,7 +864,9 @@ export function CaseViewDialog({ children, caseData }: CaseViewDialogProps) {
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <p className="text-muted-foreground text-xs">Medication</p>
-                              <p className="font-medium">{treatment.drug_name || treatment.drug_id || 'Unknown'}</p>
+                              <p className="font-medium">
+                                {treatment.drug_name || resolveMedicineName(treatment.drug_id) || 'N/A'}
+                              </p>
                             </div>
                             <div>
                               <p className="text-muted-foreground text-xs">Eye</p>

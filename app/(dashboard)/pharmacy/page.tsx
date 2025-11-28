@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Search, Pill, Eye, Edit, Trash2, Printer, AlertTriangle, Calendar, Snowflake } from "lucide-react"
+import { Search, Pill, Eye, Edit, Trash2, Printer, AlertTriangle, Calendar, Snowflake, PackagePlus, History } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -18,6 +18,8 @@ import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
 import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
 import { PharmacyPrint } from "@/components/print/pharmacy-print"
 import { PharmacyViewDialog } from "@/components/dialogs/pharmacy-view-dialog"
+import { StockAdjustmentForm } from "@/components/forms/stock-adjustment-form"
+import { StockHistoryDialog } from "@/components/dialogs/stock-history-dialog"
 import { useApiList, useApiForm, useApiDelete } from "@/lib/hooks/useApi"
 import { pharmacyApi, type PharmacyItem, type PharmacyFilters, type PharmacyMetrics } from "@/lib/services/api"
 import { useToast } from "@/hooks/use-toast"
@@ -817,6 +819,29 @@ export default function PharmacyPage() {
                                 <Eye className="h-4 w-4" />
                               </Button>
                             </PharmacyViewDialog>
+                            <StockHistoryDialog
+                              itemType="pharmacy"
+                              itemId={item.id}
+                              itemName={item.name}
+                            >
+                              <Button variant="ghost" size="icon" className="h-8 w-8" title="View stock history">
+                                <History className="h-4 w-4" />
+                              </Button>
+                            </StockHistoryDialog>
+                            <StockAdjustmentForm
+                              itemType="pharmacy"
+                              itemId={item.id}
+                              itemName={item.name}
+                              currentStock={item.stock_quantity}
+                              onSuccess={() => {
+                                refresh()
+                                fetchMetrics()
+                              }}
+                            >
+                              <Button variant="ghost" size="icon" className="h-8 w-8" title="Adjust stock">
+                                <PackagePlus className="h-4 w-4" />
+                              </Button>
+                            </StockAdjustmentForm>
                             <Button
                               variant="ghost"
                               size="icon"

@@ -21,6 +21,7 @@ export { MasterDataForm } from "./forms/master-data-form"
 export { OperationForm } from "./forms/operation-form"
 export { OpticalItemForm } from "./forms/optical-item-form"
 export { PharmacyItemForm } from "./forms/pharmacy-item-form"
+export { StockAdjustmentForm } from "./forms/stock-adjustment-form"
 
 // Dialogs
 export { AppointmentReassignDialog } from "./dialogs/appointment-reassign-dialog"
@@ -35,6 +36,7 @@ export { PatientDetailModal } from "./dialogs/patient-detail-modal"
 export { PatientFormDialog } from "./dialogs/patient-form-dialog"
 export { OpticalItemViewDialog } from "./dialogs/optical-item-view-dialog"
 export { PharmacyViewDialog } from "./dialogs/pharmacy-view-dialog"
+export { StockHistoryDialog } from "./dialogs/stock-history-dialog"
 export { ViewEditDialog } from "./dialogs/view-edit-dialog"
 
 // Print Components

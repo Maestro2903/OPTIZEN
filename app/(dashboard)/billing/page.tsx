@@ -224,14 +224,26 @@ export default function BillingPage() {
     try {
       // Map form status to API status format
       const statusMapping: Record<string, string> = {
+        'draft': 'draft',
         'Draft': 'draft',
+        'sent': 'sent',
+        'Sent': 'sent',
+        'Pending': 'sent',
+        'pending': 'sent',
+        'paid': 'paid',
         'Paid': 'paid',
-        'Pending': 'sent'
+        'overdue': 'overdue',
+        'Overdue': 'overdue',
+        'cancelled': 'cancelled',
+        'Cancelled': 'cancelled',
       }
+      
+      const normalizedStatus = values.status?.trim() || ''
+      const mappedStatus = statusMapping[normalizedStatus] || 'draft'
       
       const updateData = {
         ...values,
-        status: statusMapping[values.status] || values.status?.toLowerCase() || 'draft',
+        status: mappedStatus,
         // Ensure numeric fields are properly formatted
         subtotal: typeof values.subtotal === 'number' ? values.subtotal : parseFloat(values.subtotal || 0),
         discount_amount: typeof values.discount_amount === 'number' ? values.discount_amount : parseFloat(values.discount_amount || 0),
@@ -562,20 +574,22 @@ export default function BillingPage() {
                           >
                             <CheckCircle className="h-4 w-4" />
                           </Button>
-                          <DeleteConfirmDialog
-                            title="Delete Invoice"
-                            description={`Are you sure you want to delete invoice ${invoice.invoice_number}? This action cannot be undone.`}
-                            onConfirm={() => handleDeleteInvoice(invoice.id)}
-                          >
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-9 w-9 rounded-lg text-red-500 hover:bg-red-50 hover:text-red-600"
-                              title="Delete invoice"
+                          {invoice.status !== 'cancelled' && (
+                            <DeleteConfirmDialog
+                              title="Delete Invoice"
+                              description={`Are you sure you want to delete invoice ${invoice.invoice_number}? This action cannot be undone.`}
+                              onConfirm={() => handleDeleteInvoice(invoice.id)}
                             >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </DeleteConfirmDialog>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-9 w-9 rounded-lg text-red-500 hover:bg-red-50 hover:text-red-600"
+                                title="Delete invoice"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </DeleteConfirmDialog>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

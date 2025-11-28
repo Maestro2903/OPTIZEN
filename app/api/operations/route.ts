@@ -232,7 +232,7 @@ export async function GET(request: NextRequest) {
       ...op,
       cases: op.encounters ? {
         ...op.encounters,
-        case_no: op.encounters.id ? `ENC-${op.encounters.id.substring(0, 8).toUpperCase()}` : undefined
+        case_no: op.encounters?.case_no || undefined
       } : op.cases || null
     }))
 
@@ -383,7 +383,7 @@ export async function POST(request: NextRequest) {
       ...resolvedOperation,
       cases: resolvedOperation.encounters ? {
         ...resolvedOperation.encounters,
-        case_no: resolvedOperation.encounters.id ? `ENC-${resolvedOperation.encounters.id.substring(0, 8).toUpperCase()}` : undefined
+        case_no: resolvedOperation.encounters?.case_no || undefined
       } : resolvedOperation.cases || null
     }
 

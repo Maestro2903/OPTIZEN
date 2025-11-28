@@ -262,12 +262,13 @@ export function PatientDetailModal({
           /* Read-Only View */
           <div className="space-y-6 p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Patient ID - Full Width */}
+              {/* Patient MRN - Full Width */}
               <div className="md:col-span-2">
                 <div className="bg-slate-50 border border-slate-200 rounded-lg p-1">
                   <div className="flex items-center gap-2 px-2 py-1">
-                    <p className="font-mono font-medium text-indigo-600 tracking-wider text-sm">
-                      {patient.patient_id}
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Medical Record Number</p>
+                    <p className="font-mono font-medium text-indigo-600 tracking-wider text-sm ml-2">
+                      {patient.patient_id?.substring(0, 8).toUpperCase() || "N/A"}
                     </p>
                   </div>
                 </div>
@@ -359,27 +360,18 @@ export function PatientDetailModal({
             <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
               {/* Main Form Grid Layout */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Patient ID - Full Width */}
-                <FormField
-                  control={form.control}
-                  name="patient_id"
-                  render={({ field }) => (
-                    <FormItem className="md:col-span-2">
-                      <div className="bg-slate-50 border border-slate-200 rounded-lg p-1">
-                        <div className="flex items-center gap-2 px-2 py-1">
-                          <FormControl>
-                            <Input 
-                              {...field} 
-                              readOnly 
-                              className="font-mono font-medium text-indigo-600 tracking-wider bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0 h-auto"
-                            />
-                          </FormControl>
-                        </div>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {/* Patient MRN - Full Width (Hidden in form, but kept in state) */}
+                  <FormField
+                    control={form.control}
+                    name="patient_id"
+                    render={({ field }) => (
+                      <FormItem className="hidden">
+                        <FormControl>
+                          <Input {...field} type="hidden" />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
 
                 {/* Full Name - Full Width */}
                 <FormField

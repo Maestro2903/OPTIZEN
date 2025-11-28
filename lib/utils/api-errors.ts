@@ -267,12 +267,13 @@ export function handleNotFoundError(
   resource: string = 'Resource',
   id?: string
 ): NextResponse {
+  // Don't include ID in user-facing message to avoid showing UUIDs
   return createErrorResponse({
-    message: `${resource}${id ? ` with ID ${id}` : ''} not found`,
+    message: `${resource} not found`,
     statusCode: 404,
     errorCode: 'NOT_FOUND',
     hint: `The ${resource.toLowerCase()} you're looking for does not exist.`,
-    context: { resource, id }
+    context: { resource, id } // ID kept in context for logging but not shown to user
   })
 }
 

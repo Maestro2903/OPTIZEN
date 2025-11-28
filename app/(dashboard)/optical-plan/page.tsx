@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Search, Eye, Edit, Trash2, AlertTriangle, Eye as EyeIcon } from "lucide-react"
+import { Search, Eye, Edit, Trash2, AlertTriangle, Eye as EyeIcon, PackagePlus, History } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -17,7 +17,9 @@ import {
 import { ViewOptions, ViewOptionsConfig } from "@/components/ui/view-options"
 import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
 import { OpticalItemViewDialog } from "@/components/dialogs/optical-item-view-dialog"
+import { StockHistoryDialog } from "@/components/dialogs/stock-history-dialog"
 import { OpticalItemForm } from "@/components/forms/optical-item-form"
+import { StockAdjustmentForm } from "@/components/forms/stock-adjustment-form"
 import { useApiList, useApiForm, useApiDelete } from "@/lib/hooks/useApi"
 import { opticalPlanApi, type OpticalItem, type OpticalFilters, type OpticalMetrics } from "@/lib/services/api"
 import { useToast } from "@/hooks/use-toast"
@@ -489,6 +491,29 @@ export default function OpticalPlanPage() {
                                   <Eye className="h-4 w-4" />
                                 </Button>
                               </OpticalItemViewDialog>
+                              <StockHistoryDialog
+                                itemType="optical"
+                                itemId={item.id}
+                                itemName={item.name}
+                              >
+                                <Button variant="ghost" size="icon" className="h-8 w-8" title="View stock history">
+                                  <History className="h-4 w-4" />
+                                </Button>
+                              </StockHistoryDialog>
+                              <StockAdjustmentForm
+                                itemType="optical"
+                                itemId={item.id}
+                                itemName={item.name}
+                                currentStock={item.stock_quantity}
+                                onSuccess={() => {
+                                  refresh()
+                                  fetchMetrics()
+                                }}
+                              >
+                                <Button variant="ghost" size="icon" className="h-8 w-8" title="Adjust stock">
+                                  <PackagePlus className="h-4 w-4" />
+                                </Button>
+                              </StockAdjustmentForm>
                               <OpticalItemForm
                                 itemData={item}
                                 mode="edit"

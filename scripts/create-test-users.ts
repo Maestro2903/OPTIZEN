@@ -132,7 +132,7 @@ async function createTestUsers() {
         continue
       }
 
-      const existingUser = users.users.find(u => u.email === user.email)
+      const existingUser = users?.users?.find((u: any) => u.email === user.email)
 
       if (existingUser) {
         console.log(`⚠️  User ${user.email} already exists, skipping...`)

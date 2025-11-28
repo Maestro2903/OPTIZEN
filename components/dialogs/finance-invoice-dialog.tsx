@@ -122,7 +122,7 @@ export function FinanceInvoiceDialog({
       loadPatients()
       masterData.fetchMultiple(['revenueTypes', 'paymentMethods', 'paymentStatuses'])
     }
-  }, [open])
+  }, [open, masterData])
 
   const loadPatients = async () => {
     setLoadingPatients(true)

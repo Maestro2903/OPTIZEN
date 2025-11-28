@@ -47,9 +47,14 @@ class ApiService {
       const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
 
-      // Build headers object with Content-Type first
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
+      // Build headers object
+      const headers: Record<string, string> = {}
+
+      // Only set Content-Type for non-FormData requests
+      // FormData needs the browser to set Content-Type with boundary automatically
+      const isFormData = options.body instanceof FormData
+      if (!isFormData) {
+        headers['Content-Type'] = 'application/json'
       }
 
       // Only add Authorization header if token exists
@@ -58,14 +63,20 @@ class ApiService {
       }
 
       // Merge with custom headers from options (options.headers override defaults)
+      // Filter out undefined values to allow removing headers
+      const customHeaders = options.headers ? 
+        Object.fromEntries(
+          Object.entries(options.headers).filter(([_, v]) => v !== undefined)
+        ) : {}
+      
       const finalHeaders = {
         ...headers,
-        ...options.headers,
+        ...customHeaders,
       }
 
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
-        headers: finalHeaders,
         ...options,
+        headers: finalHeaders,
       })
 
       const data = await response.json()
@@ -172,6 +183,33 @@ export interface PatientFilters extends PaginationParams {
   state?: string | string[]
 }
 
+export interface PatientRecords {
+  patient: Patient | null
+  oldPatientId?: string
+  oldRecords?: OldPatientRecord[]
+  cases: Case[]
+  appointments: Appointment[]
+  invoices: Invoice[]
+  prescriptions: any[] // Prescription with items
+  certificates: Certificate[]
+  operations: Operation[]
+  discharges: Discharge[]
+  bedAssignments: any[] // BedAssignment with bed info
+  opticalOrders: any[] // OpticalOrder with frame info
+  summary: {
+    totalCases: number
+    totalAppointments: number
+    totalInvoices: number
+    totalPrescriptions: number
+    totalCertificates: number
+    totalOperations: number
+    totalDischarges: number
+    totalBedAssignments: number
+    totalOpticalOrders: number
+    totalOldRecords?: number
+  }
+}
+
 export const patientsApi = {
   list: (params: PatientFilters = {}) =>
     apiService.getList<Patient>('patients', params),
@@ -187,6 +225,9 @@ export const patientsApi = {
 
   delete: (id: string) =>
     apiService.delete<Patient>('patients', id),
+
+  getPatientRecords: (id: string) =>
+    apiService.fetchApi<PatientRecords>(`/patients/${id}/records`),
 }
 
 // ===============================
@@ -460,7 +501,7 @@ export interface Invoice {
   total_amount: number
   amount_paid: number
   balance_due: number
-  payment_status: 'paid' | 'partial' | 'unpaid'
+  payment_status: 'paid' | 'partial' | 'unpaid' | 'overdue'
   payment_method?: string
   notes?: string
   status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'
@@ -774,6 +815,57 @@ export const opticalPlanApi = {
   metrics: (): Promise<ApiResponse<OpticalMetrics>> => {
     return apiService.fetchApi<OpticalMetrics>('/optical-plan/metrics')
   },
+}
+
+// ===============================
+// STOCK MOVEMENTS API
+// ===============================
+
+export interface StockMovement {
+  id: string
+  movement_date: string
+  movement_type: 'purchase' | 'sale' | 'adjustment' | 'return' | 'expired' | 'damaged'
+  item_type: 'pharmacy' | 'optical'
+  item_id: string
+  item_name: string
+  quantity: number
+  unit_price: number | null
+  total_value: number | null
+  batch_number: string | null
+  reference_number: string | null
+  supplier: string | null
+  customer_name: string | null
+  invoice_id: string | null
+  user_id: string | null
+  notes: string | null
+  previous_stock: number | null
+  new_stock: number | null
+  created_at: string
+}
+
+export interface StockMovementFilters extends PaginationParams {
+  item_type?: 'pharmacy' | 'optical'
+  item_id?: string
+  movement_type?: 'purchase' | 'sale' | 'adjustment' | 'return' | 'expired' | 'damaged'
+  date_from?: string
+  date_to?: string
+}
+
+export const stockMovementsApi = {
+  list: (params: StockMovementFilters = {}) =>
+    apiService.getList<StockMovement>('stock-movements', params),
+
+  getById: (id: string) =>
+    apiService.getById<StockMovement>('stock-movements', id),
+
+  create: (data: Omit<StockMovement, 'id' | 'created_at' | 'previous_stock' | 'new_stock'>) =>
+    apiService.create<StockMovement>('stock-movements', data),
+
+  update: (id: string, data: Partial<StockMovement>) =>
+    apiService.update<StockMovement>('stock-movements', id, data),
+
+  delete: (id: string) =>
+    apiService.delete<StockMovement>('stock-movements', id),
 }
 
 // ===============================
@@ -1420,6 +1512,100 @@ export const financeRevenueApi = {
     const query = queryParams.toString() ? `?${queryParams.toString()}` : ''
     return apiService.fetchApi<FinanceRevenueMetrics>(`/finance-revenue/metrics${query}`)
   },
+}
+
+// ===============================
+// OLD PATIENT RECORDS API
+// ===============================
+
+export interface OldPatientRecordFile {
+  id: string
+  old_patient_record_id: string
+  file_name: string
+  file_path: string
+  file_size: number
+  file_type: string
+  file_url?: string // Signed URL for access
+  uploaded_by: string
+  created_at: string
+}
+
+export interface OldPatientRecord {
+  id: string
+  old_patient_id: string
+  patient_name?: string
+  uploaded_by: string
+  upload_date: string
+  notes?: string
+  old_patient_record_files?: OldPatientRecordFile[]
+  file_count?: number
+  created_at: string
+  updated_at: string
+}
+
+export interface OldPatientRecordFilters extends PaginationParams {
+  search?: string
+  old_patient_id?: string
+}
+
+export const oldPatientRecordsApi = {
+  list: (params: OldPatientRecordFilters = {}) =>
+    apiService.getList<OldPatientRecord>('old-patient-records', params),
+
+  getByOldId: (oldPatientId: string) =>
+    apiService.fetchApi<OldPatientRecord[]>(`/old-patient-records/${oldPatientId}`),
+
+  upload: async (data: {
+    old_patient_id: string
+    patient_name?: string
+    notes?: string
+    files: File[]
+  }): Promise<ApiResponse<OldPatientRecord>> => {
+    const formData = new FormData()
+    formData.append('old_patient_id', data.old_patient_id)
+    if (data.patient_name) {
+      formData.append('patient_name', data.patient_name)
+    }
+    if (data.notes) {
+      formData.append('notes', data.notes)
+    }
+    
+    // Append all files
+    data.files.forEach((file) => {
+      formData.append('files', file)
+    })
+
+    // FormData will be handled correctly by fetchApi (it won't set Content-Type)
+    return apiService.fetchApi<OldPatientRecord>('/old-patient-records', {
+      method: 'POST',
+      body: formData,
+    })
+  },
+
+  deleteRecord: (recordId: string) =>
+    apiService.fetchApi(`/old-patient-records/record/${recordId}`, {
+      method: 'DELETE',
+    }),
+
+  addFiles: async (recordId: string, files: File[]): Promise<ApiResponse<OldPatientRecord>> => {
+    const formData = new FormData()
+    
+    // Append all files
+    files.forEach((file) => {
+      formData.append('files', file)
+    })
+
+    return apiService.fetchApi<OldPatientRecord>(`/old-patient-records/record/${recordId}/files`, {
+      method: 'POST',
+      body: formData,
+    })
+  },
+
+  delete: (oldPatientId: string) =>
+    apiService.fetchApi<{ success: boolean; message: string }>(
+      `/old-patient-records/${oldPatientId}`,
+      { method: 'DELETE' }
+    ),
 }
 
 // ===============================

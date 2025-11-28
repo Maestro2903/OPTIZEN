@@ -74,7 +74,7 @@ export function BillingPrint({ billing, children }: BillingPrintProps) {
   const discountAmount = billing.discount_amount || 0
   const finalTotal = billing.total_amount || (calculatedSubtotal + taxAmount - discountAmount)
 
-  const invoiceTitle = `Invoice_${billing.invoice_no || billing.id}`
+  const invoiceTitle = `Invoice_${billing.invoice_no || 'N/A'}`
 
   const modalContent = (
     <PrintModalShell
@@ -97,7 +97,7 @@ export function BillingPrint({ billing, children }: BillingPrintProps) {
         <div className="flex justify-end mb-2">
           <div className="text-right space-y-0">
             <div className="text-base font-bold">
-              Invoice #{billing.invoice_no || billing.id}
+              Invoice #{billing.invoice_no || 'N/A'}
             </div>
             <div className="text-[11px] text-gray-700">
               Date: {formatDate(billing.date)}

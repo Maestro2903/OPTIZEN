@@ -19,6 +19,8 @@ import {
   CalendarClock,
   CalendarCheck,
   Eye,
+  FolderTree,
+  Upload,
 } from "lucide-react"
 import { Logo } from "@/components/shared/logo"
 import { cn } from "@/lib/utils"
@@ -69,6 +71,12 @@ const navigationGroups = [
         url: "/cases",
         icon: FolderOpen,
         requiredPermission: "cases" as const,
+      },
+      {
+        title: "Medical Records",
+        url: "/medical-records",
+        icon: FolderTree,
+        requiredPermission: "patients" as const,
       },
       {
         title: "Operations",
@@ -134,6 +142,12 @@ const navigationGroups = [
         url: "/employees",
         icon: UserCog,
         requiredPermission: "employees" as const,
+      },
+      {
+        title: "Old Patient Records",
+        url: "/old-patient-records",
+        icon: Upload,
+        requiredPermission: "patients" as const,
       },
     ],
   },

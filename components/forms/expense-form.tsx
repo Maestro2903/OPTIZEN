@@ -59,7 +59,7 @@ export function ExpenseForm({ children, expenseData, mode = "create" }: ExpenseF
     if (isOpen) {
       masterData.fetchMultiple(['expenseCategories', 'paymentMethods'])
     }
-  }, [isOpen])
+  }, [isOpen, masterData])
 
   const form = useForm<z.infer<typeof expenseSchema>>({
     resolver: zodResolver(expenseSchema),

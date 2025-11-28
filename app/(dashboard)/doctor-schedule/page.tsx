@@ -185,7 +185,7 @@ export default function DoctorSchedulePage() {
     }
     
     loadDoctors()
-  }, [isAdmin, toast])
+  }, [isAdmin, toast, selectedDoctorId])
 
   // Fetch schedule data
   const fetchSchedule = React.useCallback(async () => {

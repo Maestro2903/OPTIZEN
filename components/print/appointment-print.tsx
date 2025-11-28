@@ -95,13 +95,8 @@ export function AppointmentPrint({ appointment, children }: AppointmentPrintProp
     if (id && !isUUID(id)) {
       return id
     }
-    // If both are UUIDs, show the appointment_no if it exists, otherwise show formatted version
-    if (appointmentNo) {
-      return appointmentNo.substring(0, 8).toUpperCase() // Show first 8 chars of UUID
-    }
-    if (id) {
-      return `APT-${id.substring(0, 8).toUpperCase()}` // Format as APT-XXXXXXXX
-    }
+    // If both are UUIDs, return N/A instead of showing UUID fragments
+    return 'N/A'
     return '-'
   }
 

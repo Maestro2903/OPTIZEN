@@ -38,27 +38,7 @@ export function PatientSelectorWithHistory({
   const searchTimeoutRef = React.useRef<NodeJS.Timeout>()
 
   // Debounced search
-  React.useEffect(() => {
-    if (searchQuery.length >= 2) {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current)
-      }
-
-      searchTimeoutRef.current = setTimeout(() => {
-        performSearch(searchQuery)
-      }, 300)
-    } else {
-      setSearchResults([])
-    }
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current)
-      }
-    }
-  }, [searchQuery])
-
-  const performSearch = async (query: string) => {
+  const performSearch = React.useCallback(async (query: string) => {
     setSearching(true)
     try {
       const response = await patientsApi.list({
@@ -89,7 +69,27 @@ export function PatientSelectorWithHistory({
     } finally {
       setSearching(false)
     }
-  }
+  }, [toast])
+
+  React.useEffect(() => {
+    if (searchQuery.length >= 2) {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+
+      searchTimeoutRef.current = setTimeout(() => {
+        performSearch(searchQuery)
+      }, 300)
+    } else {
+      setSearchResults([])
+    }
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+    }
+  }, [searchQuery, performSearch])
 
   const handleSelectPatient = (patient: Patient) => {
     onSelect(patient)
