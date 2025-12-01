@@ -185,3 +185,5 @@ COMMENT ON FUNCTION update_stock_from_movement() IS 'Automatically updates stock
 COMMENT ON FUNCTION reverse_stock_movement() IS 'Reverses stock changes when a stock movement is deleted';
 COMMENT ON FUNCTION validate_stock_availability(TEXT, UUID, INTEGER) IS 'Validates if sufficient stock is available for a sale';
 
+
+

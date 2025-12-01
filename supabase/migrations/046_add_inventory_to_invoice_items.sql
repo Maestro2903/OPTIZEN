@@ -16,3 +16,5 @@ COMMENT ON COLUMN invoice_items.item_sku IS 'SKU of the item for quick reference
 CREATE INDEX IF NOT EXISTS idx_invoice_items_item_id ON invoice_items(item_id) WHERE item_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_invoice_items_item_type ON invoice_items(item_type) WHERE item_type IS NOT NULL;
 
+
+

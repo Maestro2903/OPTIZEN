@@ -94,3 +94,5 @@ CREATE POLICY "Authenticated users can delete old patient record files"
   TO authenticated
   USING (true);
 
+
+
