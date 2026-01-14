@@ -30,12 +30,12 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Combobox,
+  ComboboxContent,
+  ComboboxItem,
+  ComboboxTrigger,
+  ComboboxValue,
+} from "@/components/ui/combobox"
 import {
   Table,
   TableBody,
@@ -88,6 +88,7 @@ const invoiceFormSchema = z.object({
   invoice_date: z.string().min(1, "Invoice date is required"),
   due_date: z.string().min(1, "Due date is required"),
   status: z.enum(["Draft", "Paid", "Pending"]),
+  billing_type: z.enum(["consultation_operation", "medical", "optical"]).optional(),
   items: z.array(invoiceItemSchema).min(1, "At least one item is required"),
   discount_percent: z.string().optional(),
   tax_percent: z.string().optional(),
@@ -147,9 +148,10 @@ interface InvoiceFormProps {
   invoiceData?: any
   mode?: "add" | "edit"
   onFormSubmitAction?: (data: any) => void
+  defaultBillingType?: "consultation_operation" | "medical" | "optical"
 }
 
-export function InvoiceForm({ children, invoiceData, mode = "add", onFormSubmitAction: onSubmitCallback }: InvoiceFormProps) {
+export function InvoiceForm({ children, invoiceData, mode = "add", onFormSubmitAction: onSubmitCallback, defaultBillingType }: InvoiceFormProps) {
   const { toast } = useToast()
   const [open, setOpen] = React.useState(false)
   const [patients, setPatients] = React.useState<Array<{ value: string; label: string }>>([])
@@ -169,6 +171,7 @@ export function InvoiceForm({ children, invoiceData, mode = "add", onFormSubmitA
       invoice_date: new Date().toISOString().split("T")[0],
       due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
       status: "Draft",
+      billing_type: defaultBillingType || (invoiceData?.billing_type || "consultation_operation"),
       items: [{ service: "", description: "", quantity: "1", rate: "", item_type: undefined, item_id: undefined, item_sku: undefined }],
       discount_percent: "0",
       tax_percent: "0",
@@ -389,6 +392,7 @@ export function InvoiceForm({ children, invoiceData, mode = "add", onFormSubmitA
           ? new Date(invoiceData.due_date).toISOString().split("T")[0]
           : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
         status: formStatus,
+        billing_type: invoiceData.billing_type || defaultBillingType || "consultation_operation",
         items: formItems,
         discount_percent: discountPercent,
         tax_percent: taxPercent,
@@ -420,6 +424,7 @@ export function InvoiceForm({ children, invoiceData, mode = "add", onFormSubmitA
         invoice_date: values.invoice_date,
         due_date: values.due_date,
         status: values.status,
+        billing_type: values.billing_type || defaultBillingType || "consultation_operation",
         subtotal: subtotal,
         discount_amount: discountAmount,
         tax_amount: taxAmount,
@@ -560,20 +565,44 @@ export function InvoiceForm({ children, invoiceData, mode = "add", onFormSubmitA
                   control={form.control}
                   name="status"
                   render={({ field }) => (
-                    <FormItem className="col-span-6">
+                    <FormItem className="col-span-3">
                       <FormLabel>Status</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Combobox value={field.value} onValueChange={field.onChange}>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select status" />
-                          </SelectTrigger>
+                          <ComboboxTrigger>
+                            <ComboboxValue placeholder="Select status" />
+                          </ComboboxTrigger>
                         </FormControl>
-                        <SelectContent>
-                          <SelectItem value="Draft">Draft</SelectItem>
-                          <SelectItem value="Paid">Paid</SelectItem>
-                          <SelectItem value="Pending">Pending</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        <ComboboxContent>
+                          <ComboboxItem value="Draft">Draft</ComboboxItem>
+                          <ComboboxItem value="Paid">Paid</ComboboxItem>
+                          <ComboboxItem value="Pending">Pending</ComboboxItem>
+                        </ComboboxContent>
+                      </Combobox>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Billing Type */}
+                <FormField
+                  control={form.control}
+                  name="billing_type"
+                  render={({ field }) => (
+                    <FormItem className="col-span-3">
+                      <FormLabel>Billing Type</FormLabel>
+                      <Combobox value={field.value || defaultBillingType || "consultation_operation"} onValueChange={field.onChange}>
+                        <FormControl>
+                          <ComboboxTrigger>
+                            <ComboboxValue placeholder="Select billing type" />
+                          </ComboboxTrigger>
+                        </FormControl>
+                        <ComboboxContent>
+                          <ComboboxItem value="consultation_operation">Consultation & Operation</ComboboxItem>
+                          <ComboboxItem value="medical">Medical</ComboboxItem>
+                          <ComboboxItem value="optical">Optical</ComboboxItem>
+                        </ComboboxContent>
+                      </Combobox>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -620,7 +649,7 @@ export function InvoiceForm({ children, invoiceData, mode = "add", onFormSubmitA
                             render={({ field: typeField }) => (
                               <FormItem className="w-24">
                                 <FormControl>
-                                  <Select
+                                  <Combobox
                                     value={typeField.value || 'service'}
                                     onValueChange={(value) => {
                                       typeField.onChange(value === 'service' ? undefined : value)
@@ -631,15 +660,15 @@ export function InvoiceForm({ children, invoiceData, mode = "add", onFormSubmitA
                                       form.setValue(`items.${index}.rate`, '')
                                     }}
                                   >
-                                    <SelectTrigger className="h-8 text-xs">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="service">Service</SelectItem>
-                                      <SelectItem value="pharmacy">Pharmacy</SelectItem>
-                                      <SelectItem value="optical">Optical</SelectItem>
-                                    </SelectContent>
-                                  </Select>
+                                    <ComboboxTrigger className="h-8 text-xs">
+                                      <ComboboxValue />
+                                    </ComboboxTrigger>
+                                    <ComboboxContent>
+                                      <ComboboxItem value="service">Service</ComboboxItem>
+                                      <ComboboxItem value="pharmacy">Pharmacy</ComboboxItem>
+                                      <ComboboxItem value="optical">Optical</ComboboxItem>
+                                    </ComboboxContent>
+                                  </Combobox>
                                 </FormControl>
                               </FormItem>
                             )}
@@ -818,20 +847,20 @@ export function InvoiceForm({ children, invoiceData, mode = "add", onFormSubmitA
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Payment Method *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Combobox value={field.value} onValueChange={field.onChange}>
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select payment method" />
-                            </SelectTrigger>
+                            <ComboboxTrigger>
+                              <ComboboxValue placeholder="Select payment method" />
+                            </ComboboxTrigger>
                           </FormControl>
-                          <SelectContent>
-                            <SelectItem value="Cash">Cash</SelectItem>
-                            <SelectItem value="Card">Card</SelectItem>
-                            <SelectItem value="UPI">UPI</SelectItem>
-                            <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                            <SelectItem value="Cheque">Cheque</SelectItem>
-                          </SelectContent>
-                        </Select>
+                          <ComboboxContent>
+                            <ComboboxItem value="Cash">Cash</ComboboxItem>
+                            <ComboboxItem value="Card">Card</ComboboxItem>
+                            <ComboboxItem value="UPI">UPI</ComboboxItem>
+                            <ComboboxItem value="Bank Transfer">Bank Transfer</ComboboxItem>
+                            <ComboboxItem value="Cheque">Cheque</ComboboxItem>
+                          </ComboboxContent>
+                        </Combobox>
                         <FormMessage />
                       </FormItem>
                     )}

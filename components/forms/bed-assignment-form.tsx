@@ -26,12 +26,12 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Combobox,
+  ComboboxContent,
+  ComboboxItem,
+  ComboboxTrigger,
+  ComboboxValue,
+} from "@/components/ui/combobox"
 import { Textarea } from "@/components/ui/textarea"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -291,7 +291,7 @@ export function BedAssignmentForm({ children, assignmentData, mode = "create", o
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0">
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0" onCloseButtonClickOnly={true}>
         {/* Fixed Header */}
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <DialogTitle>{mode === "edit" ? "Update Bed Assignment" : "Assign Patient to Bed"}</DialogTitle>
@@ -336,34 +336,34 @@ export function BedAssignmentForm({ children, assignmentData, mode = "create", o
                   render={({ field }) => (
                     <FormItem className="col-span-6">
                       <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Bed *</FormLabel>
-                      <Select
+                      <Combobox
                         onValueChange={(value) => {
+                          if (value === "no-beds") return
                           field.onChange(value)
                           handleBedChange(value)
                         }}
                         value={field.value || ""}
-                        disabled={loadingBeds}
                       >
                         <FormControl>
-                          <SelectTrigger className="bg-white border-gray-200 focus:border-gray-600 text-sm rounded-lg h-11">
-                            <SelectValue placeholder={loadingBeds ? "Loading beds..." : "Select bed"} />
-                          </SelectTrigger>
+                          <ComboboxTrigger className="bg-white border-gray-200 focus:border-gray-600 text-sm rounded-lg h-11" disabled={loadingBeds}>
+                            <ComboboxValue placeholder={loadingBeds ? "Loading beds..." : "Select bed"} />
+                          </ComboboxTrigger>
                         </FormControl>
-                        <SelectContent>
+                        <ComboboxContent>
                           {availableBeds.length === 0 ? (
-                            <SelectItem value="no-beds" disabled>
+                            <ComboboxItem value="no-beds" disabled>
                               No available beds
-                            </SelectItem>
+                            </ComboboxItem>
                           ) : (
                             availableBeds.map((bed) => (
-                              <SelectItem key={bed.id} value={bed.id}>
+                              <ComboboxItem key={bed.id} value={bed.id}>
                                 {bed.bed_number} - {bed.name}
                                 {bed.description && ` (${bed.description})`}
-                              </SelectItem>
+                              </ComboboxItem>
                             ))
                           )}
-                        </SelectContent>
-                      </Select>
+                        </ComboboxContent>
+                      </Combobox>
                       <FormMessage />
                     </FormItem>
                   )}

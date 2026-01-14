@@ -23,9 +23,9 @@ interface PrintLayoutProps {
 export function PrintLayout({
   documentType,
   documentTitle,
-  clinicName = "OptiZen Medical Center",
-  clinicAddress = "123 Medical Plaza, Healthcare District, City - 123456",
-  clinicPhone = "+91 98765 43210",
+  clinicName = "Sri Ramana Maharishi Eye Hospital",
+  clinicAddress = "51-C, Somavarakula Street, Tiruvannamalai – 606 603",
+  clinicPhone = "229461",
   children,
   showPrintButton = true,
   isDraft = false,
@@ -118,15 +118,13 @@ interface PrintHeaderProps {
 }
 
 export function PrintHeader({
-  hospitalName = "OptiZen Medical Center",
-  hospitalAddress = "123 Medical Plaza, Healthcare District, City - 123456",
-  hospitalPhone = "+91 98765 43210",
+  hospitalName = "Sri Ramana Maharishi Eye Hospital",
+  hospitalAddress = "51-C, Somavarakula Street, Tiruvannamalai – 606 603",
+  hospitalPhone = "229461",
   compact = false
 }: PrintHeaderProps & { compact?: boolean }) {
-  // Normalize hospital name - replace EyeCare with OptiZen
-  const normalizedHospitalName = hospitalName?.includes('EyeCare') 
-    ? hospitalName.replace(/EyeCare/gi, 'OptiZen')
-    : hospitalName || "OptiZen Medical Center"
+  // Use provided hospital name or default
+  const normalizedHospitalName = hospitalName || "Sri Ramana Maharishi Eye Hospital"
 
   return (
     <div className={compact ? "mb-2" : "mb-6"}>

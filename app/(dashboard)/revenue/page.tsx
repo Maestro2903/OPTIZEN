@@ -33,7 +33,7 @@ import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
 import { RevenuePrint } from "@/components/print/revenue-print"
 import { ViewEditDialog } from "@/components/dialogs/view-edit-dialog"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Combobox, ComboboxContent, ComboboxItem, ComboboxTrigger, ComboboxValue } from "@/components/ui/combobox"
 import { financeRevenueApi, expensesApi, type FinanceRevenueMetrics, type ExpenseMetrics } from "@/lib/services/api"
 
 interface Expense {
@@ -364,19 +364,19 @@ export default function RevenuePage() {
                                     <FormField control={form.control} name={"payment_method"} render={({ field }) => (
                                       <FormItem>
                                         <FormLabel>Payment</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <Combobox value={field.value} onValueChange={field.onChange}>
                                           <FormControl>
-                                            <SelectTrigger>
-                                              <SelectValue placeholder="Select method" />
-                                            </SelectTrigger>
+                                            <ComboboxTrigger>
+                                              <ComboboxValue placeholder="Select method" />
+                                            </ComboboxTrigger>
                                           </FormControl>
-                                          <SelectContent>
-                                            <SelectItem value="Cash">Cash</SelectItem>
-                                            <SelectItem value="Card">Card</SelectItem>
-                                            <SelectItem value="UPI">UPI</SelectItem>
-                                            <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                                          </SelectContent>
-                                        </Select>
+                                          <ComboboxContent>
+                                            <ComboboxItem value="Cash">Cash</ComboboxItem>
+                                            <ComboboxItem value="Card">Card</ComboboxItem>
+                                            <ComboboxItem value="UPI">UPI</ComboboxItem>
+                                            <ComboboxItem value="Bank Transfer">Bank Transfer</ComboboxItem>
+                                          </ComboboxContent>
+                                        </Combobox>
                                         <FormMessage />
                                       </FormItem>
                                     )}/>

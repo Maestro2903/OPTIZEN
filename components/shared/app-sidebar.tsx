@@ -79,6 +79,36 @@ const navigationGroups = [
         requiredPermission: "patients" as const,
       },
       {
+        title: "Out Patient Records",
+        url: "/out-patient-records",
+        icon: FileText,
+        requiredPermission: "patients" as const,
+      },
+      {
+        title: "Vision Records",
+        url: "/vision",
+        icon: Eye,
+        requiredPermission: "patients" as const,
+      },
+      {
+        title: "Diagnosis & Tests",
+        url: "/diagnosis-tests",
+        icon: FileText,
+        requiredPermission: "patients" as const,
+      },
+      {
+        title: "Treatments & Medications",
+        url: "/treatments-medications",
+        icon: FileText,
+        requiredPermission: "patients" as const,
+      },
+      {
+        title: "Blood & Advice",
+        url: "/blood-advice",
+        icon: FileText,
+        requiredPermission: "patients" as const,
+      },
+      {
         title: "Operations",
         url: "/operations",
         icon: Stethoscope,
@@ -114,8 +144,26 @@ const navigationGroups = [
     header: "ADMIN",
     items: [
       {
-        title: "Billing",
+        title: "All Billing",
         url: "/billing",
+        icon: CreditCard,
+        requiredPermission: "invoices" as const,
+      },
+      {
+        title: "Consultation & Operation Billing",
+        url: "/billing/consultation-operation",
+        icon: CreditCard,
+        requiredPermission: "invoices" as const,
+      },
+      {
+        title: "Medical Billing",
+        url: "/billing/medical",
+        icon: CreditCard,
+        requiredPermission: "invoices" as const,
+      },
+      {
+        title: "Optical Billing",
+        url: "/billing/optical",
         icon: CreditCard,
         requiredPermission: "invoices" as const,
       },

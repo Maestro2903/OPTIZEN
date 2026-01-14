@@ -43,12 +43,12 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Combobox,
+  ComboboxContent,
+  ComboboxItem,
+  ComboboxTrigger,
+  ComboboxValue,
+} from "@/components/ui/combobox"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -466,20 +466,20 @@ export default function PharmacyPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Category *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Combobox value={field.value} onValueChange={field.onChange}>
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select category" />
-                            </SelectTrigger>
+                            <ComboboxTrigger>
+                              <ComboboxValue placeholder="Select category" />
+                            </ComboboxTrigger>
                           </FormControl>
-                          <SelectContent>
-                            <SelectItem value="antibiotics">Antibiotics</SelectItem>
-                            <SelectItem value="analgesics">Analgesics</SelectItem>
-                            <SelectItem value="antihistamines">Antihistamines</SelectItem>
-                            <SelectItem value="supplements">Supplements</SelectItem>
-                            <SelectItem value="other">Other</SelectItem>
-                          </SelectContent>
-                        </Select>
+                          <ComboboxContent>
+                            <ComboboxItem value="antibiotics">Antibiotics</ComboboxItem>
+                            <ComboboxItem value="analgesics">Analgesics</ComboboxItem>
+                            <ComboboxItem value="antihistamines">Antihistamines</ComboboxItem>
+                            <ComboboxItem value="supplements">Supplements</ComboboxItem>
+                            <ComboboxItem value="other">Other</ComboboxItem>
+                          </ComboboxContent>
+                        </Combobox>
                         <FormMessage />
                       </FormItem>
                     )}

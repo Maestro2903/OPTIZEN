@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/middleware/rbac'
+import { logger } from '@/lib/utils/logger'
 import * as z from 'zod'
 
 // Helper function to resolve eye and anesthesia names from master_data
@@ -123,6 +124,9 @@ const operationSchema = z.object({
 })
 
 export async function GET(request: NextRequest) {
+  const requestId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+  const startTime = Date.now()
+
   try {
     // RBAC check
     const authCheck = await requirePermission('operations', 'view')
@@ -131,9 +135,13 @@ export async function GET(request: NextRequest) {
   }
     const { context } = authCheck
 
-    // Use service client to bypass RLS during RBAC bypass mode
+    // Use service client for admin operations that need to bypass RLS
     const supabase = createServiceClient()
-    console.log('🔧 Service client created for operations GET')
+    logger.debug('Service client created for operations GET', {
+      request_id: requestId,
+      endpoint: '/api/operations',
+      user_id: context.user_id
+    })
     const { searchParams } = new URL(request.url)
 
     // Get query parameters with safe parsing
@@ -158,8 +166,10 @@ export async function GET(request: NextRequest) {
     const case_id = searchParams.get('case_id')
     const status = searchParams.get('status')
 
-    // Calculate offset for pagination
-    const offset = (page - 1) * limit
+    // Calculate offset for pagination with explicit guards
+    const safePage = Number.isFinite(page) ? page : 1
+    const safeLimit = Number.isFinite(limit) ? limit : 10
+    const offset = (safePage - 1) * safeLimit
 
     // Build query - filter out deleted records
     let query = supabase
@@ -206,24 +216,41 @@ export async function GET(request: NextRequest) {
     query = query.order(sortBy, { ascending: sortOrder === 'asc' })
 
     // Apply pagination
-    query = query.range(offset, offset + limit - 1)
+    query = query.range(offset, offset + safeLimit - 1)
 
-    console.log('🔍 Executing query...')
+    logger.debug('Executing operations query', {
+      request_id: requestId,
+      endpoint: '/api/operations',
+      user_id: context.user_id,
+      filters: { patient_id, case_id, status, search }
+    })
     const { data: operations, error, count } = await query
 
     if (error) {
-      console.error('❌ Operations fetch error:', error)
-      console.error('Error details:', JSON.stringify(error, null, 2))
+      logger.error('Operations fetch error', error, {
+        request_id: requestId,
+        endpoint: '/api/operations',
+        user_id: context.user_id
+      })
       return NextResponse.json(
         { success: false, error: error.message, details: error },
         { status: 500 }
       )
     }
 
-    console.log(`✅ Fetched ${operations?.length || 0} operations`)
+    logger.debug(`Fetched ${operations?.length || 0} operations`, {
+      request_id: requestId,
+      endpoint: '/api/operations',
+      user_id: context.user_id,
+      count: operations?.length || 0
+    })
     
     // Resolve eye and anesthesia names from master_data
-    console.log('🔄 Resolving operation fields from master_data...')
+    logger.debug('Resolving operation fields from master_data', {
+      request_id: requestId,
+      endpoint: '/api/operations',
+      user_id: context.user_id
+    })
     const resolvedOperations = operations ? await resolveOperationFields(operations, supabase) : []
 
     // Normalize response: add cases alias for backward compatibility
@@ -237,17 +264,26 @@ export async function GET(request: NextRequest) {
     }))
 
     // Calculate pagination metadata
-    const totalPages = Math.ceil((count || 0) / limit)
-    const hasNextPage = page < totalPages
-    const hasPrevPage = page > 1
+    const total = count || 0
+    const totalPages = total > 0 ? Math.ceil(total / safeLimit) : 1
+    const hasNextPage = safePage < totalPages
+    const hasPrevPage = safePage > 1
+
+    const duration = Date.now() - startTime
+    logger.requestComplete('GET', '/api/operations', 200, duration, requestId, {
+      user_id: context.user_id,
+      total,
+      page: safePage,
+      limit: safeLimit
+    })
 
     return NextResponse.json({
       success: true,
       data: normalizedOperations,
       pagination: {
-        page,
-        limit,
-        total: count || 0,
+        page: safePage,
+        limit: safeLimit,
+        total,
         totalPages,
         hasNextPage,
         hasPrevPage
@@ -255,7 +291,12 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Unexpected error in operations GET:', error)
+    const duration = Date.now() - startTime
+    logger.error('Unexpected error in operations GET', error, {
+      request_id: requestId,
+      endpoint: '/api/operations',
+      duration_ms: duration
+    })
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }
@@ -264,6 +305,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const requestId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+  const startTime = Date.now()
+
   try {
     // RBAC check
     const authCheck = await requirePermission('operations', 'create')
@@ -273,7 +317,12 @@ export async function POST(request: NextRequest) {
     const { context } = authCheck
 
     const body = await request.json()
-    console.log('📝 Creating operation with data:', JSON.stringify(body, null, 2))
+    logger.info('Creating operation', {
+      request_id: requestId,
+      endpoint: '/api/operations',
+      user_id: context.user_id,
+      patient_id: body.patient_id
+    })
 
     // Clean up empty strings to undefined for optional fields
     const emptyStringFields = ['case_id', 'iol_name', 'iol_power', 'operation_notes', 'follow_up_notes']
@@ -293,7 +342,12 @@ export async function POST(request: NextRequest) {
     // Validate input data
     const validation = operationSchema.safeParse(body)
     if (!validation.success) {
-      console.error('❌ Validation failed:', validation.error.issues)
+      logger.warn('Operation validation failed', {
+        request_id: requestId,
+        endpoint: '/api/operations',
+        user_id: context.user_id,
+        validation_errors: validation.error.issues
+      })
       return NextResponse.json(
         {
           success: false,
@@ -303,10 +357,14 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-    console.log('✅ Validation passed')
+    logger.debug('Operation validation passed', {
+      request_id: requestId,
+      endpoint: '/api/operations',
+      user_id: context.user_id
+    })
 
     const validatedData = validation.data
-    // Use service client to bypass RLS during RBAC bypass mode
+    // Use service client for admin operations that need to bypass RLS
     const supabase = createServiceClient()
 
     // Resolve master_data UUIDs to text values for eye, anesthesia, sys_diagnosis
@@ -322,23 +380,24 @@ export async function POST(request: NextRequest) {
           .single()
         
         if (masterData) {
-          console.log(`🔄 Resolved ${field} UUID to: ${masterData.name}`)
+          logger.debug(`Resolved ${field} UUID to name`, {
+            request_id: requestId,
+            endpoint: '/api/operations',
+            user_id: context.user_id,
+            field,
+            resolved_name: masterData.name
+          })
           ;(validatedData as any)[field] = masterData.name
         }
       }
     }
 
     // Prepare insert data
-    // In development mode with RBAC bypass, don't set created_by to avoid foreign key constraint issues
     const insertData: any = {
       ...validatedData,
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }
-    
-    // Only set created_by if it's not the mock bypass user ID
-    if (context.user_id !== '00000000-0000-0000-0000-000000000000') {
-      insertData.created_by = context.user_id
+      updated_at: new Date().toISOString(),
+      created_by: context.user_id
     }
 
     const { data: operation, error } = await (supabase as any)
@@ -364,15 +423,24 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('❌ Operation creation error:', error)
-      console.error('Error details:', JSON.stringify(error, null, 2))
+      logger.error('Operation creation error', error, {
+        request_id: requestId,
+        endpoint: '/api/operations',
+        user_id: context.user_id,
+        patient_id: validatedData.patient_id
+      })
       return NextResponse.json(
         { success: false, error: error.message, details: error },
         { status: 500 }
       )
     }
 
-    console.log('✅ Operation created successfully:', operation?.id)
+    const duration = Date.now() - startTime
+    logger.requestComplete('POST', '/api/operations', 201, duration, requestId, {
+      user_id: context.user_id,
+      operation_id: operation?.id,
+      patient_id: validatedData.patient_id
+    })
 
     // Resolve eye and anesthesia names from master_data
     const resolvedOperations = operation ? await resolveOperationFields([operation], supabase) : []
@@ -394,7 +462,12 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Unexpected error in operations POST:', error)
+    const duration = Date.now() - startTime
+    logger.error('Unexpected error in operations POST', error, {
+      request_id: requestId,
+      endpoint: '/api/operations',
+      duration_ms: duration
+    })
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

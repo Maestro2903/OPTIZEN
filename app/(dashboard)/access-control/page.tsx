@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Combobox, ComboboxContent, ComboboxItem, ComboboxTrigger, ComboboxValue } from '@/components/ui/combobox'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
@@ -679,21 +679,21 @@ export default function AccessControlPage() {
           {/* Role Selector */}
           <div className="flex items-center gap-4">
             <div className="flex-1">
-              <Select value={selectedRole} onValueChange={setSelectedRole} disabled={loading}>
-                <SelectTrigger className="w-full bg-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
+              <Combobox value={selectedRole} onValueChange={setSelectedRole}>
+                <ComboboxTrigger className="w-full bg-white" disabled={loading}>
+                  <ComboboxValue />
+                </ComboboxTrigger>
+                <ComboboxContent>
                   {ROLES.map(role => (
-                    <SelectItem key={role.value} value={role.value}>
+                    <ComboboxItem key={role.value} value={role.value}>
                       <div className="flex items-center gap-2">
                         <div className={`w-3 h-3 rounded-full ${role.color}`} />
                         {role.label}
                       </div>
-                    </SelectItem>
+                    </ComboboxItem>
                   ))}
-                </SelectContent>
-              </Select>
+                </ComboboxContent>
+              </Combobox>
             </div>
             {selectedRoleData && (
               <Badge className={`${selectedRoleData.color} text-white px-3 py-1`}>
@@ -741,23 +741,23 @@ export default function AccessControlPage() {
                 className="pl-9"
               />
             </div>
-            <Select 
+            <Combobox 
               value={selectedCategory || 'all'} 
               onValueChange={(value) => setSelectedCategory(value === 'all' ? null : value)}
             >
-              <SelectTrigger className="w-full md:w-[250px]">
+              <ComboboxTrigger className="w-full md:w-[250px]">
                 <Filter className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Filter by category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
+                <ComboboxValue placeholder="Filter by category" />
+              </ComboboxTrigger>
+              <ComboboxContent>
+                <ComboboxItem value="all">All Categories</ComboboxItem>
                 {MODULE_CATEGORIES.map(cat => (
-                  <SelectItem key={cat.id} value={cat.id}>
+                  <ComboboxItem key={cat.id} value={cat.id}>
                     {cat.label}
-                  </SelectItem>
+                  </ComboboxItem>
                 ))}
-              </SelectContent>
-            </Select>
+              </ComboboxContent>
+            </Combobox>
           </div>
         </CardContent>
       </Card>

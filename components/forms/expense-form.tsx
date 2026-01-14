@@ -89,6 +89,7 @@ export function ExpenseForm({ children, expenseData, mode = "create" }: ExpenseF
         <DialogOverlay className="bg-gray-900/50 backdrop-blur-sm" />
         <DialogContent
           className="max-w-2xl h-[90vh] flex flex-col p-0 overflow-hidden"
+          onCloseButtonClickOnly={true}
         >
         {/* Fixed Header */}
         <DialogHeader className="px-6 py-4 border-b">

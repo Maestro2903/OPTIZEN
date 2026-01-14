@@ -187,3 +187,14 @@ COMMENT ON FUNCTION validate_stock_availability(TEXT, UUID, INTEGER) IS 'Validat
 
 
 
+
+
+
+
+
+
+
+
+
+
+

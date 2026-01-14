@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { requirePermission } from '@/lib/middleware/rbac'
+import { handleDatabaseError, handleNotFoundError, handleServerError } from '@/lib/utils/api-errors'
 
 // GET /api/finance-revenue/[id] - Get a specific revenue entry
 export async function GET(
@@ -111,10 +113,32 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  // RBAC check
+  const authCheck = await requirePermission('revenue', 'delete')
+  if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
+  const { context } = authCheck
+
   try {
     const supabase = createClient()
     const { id } = params
 
+    // Verify revenue entry exists before deleting
+    const { data: existingRevenue, error: fetchError } = await supabase
+      .from('finance_revenue')
+      .select('id')
+      .eq('id', id)
+      .single()
+
+    if (fetchError || !existingRevenue) {
+      if (fetchError?.code === 'PGRST116') {
+        return handleNotFoundError('Revenue entry', id)
+      }
+      return handleDatabaseError(fetchError || new Error('Revenue entry not found'), 'fetch', 'revenue entry')
+    }
+
+    // Delete revenue entry
     const { data: revenue, error } = await supabase
       .from('finance_revenue')
       .delete()
@@ -124,10 +148,9 @@ export async function DELETE(
 
     if (error) {
       if (error.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Revenue entry not found' }, { status: 404 })
+        return handleNotFoundError('Revenue entry', id)
       }
-      console.error('Database error:', error)
-      return NextResponse.json({ error: 'Failed to delete revenue entry' }, { status: 500 })
+      return handleDatabaseError(error, 'delete', 'revenue entry')
     }
 
     return NextResponse.json({
@@ -137,7 +160,6 @@ export async function DELETE(
     })
 
   } catch (error) {
-    console.error('API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleServerError(error, 'delete', 'revenue entry')
   }
 }

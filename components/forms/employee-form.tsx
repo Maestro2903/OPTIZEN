@@ -28,12 +28,12 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Eye, EyeOff } from "lucide-react"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Combobox,
+  ComboboxContent,
+  ComboboxItem,
+  ComboboxTrigger,
+  ComboboxValue,
+} from "@/components/ui/combobox"
 
 const employeeFormSchema = z.object({
   full_name: z.string().min(2, "Name must be at least 2 characters"),
@@ -310,7 +310,7 @@ export const EmployeeForm = React.forwardRef<HTMLDivElement, EmployeeFormProps>(
       }
     }}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" onCloseButtonClickOnly={true}>
         <DialogHeader>
           <DialogTitle>{employee ? 'Edit Employee' : 'Add Employee'}</DialogTitle>
           <DialogDescription>
@@ -628,18 +628,18 @@ export const EmployeeForm = React.forwardRef<HTMLDivElement, EmployeeFormProps>(
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Gender</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                    <Combobox value={field.value ?? ""} onValueChange={field.onChange}>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
+                        <ComboboxTrigger>
+                          <ComboboxValue placeholder="Select" />
+                        </ComboboxTrigger>
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="male">Male</SelectItem>
-                        <SelectItem value="female">Female</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      <ComboboxContent>
+                        <ComboboxItem value="male">Male</ComboboxItem>
+                        <ComboboxItem value="female">Female</ComboboxItem>
+                        <ComboboxItem value="other">Other</ComboboxItem>
+                      </ComboboxContent>
+                    </Combobox>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -650,23 +650,23 @@ export const EmployeeForm = React.forwardRef<HTMLDivElement, EmployeeFormProps>(
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Blood Group</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                    <Combobox value={field.value ?? ""} onValueChange={field.onChange}>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
+                        <ComboboxTrigger>
+                          <ComboboxValue placeholder="Select" />
+                        </ComboboxTrigger>
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="A+">A+</SelectItem>
-                        <SelectItem value="A-">A-</SelectItem>
-                        <SelectItem value="B+">B+</SelectItem>
-                        <SelectItem value="B-">B-</SelectItem>
-                        <SelectItem value="AB+">AB+</SelectItem>
-                        <SelectItem value="AB-">AB-</SelectItem>
-                        <SelectItem value="O+">O+</SelectItem>
-                        <SelectItem value="O-">O-</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      <ComboboxContent>
+                        <ComboboxItem value="A+">A+</ComboboxItem>
+                        <ComboboxItem value="A-">A-</ComboboxItem>
+                        <ComboboxItem value="B+">B+</ComboboxItem>
+                        <ComboboxItem value="B-">B-</ComboboxItem>
+                        <ComboboxItem value="AB+">AB+</ComboboxItem>
+                        <ComboboxItem value="AB-">AB-</ComboboxItem>
+                        <ComboboxItem value="O+">O+</ComboboxItem>
+                        <ComboboxItem value="O-">O-</ComboboxItem>
+                      </ComboboxContent>
+                    </Combobox>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -677,19 +677,19 @@ export const EmployeeForm = React.forwardRef<HTMLDivElement, EmployeeFormProps>(
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Marital Status</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                    <Combobox value={field.value ?? ""} onValueChange={field.onChange}>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
+                        <ComboboxTrigger>
+                          <ComboboxValue placeholder="Select" />
+                        </ComboboxTrigger>
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="single">Single</SelectItem>
-                        <SelectItem value="married">Married</SelectItem>
-                        <SelectItem value="divorced">Divorced</SelectItem>
-                        <SelectItem value="widowed">Widowed</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      <ComboboxContent>
+                        <ComboboxItem value="single">Single</ComboboxItem>
+                        <ComboboxItem value="married">Married</ComboboxItem>
+                        <ComboboxItem value="divorced">Divorced</ComboboxItem>
+                        <ComboboxItem value="widowed">Widowed</ComboboxItem>
+                      </ComboboxContent>
+                    </Combobox>
                     <FormMessage />
                   </FormItem>
                 )}

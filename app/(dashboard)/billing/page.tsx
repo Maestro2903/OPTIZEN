@@ -38,6 +38,13 @@ import { useApiList, useApiForm, useApiDelete } from "@/lib/hooks/useApi"
 import { invoicesApi, type Invoice, type InvoiceFilters, type InvoiceMetrics } from "@/lib/services/api"
 import { useToast } from "@/hooks/use-toast"
 import { Pagination } from "@/components/ui/pagination"
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxItem,
+  ComboboxTrigger,
+  ComboboxValue,
+} from "@/components/ui/combobox"
 
 const statusColors = {
   draft: "bg-gray-100 text-gray-700 border-gray-200",
@@ -104,6 +111,7 @@ export default function BillingPage() {
   const [appliedFilters, setAppliedFilters] = React.useState<string[]>([])
   const [currentSort, setCurrentSort] = React.useState("invoice_date")
   const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('desc')
+  const [billingTypeFilter, setBillingTypeFilter] = React.useState<string>("all")
   const [metrics, setMetrics] = React.useState<InvoiceMetrics | null>(null)
   const [metricsLoading, setMetricsLoading] = React.useState(false)
 
@@ -126,7 +134,8 @@ export default function BillingPage() {
     page: currentPage,
     limit: pageSize,
     sortBy: currentSort,
-    sortOrder: sortDirection
+    sortOrder: sortDirection,
+    billing_type: billingTypeFilter !== "all" ? billingTypeFilter : undefined
   })
 
   const { submitForm: createInvoice, loading: createLoading } = useApiForm<Invoice>()
@@ -200,6 +209,7 @@ export default function BillingPage() {
           payment_method: invoiceData.payment_method,
           notes: invoiceData.notes,
           status: 'draft',
+          billing_type: invoiceData.billing_type || 'consultation_operation',
           items: invoiceData.items || []
         }),
         {
@@ -300,8 +310,32 @@ export default function BillingPage() {
     setAppliedFilters(filters)
     const filterParams: InvoiceFilters = {}
 
+    // Add billing_type filter if not "all"
+    if (billingTypeFilter !== "all") {
+      filterParams.billing_type = billingTypeFilter
+    }
+
     // Collect all status/payment_status filters
     const statusFilters = filters.filter(f => 
+      ["paid", "unpaid", "partial", "overdue"].includes(f)
+    )
+    if (statusFilters.length > 0) {
+      filterParams.status = statusFilters
+    }
+
+    filter(filterParams)
+  }
+
+  const handleBillingTypeFilterChange = (value: string) => {
+    setBillingTypeFilter(value)
+    const filterParams: InvoiceFilters = {}
+
+    if (value !== "all") {
+      filterParams.billing_type = value
+    }
+
+    // Preserve existing status filters
+    const statusFilters = appliedFilters.filter(f => 
       ["paid", "unpaid", "partial", "overdue"].includes(f)
     )
     if (statusFilters.length > 0) {
@@ -331,7 +365,7 @@ export default function BillingPage() {
       { id: "due_date", label: "Due Date" },
     ],
     showExport: false,
-    showSettings: true,
+    showSettings: false,
   }
 
   // Use server-provided aggregate metrics instead of calculating from paginated data
@@ -339,14 +373,60 @@ export default function BillingPage() {
   const paidAmount = metrics?.paid_amount || 0
   const pendingAmount = metrics?.pending_amount || 0
 
+  // Calculate billing type breakdown from current invoices
+  const billingTypeBreakdown = React.useMemo(() => {
+    const breakdown = {
+      consultation_operation: { count: 0, total: 0, paid: 0 },
+      medical: { count: 0, total: 0, paid: 0 },
+      optical: { count: 0, total: 0, paid: 0 },
+    }
+    
+    invoices.forEach(invoice => {
+      const type = invoice.billing_type || 'consultation_operation'
+      if (breakdown[type as keyof typeof breakdown]) {
+        breakdown[type as keyof typeof breakdown].count++
+        breakdown[type as keyof typeof breakdown].total += invoice.total_amount
+        breakdown[type as keyof typeof breakdown].paid += invoice.amount_paid
+      }
+    })
+    
+    return breakdown
+  }, [invoices])
+
+  const getBillingTypeLabel = (type?: string) => {
+    switch (type) {
+      case 'consultation_operation':
+        return 'Consultation & Operation'
+      case 'medical':
+        return 'Medical'
+      case 'optical':
+        return 'Optical'
+      default:
+        return 'N/A'
+    }
+  }
+
+  const getBillingTypeBadgeColor = (type?: string) => {
+    switch (type) {
+      case 'consultation_operation':
+        return 'bg-blue-100 text-blue-700 border-blue-200'
+      case 'medical':
+        return 'bg-green-100 text-green-700 border-green-200'
+      case 'optical':
+        return 'bg-purple-100 text-purple-700 border-purple-200'
+      default:
+        return 'bg-gray-100 text-gray-700 border-gray-200'
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 px-5 py-6">
       <div className="flex flex-col gap-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight font-jakarta">Billing & Invoices</h1>
+            <h1 className="text-3xl font-bold tracking-tight font-jakarta">All Billing & Invoices</h1>
             <p className="text-muted-foreground">
-              Manage patient billing and invoice records
+              Complete overview of all billing types - Consultation & Operation, Medical, and Optical
             </p>
           </div>
           <InvoiceForm onFormSubmitAction={handleAddInvoice}>
@@ -357,13 +437,60 @@ export default function BillingPage() {
           </InvoiceForm>
         </div>
 
+        {/* Billing Type Summary Cards */}
+        {billingTypeFilter === "all" && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="rounded-xl border border-blue-200 bg-blue-50/50">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-blue-900">Consultation & Operation</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-1">
+                  <div className="text-2xl font-bold text-blue-900">{billingTypeBreakdown.consultation_operation.count}</div>
+                  <div className="text-xs text-blue-700">Invoices</div>
+                  <div className="text-sm font-semibold text-blue-900">₹{billingTypeBreakdown.consultation_operation.total.toLocaleString()}</div>
+                  <div className="text-xs text-blue-600">₹{billingTypeBreakdown.consultation_operation.paid.toLocaleString()} paid</div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="rounded-xl border border-green-200 bg-green-50/50">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-green-900">Medical</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-1">
+                  <div className="text-2xl font-bold text-green-900">{billingTypeBreakdown.medical.count}</div>
+                  <div className="text-xs text-green-700">Invoices</div>
+                  <div className="text-sm font-semibold text-green-900">₹{billingTypeBreakdown.medical.total.toLocaleString()}</div>
+                  <div className="text-xs text-green-600">₹{billingTypeBreakdown.medical.paid.toLocaleString()} paid</div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="rounded-xl border border-purple-200 bg-purple-50/50">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-purple-900">Optical</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-1">
+                  <div className="text-2xl font-bold text-purple-900">{billingTypeBreakdown.optical.count}</div>
+                  <div className="text-xs text-purple-700">Invoices</div>
+                  <div className="text-sm font-semibold text-purple-900">₹{billingTypeBreakdown.optical.total.toLocaleString()}</div>
+                  <div className="text-xs text-purple-600">₹{billingTypeBreakdown.optical.paid.toLocaleString()} paid</div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         <Card className="rounded-xl border border-gray-200 bg-white shadow-sm">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Invoice Records</CardTitle>
               <CardDescription>
-                View and manage all patient invoices
+                {billingTypeFilter === "all" 
+                  ? "Complete overview of all billing types across the hospital"
+                  : `View and manage ${getBillingTypeLabel(billingTypeFilter)} invoices`}
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
@@ -378,6 +505,17 @@ export default function BillingPage() {
                   disabled={loading}
                 />
               </div>
+              <Combobox value={billingTypeFilter} onValueChange={handleBillingTypeFilterChange}>
+                <ComboboxTrigger className="w-[200px]">
+                  <ComboboxValue placeholder="All Billing Types" />
+                </ComboboxTrigger>
+                <ComboboxContent>
+                  <ComboboxItem value="all">All Billing Types</ComboboxItem>
+                  <ComboboxItem value="consultation_operation">Consultation & Operation</ComboboxItem>
+                  <ComboboxItem value="medical">Medical</ComboboxItem>
+                  <ComboboxItem value="optical">Optical</ComboboxItem>
+                </ComboboxContent>
+              </Combobox>
               <ViewOptions
                 config={viewOptionsConfig}
                 currentView="list"
@@ -410,6 +548,7 @@ export default function BillingPage() {
                 <TableRow className="bg-gray-50">
                   <TableHead className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Invoice No.</TableHead>
                   <TableHead className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Patient</TableHead>
+                  <TableHead className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Billing Type</TableHead>
                   <TableHead className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Date</TableHead>
                   <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Amount</TableHead>
                   <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Paid</TableHead>
@@ -451,6 +590,11 @@ export default function BillingPage() {
                             </div>
                           </div>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${getBillingTypeBadgeColor(invoice.billing_type)}`}>
+                          {getBillingTypeLabel(invoice.billing_type)}
+                        </span>
                       </TableCell>
                       <TableCell className="text-sm text-gray-600">{formatInvoiceDate(invoice.invoice_date)}</TableCell>
                       <TableCell className="text-right font-mono tabular-nums text-sm font-semibold text-gray-900">

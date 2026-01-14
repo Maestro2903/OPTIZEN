@@ -5,8 +5,8 @@ import { Database } from './database.types'
 /**
  * Creates a Supabase client for server-side operations
  * 
- * DEVELOPMENT MODE: Uses service role key to bypass RLS when no auth is configured
- * PRODUCTION: Uses SSR client with cookies for proper authentication
+ * Uses SSR client with cookies for proper authentication.
+ * Falls back to service role key only during build-time when cookies are unavailable.
  * 
  * NOTE: This function is synchronous for the service role case, but requires async
  * for the cookie-based case. Use createAuthenticatedClient() in async contexts.
@@ -16,47 +16,6 @@ export const createClient = () => {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   
-  // Development mode: Use service role key to bypass RLS (synchronous)
-  if (process.env.NODE_ENV !== 'production' && serviceRoleKey) {
-    if (!supabaseUrl) {
-      throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable')
-    }
-    
-    return createSupabaseClient<Database>(
-      supabaseUrl,
-      serviceRoleKey,
-      {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-        },
-        global: {
-          // Use a custom fetch that works better with Next.js
-          fetch: async (url, options = {}) => {
-            try {
-              // Add keepalive and set a reasonable timeout
-              const response = await fetch(url, {
-                ...options,
-                keepalive: false,
-                signal: AbortSignal.timeout(30000), // 30 second timeout
-              })
-              return response
-            } catch (error) {
-              console.error('Fetch error:', {
-                url,
-                error: error instanceof Error ? error.message : String(error),
-                stack: error instanceof Error ? error.stack : undefined
-              })
-              throw error
-            }
-          }
-        }
-      }
-    )
-  }
-  
-  // Production mode: Use SSR client with cookies (requires async)
-  // For production, use createAuthenticatedClient() instead
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Missing Supabase environment variables')
   }

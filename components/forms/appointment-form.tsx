@@ -23,12 +23,12 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Combobox,
+  ComboboxContent,
+  ComboboxItem,
+  ComboboxTrigger,
+  ComboboxValue,
+} from "@/components/ui/combobox"
 import { Textarea } from "@/components/ui/textarea"
 import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
 import { useForm } from "react-hook-form"
@@ -333,6 +333,7 @@ export function AppointmentForm({
       <DialogOverlay className="bg-gray-900/50 backdrop-blur-sm" />
       <DialogContent
         className="max-w-2xl rounded-2xl bg-white shadow-2xl"
+        onCloseButtonClickOnly={true}
       >
         <DialogHeader className="pb-4 border-b border-gray-100">
           <DialogTitle className="text-xl font-bold text-gray-900">
@@ -466,20 +467,20 @@ export function AppointmentForm({
                     <FormLabel className="block text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1.5">
                       Appointment Type *
                     </FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Combobox value={field.value} onValueChange={field.onChange}>
                       <FormControl>
-                        <SelectTrigger className={inputClassName}>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
+                        <ComboboxTrigger className={inputClassName}>
+                          <ComboboxValue placeholder="Select type" />
+                        </ComboboxTrigger>
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="consult">Consultation</SelectItem>
-                        <SelectItem value="follow-up">Follow-up</SelectItem>
-                        <SelectItem value="surgery">Surgery</SelectItem>
-                        <SelectItem value="refraction">Refraction</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      <ComboboxContent>
+                        <ComboboxItem value="consult">Consultation</ComboboxItem>
+                        <ComboboxItem value="follow-up">Follow-up</ComboboxItem>
+                        <ComboboxItem value="surgery">Surgery</ComboboxItem>
+                        <ComboboxItem value="refraction">Refraction</ComboboxItem>
+                        <ComboboxItem value="other">Other</ComboboxItem>
+                      </ComboboxContent>
+                    </Combobox>
                     <FormMessage />
                   </FormItem>
                 )}

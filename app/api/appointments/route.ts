@@ -60,8 +60,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid date format. Use ISO date format (YYYY-MM-DD)' }, { status: 400 })
     }
 
-    // Calculate offset for pagination
-    const offset = (page - 1) * limit
+    // Calculate offset for pagination (guard against overflow)
+    const safePage = Number.isFinite(page) ? page : 1
+    const safeLimit = Number.isFinite(limit) ? limit : 50
+    const offset = (safePage - 1) * safeLimit
 
     // Build query with joins to get patient and provider information
     // Note: PostgREST uses table!foreign_key_column syntax for joins
@@ -134,17 +136,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Calculate pagination metadata
-    const totalPages = Math.ceil((count || 0) / limit)
-    const hasNextPage = page < totalPages
-    const hasPrevPage = page > 1
+    const total = count || 0
+    const totalPages = total > 0 ? Math.ceil(total / safeLimit) : 1
+    const hasNextPage = safePage < totalPages
+    const hasPrevPage = safePage > 1
 
     return NextResponse.json({
       success: true,
       data: appointments,
       pagination: {
-        page,
-        limit,
-        total: count,
+        page: safePage,
+        limit: safeLimit,
+        total,
         totalPages,
         hasNextPage,
         hasPrevPage

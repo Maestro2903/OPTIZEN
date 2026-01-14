@@ -26,12 +26,12 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Combobox,
+  ComboboxContent,
+  ComboboxItem,
+  ComboboxTrigger,
+  ComboboxValue,
+} from "@/components/ui/combobox"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { CalendarIcon } from "lucide-react"
@@ -76,8 +76,8 @@ export function CertificateGeneratorForm({ children, onSuccess }: CertificateGen
       purpose: "",
       content: "",
       issue_date: new Date().toISOString().split('T')[0], // Default to today's date
-      hospital_name: "OptiZen Medical Center",
-      hospital_address: "123 Medical Plaza, Healthcare District",
+      hospital_name: "Sri Ramana Maharishi Eye Hospital",
+      hospital_address: "51-C, Somavarakula Street, Tiruvannamalai – 606 603",
       doctor_name: "",
       doctor_qualification: "MBBS, MS (Ophthalmology)",
       doctor_registration_number: "REG/12345/2020",
@@ -288,8 +288,8 @@ This certificate is issued for the purpose of medical leave application.`,
       </head>
       <body>
         <div class="header">
-          <div class="hospital-name">${certificate.hospital_name || 'OptiZen Medical Center'}</div>
-          <div class="hospital-address">${certificate.hospital_address || '123 Medical Plaza, Healthcare District'}</div>
+          <div class="hospital-name">${certificate.hospital_name || 'Sri Ramana Maharishi Eye Hospital'}</div>
+          <div class="hospital-address">${certificate.hospital_address || '51-C, Somavarakula Street, Tiruvannamalai – 606 603'}</div>
           <div class="cert-title">${certificate.type?.toUpperCase() || 'MEDICAL CERTIFICATE'}</div>
         </div>
 
@@ -488,7 +488,7 @@ This certificate is issued for the purpose of medical leave application.`,
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-4xl h-[85vh] p-0 flex flex-col">
+      <DialogContent className="max-w-4xl h-[85vh] p-0 flex flex-col" onCloseButtonClickOnly={true}>
         {/* Fixed Header */}
         <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-200 flex-shrink-0">
           <DialogTitle className="flex items-center gap-2 text-xl font-bold text-gray-900">
@@ -559,20 +559,20 @@ This certificate is issued for the purpose of medical leave application.`,
                   render={({ field }) => (
                     <FormItem className="col-span-4">
                       <FormLabel className="text-xs font-bold text-gray-500 uppercase">Certificate Type *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Combobox value={field.value} onValueChange={field.onChange}>
                         <FormControl>
-                          <SelectTrigger className="bg-white border-gray-200 rounded-lg focus:border-gray-800">
-                            <SelectValue placeholder="Select type" />
-                          </SelectTrigger>
+                          <ComboboxTrigger className="bg-white border-gray-200 rounded-lg focus:border-gray-800">
+                            <ComboboxValue placeholder="Select type" />
+                          </ComboboxTrigger>
                         </FormControl>
-                        <SelectContent>
-                          <SelectItem value="Fitness Certificate">Fitness Certificate</SelectItem>
-                          <SelectItem value="Medical Certificate">Medical Certificate</SelectItem>
-                          <SelectItem value="Eye Test Certificate">Eye Test Certificate</SelectItem>
-                          <SelectItem value="Sick Leave">Sick Leave</SelectItem>
-                          <SelectItem value="Custom">Custom</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        <ComboboxContent>
+                          <ComboboxItem value="Fitness Certificate">Fitness Certificate</ComboboxItem>
+                          <ComboboxItem value="Medical Certificate">Medical Certificate</ComboboxItem>
+                          <ComboboxItem value="Eye Test Certificate">Eye Test Certificate</ComboboxItem>
+                          <ComboboxItem value="Sick Leave">Sick Leave</ComboboxItem>
+                          <ComboboxItem value="Custom">Custom</ComboboxItem>
+                        </ComboboxContent>
+                      </Combobox>
                       <FormMessage />
                     </FormItem>
                   )}

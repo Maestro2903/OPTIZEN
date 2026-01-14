@@ -19,12 +19,12 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Combobox,
+  ComboboxContent,
+  ComboboxItem,
+  ComboboxTrigger,
+  ComboboxValue,
+} from "@/components/ui/combobox"
 import { Textarea } from "@/components/ui/textarea"
 import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
 import { useForm } from "react-hook-form"
@@ -299,21 +299,21 @@ export function AppointmentReassignDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Reason for Reassignment *</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Combobox value={field.value} onValueChange={field.onChange}>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select reason" />
-                      </SelectTrigger>
+                      <ComboboxTrigger>
+                        <ComboboxValue placeholder="Select reason" />
+                      </ComboboxTrigger>
                     </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Emergency">Emergency</SelectItem>
-                      <SelectItem value="Doctor on Leave">Doctor on Leave</SelectItem>
-                      <SelectItem value="Specialist Required">Specialist Required</SelectItem>
-                      <SelectItem value="Patient Request">Patient Request</SelectItem>
-                      <SelectItem value="Schedule Conflict">Schedule Conflict</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <ComboboxContent>
+                      <ComboboxItem value="Emergency">Emergency</ComboboxItem>
+                      <ComboboxItem value="Doctor on Leave">Doctor on Leave</ComboboxItem>
+                      <ComboboxItem value="Specialist Required">Specialist Required</ComboboxItem>
+                      <ComboboxItem value="Patient Request">Patient Request</ComboboxItem>
+                      <ComboboxItem value="Schedule Conflict">Schedule Conflict</ComboboxItem>
+                      <ComboboxItem value="Other">Other</ComboboxItem>
+                    </ComboboxContent>
+                  </Combobox>
                   <FormMessage />
                 </FormItem>
               )}

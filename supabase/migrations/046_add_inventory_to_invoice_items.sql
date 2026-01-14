@@ -18,3 +18,14 @@ CREATE INDEX IF NOT EXISTS idx_invoice_items_item_type ON invoice_items(item_typ
 
 
 
+
+
+
+
+
+
+
+
+
+
+

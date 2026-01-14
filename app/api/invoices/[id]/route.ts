@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { handleDatabaseError, handleNotFoundError, handleServerError } from '@/lib/utils/api-errors'
+import { requirePermission } from '@/lib/middleware/rbac'
 
 // GET /api/invoices/[id] - Get a specific invoice by ID
 export async function GET(
@@ -85,33 +86,31 @@ export async function PUT(
     const supabase = createClient()
     const { id } = params
 
-    // Check authentication (skip in development mode)
+    // Check authentication
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session && process.env.NODE_ENV === 'production') {
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check authorization - verify user has access to this invoice (skip in dev mode)
-    if (session) {
-      const { data: invoiceAuth, error: fetchError } = await supabase
-        .from('invoices')
-        .select('id, created_by, patient_id')
-        .eq('id', id)
-        .single()
+    // Check authorization - verify user has access to this invoice
+    const { data: invoiceAuth, error: fetchError } = await supabase
+      .from('invoices')
+      .select('id, created_by, patient_id')
+      .eq('id', id)
+      .single()
 
-      if (fetchError || !invoiceAuth) {
-        return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
-      }
+    if (fetchError || !invoiceAuth) {
+      return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
+    }
 
-      // Verify user owns this invoice or has appropriate role
-      const userRole = session.user.user_metadata?.role || session.user.app_metadata?.role
-      const isAdmin = userRole === 'admin'
-      const isManager = userRole === 'manager'
-      const ownsInvoice = invoiceAuth.created_by === session.user.id
+    // Verify user owns this invoice or has appropriate role
+    const userRole = session.user.user_metadata?.role || session.user.app_metadata?.role
+    const isAdmin = userRole === 'admin'
+    const isManager = userRole === 'manager'
+    const ownsInvoice = invoiceAuth.created_by === session.user.id
 
-      if (!ownsInvoice && !isAdmin && !isManager) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-      }
+    if (!ownsInvoice && !isAdmin && !isManager) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const body = await request.json()
@@ -149,6 +148,17 @@ export async function PUT(
       if (!allowedStatuses.includes(body.status)) {
         return NextResponse.json(
           { error: `status must be one of: ${allowedStatuses.join(', ')}` },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Validate billing_type if present
+    if (body.billing_type !== undefined) {
+      const allowedBillingTypes = ['consultation_operation', 'medical', 'optical']
+      if (!allowedBillingTypes.includes(body.billing_type)) {
+        return NextResponse.json(
+          { error: `billing_type must be one of: ${allowedBillingTypes.join(', ')}` },
           { status: 400 }
         )
       }
@@ -268,60 +278,48 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  // RBAC check
+  const authCheck = await requirePermission('invoices', 'delete')
+  if (!authCheck.authorized) {
+    return (authCheck as { authorized: false; response: NextResponse }).response
+  }
+  const { context } = authCheck
+
   try {
     const supabase = createClient()
     const { id } = params
 
-    // Check authentication (skip in development mode)
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session && process.env.NODE_ENV === 'production') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check authorization - verify user has access to this invoice (skip in dev mode)
-    if (session) {
-      const { data: invoiceAuth, error: fetchError } = await supabase
-        .from('invoices')
-        .select('id, created_by, patient_id')
-        .eq('id', id)
-        .single()
-
-      if (fetchError || !invoiceAuth) {
-        return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
-      }
-
-      // Verify user owns this invoice or has appropriate role
-      const userRole = session.user.user_metadata?.role || session.user.app_metadata?.role
-      const isAdmin = userRole === 'admin'
-      const isManager = userRole === 'manager'
-      const ownsInvoice = invoiceAuth.created_by === session.user.id
-
-      if (!ownsInvoice && !isAdmin && !isManager) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-      }
-    }
-
-    // Get invoice items before cancelling to reverse stock movements
-    const { data: invoiceBeforeCancel } = await supabase
+    // Verify invoice exists
+    const { data: invoiceAuth, error: fetchError } = await supabase
       .from('invoices')
-      .select('items, status')
+      .select('id, created_by, patient_id, status')
       .eq('id', id)
       .single()
 
-    if (!invoiceBeforeCancel) {
-      return handleNotFoundError('Invoice', id)
+    if (fetchError || !invoiceAuth) {
+      if (fetchError?.code === 'PGRST116') {
+        return handleNotFoundError('Invoice', id)
+      }
+      return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
     }
 
     // If invoice was already cancelled, return
-    if (invoiceBeforeCancel.status === 'cancelled') {
+    if (invoiceAuth.status === 'cancelled') {
       return NextResponse.json(
         { error: 'Invoice is already cancelled' },
         { status: 400 }
       )
     }
 
+    // Get invoice items before cancelling to reverse stock movements
+    const { data: invoiceData } = await supabase
+      .from('invoices')
+      .select('items')
+      .eq('id', id)
+      .single()
+
     // Delete stock movements linked to this invoice (trigger will reverse stock)
-    if (invoiceBeforeCancel.items && Array.isArray(invoiceBeforeCancel.items)) {
+    if (invoiceData?.items && Array.isArray(invoiceData.items)) {
       const { error: deleteMovementsError } = await supabase
         .from('stock_movements')
         .delete()

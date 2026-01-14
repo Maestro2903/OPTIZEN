@@ -21,12 +21,12 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Combobox,
+  ComboboxContent,
+  ComboboxItem,
+  ComboboxTrigger,
+  ComboboxValue,
+} from "@/components/ui/combobox"
 import { Textarea } from "@/components/ui/textarea"
 import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
 import { useForm } from "react-hook-form"
@@ -312,7 +312,7 @@ export function AttendanceForm({ children, attendanceData, mode = "create", onFo
   return (
     <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl" onCloseButtonClickOnly={true}>
         <DialogHeader>
           <DialogTitle>{mode === "edit" ? "Edit Attendance" : "Mark Attendance"}</DialogTitle>
           <DialogDescription>
@@ -367,21 +367,21 @@ export function AttendanceForm({ children, attendanceData, mode = "create", onFo
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Status *</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Combobox value={field.value} onValueChange={field.onChange}>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
+                      <ComboboxTrigger>
+                        <ComboboxValue placeholder="Select status" />
+                      </ComboboxTrigger>
                     </FormControl>
-                    <SelectContent>
-                      <SelectItem value="present">Present</SelectItem>
-                      <SelectItem value="absent">Absent</SelectItem>
-                      <SelectItem value="half_day">Half Day</SelectItem>
-                      <SelectItem value="sick_leave">Sick Leave</SelectItem>
-                      <SelectItem value="casual_leave">Casual Leave</SelectItem>
-                      <SelectItem value="paid_leave">Paid Leave</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <ComboboxContent>
+                      <ComboboxItem value="present">Present</ComboboxItem>
+                      <ComboboxItem value="absent">Absent</ComboboxItem>
+                      <ComboboxItem value="half_day">Half Day</ComboboxItem>
+                      <ComboboxItem value="sick_leave">Sick Leave</ComboboxItem>
+                      <ComboboxItem value="casual_leave">Casual Leave</ComboboxItem>
+                      <ComboboxItem value="paid_leave">Paid Leave</ComboboxItem>
+                    </ComboboxContent>
+                  </Combobox>
                   <FormMessage />
                 </FormItem>
               )}

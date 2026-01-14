@@ -22,12 +22,12 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Combobox,
+  ComboboxContent,
+  ComboboxItem,
+  ComboboxTrigger,
+  ComboboxValue,
+} from "@/components/ui/combobox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { DoctorAppointmentCard } from "@/components/features/appointments/doctor-appointment-card"
@@ -475,21 +475,21 @@ export default function DoctorSchedulePage() {
             </Tabs>
 
             {/* Status Filter */}
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className={`w-[180px] ${toolbarButtonClass} justify-between`}>
+            <Combobox value={statusFilter} onValueChange={setStatusFilter}>
+              <ComboboxTrigger className={`w-[180px] ${toolbarButtonClass} justify-between`}>
                 <Filter className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="scheduled">Scheduled</SelectItem>
-                <SelectItem value="checked-in">Checked In</SelectItem>
-                <SelectItem value="in-progress">In Progress</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-                <SelectItem value="no-show">No Show</SelectItem>
-              </SelectContent>
-            </Select>
+                <ComboboxValue placeholder="Filter by status" />
+              </ComboboxTrigger>
+              <ComboboxContent>
+                <ComboboxItem value="all">All Status</ComboboxItem>
+                <ComboboxItem value="scheduled">Scheduled</ComboboxItem>
+                <ComboboxItem value="checked-in">Checked In</ComboboxItem>
+                <ComboboxItem value="in-progress">In Progress</ComboboxItem>
+                <ComboboxItem value="completed">Completed</ComboboxItem>
+                <ComboboxItem value="cancelled">Cancelled</ComboboxItem>
+                <ComboboxItem value="no-show">No Show</ComboboxItem>
+              </ComboboxContent>
+            </Combobox>
           </div>
         </CardHeader>
       </Card>

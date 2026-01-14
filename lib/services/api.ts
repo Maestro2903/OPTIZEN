@@ -96,9 +96,25 @@ class ApiService {
       return data
     } catch (error) {
       console.error(`API Error [${endpoint}]:`, error)
+
+      // Normalize permission/auth errors so the UI can show a clear message
+      let errorMessage =
+        error instanceof Error ? error.message : 'Unknown error occurred'
+
+      // Common RBAC / auth patterns from our API middleware
+      const lower = errorMessage.toLowerCase()
+      if (
+        lower.includes('forbidden') ||
+        lower.includes('insufficient permissions') ||
+        lower.includes('unauthorized')
+      ) {
+        errorMessage =
+          'You do not have permission to perform this action. Please contact an administrator.'
+      }
+
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
+        error: errorMessage,
       }
     }
   }
@@ -505,6 +521,7 @@ export interface Invoice {
   payment_method?: string
   notes?: string
   status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'
+  billing_type?: 'consultation_operation' | 'medical' | 'optical'
   patients?: Pick<Patient, 'id' | 'patient_id' | 'full_name' | 'email' | 'mobile' | 'gender'>
   items?: Array<{
     service: string
@@ -523,6 +540,7 @@ export interface InvoiceFilters extends PaginationParams {
   patient_id?: string
   date_from?: string
   date_to?: string
+  billing_type?: 'consultation_operation' | 'medical' | 'optical' | string
 }
 
 export interface InvoiceMetrics {
@@ -1604,6 +1622,375 @@ export const oldPatientRecordsApi = {
   delete: (oldPatientId: string) =>
     apiService.fetchApi<{ success: boolean; message: string }>(
       `/old-patient-records/${oldPatientId}`,
+      { method: 'DELETE' }
+    ),
+}
+
+// ===============================
+// OUT PATIENT RECORDS API
+// ===============================
+
+export interface OutPatientRecord {
+  id: string
+  receipt_no: string
+  uhd_no?: string
+  record_date: string
+  record_time?: string
+  patient_id?: string
+  name: string
+  age?: number
+  sex?: 'male' | 'female' | 'other'
+  address?: string
+  pain_assessment_scale?: number
+  complaints?: string
+  diagnosis?: string
+  tension?: string
+  fundus?: string
+  eye_examination?: {
+    right_eye?: {
+      lids?: string
+      lacrimal_ducts?: string
+      conjunctiva?: string
+      cornea?: string
+      anterior_chamber?: string
+      iris?: string
+      pupil?: string
+      lens?: string
+      ocular_movements?: string
+    }
+    left_eye?: {
+      lids?: string
+      lacrimal_ducts?: string
+      conjunctiva?: string
+      cornea?: string
+      anterior_chamber?: string
+      iris?: string
+      pupil?: string
+      lens?: string
+      ocular_movements?: string
+    }
+  }
+  vision_assessment?: {
+    right_eye?: {
+      vision_without_glasses_dv?: string
+      vision_without_glasses_nv?: string
+      vision_with_glasses_dv?: string
+      vision_with_glasses_nv?: string
+    }
+    left_eye?: {
+      vision_without_glasses_dv?: string
+      vision_without_glasses_nv?: string
+      vision_with_glasses_dv?: string
+      vision_with_glasses_nv?: string
+    }
+  }
+  history?: {
+    dm?: boolean
+    htn?: boolean
+    previous_surgery?: boolean
+    vaccination?: boolean
+    others?: string
+  }
+  proposed_plan?: string
+  rx?: string
+  urine_albumin?: string
+  urine_sugar?: string
+  bp?: string
+  weight?: number
+  created_by?: string
+  created_at: string
+  updated_at: string
+  patients?: Patient
+}
+
+export interface OutPatientRecordFilters extends PaginationParams {
+  search?: string
+  patient_id?: string
+  receipt_no?: string
+}
+
+export const outPatientRecordsApi = {
+  list: (params: OutPatientRecordFilters = {}) =>
+    apiService.getList<OutPatientRecord>('out-patient-records', params),
+
+  get: (id: string) =>
+    apiService.fetchApi<OutPatientRecord>(`/out-patient-records/${id}`),
+
+  create: (data: Omit<OutPatientRecord, 'id' | 'created_at' | 'updated_at'>) =>
+    apiService.fetchApi<OutPatientRecord>('/out-patient-records', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: string, data: Partial<OutPatientRecord>) =>
+    apiService.fetchApi<OutPatientRecord>(`/out-patient-records/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: string) =>
+    apiService.fetchApi<{ success: boolean; message: string }>(
+      `/out-patient-records/${id}`,
+      { method: 'DELETE' }
+    ),
+}
+
+// ===============================
+// VISION RECORDS API
+// ===============================
+
+export interface VisionRecord {
+  id: string
+  patient_id?: string
+  record_date: string
+  record_time?: string
+  record_number: string
+  vision_data?: VisionData
+  examination_data?: ExaminationData
+  created_by?: string
+  updated_by?: string
+  created_at: string
+  updated_at: string
+  patients?: Pick<Patient, 'id' | 'patient_id' | 'full_name' | 'email' | 'mobile' | 'gender' | 'date_of_birth' | 'state'>
+}
+
+export interface VisionRecordFilters extends PaginationParams {
+  search?: string
+  patient_id?: string
+  record_number?: string
+}
+
+export const visionRecordsApi = {
+  list: (params: VisionRecordFilters = {}) =>
+    apiService.getList<VisionRecord>('vision-records', params),
+
+  get: (id: string) =>
+    apiService.fetchApi<VisionRecord>(`/vision-records/${id}`),
+
+  create: (data: Omit<VisionRecord, 'id' | 'created_at' | 'updated_at' | 'patients'>) =>
+    apiService.fetchApi<VisionRecord>('/vision-records', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: string, data: Partial<VisionRecord>) =>
+    apiService.fetchApi<VisionRecord>(`/vision-records/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: string) =>
+    apiService.fetchApi<{ success: boolean; message: string }>(
+      `/vision-records/${id}`,
+      { method: 'DELETE' }
+    ),
+}
+
+// ===============================
+// DIAGNOSIS TESTS API
+// ===============================
+
+export interface DiagnosisTestRecord {
+  id: string
+  patient_id?: string
+  record_date: string
+  record_time?: string
+  record_number: string
+  diagnosis_data?: {
+    diagnosis?: string[]
+    diagnosis_pending?: boolean
+  }
+  tests_data?: {
+    iop?: {
+      right?: { id: string; value: string }
+      left?: { id: string; value: string }
+    }
+    sac_test?: {
+      right?: string
+      left?: string
+    }
+    diagnostic_tests?: Array<{
+      test_id: string
+      eye?: string
+      type?: string
+      problem?: string
+      notes?: string
+    }>
+  }
+  created_by?: string
+  updated_by?: string
+  created_at: string
+  updated_at: string
+  patients?: Pick<Patient, 'id' | 'patient_id' | 'full_name' | 'email' | 'mobile' | 'gender' | 'date_of_birth' | 'state'>
+}
+
+export interface DiagnosisTestFilters extends PaginationParams {
+  search?: string
+  patient_id?: string
+  record_number?: string
+}
+
+export const diagnosisTestsApi = {
+  list: (params: DiagnosisTestFilters = {}) =>
+    apiService.getList<DiagnosisTestRecord>('diagnosis-tests', params),
+
+  get: (id: string) =>
+    apiService.fetchApi<DiagnosisTestRecord>(`/diagnosis-tests/${id}`),
+
+  create: (data: Omit<DiagnosisTestRecord, 'id' | 'created_at' | 'updated_at' | 'patients'>) =>
+    apiService.fetchApi<DiagnosisTestRecord>('/diagnosis-tests', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: string, data: Partial<DiagnosisTestRecord>) =>
+    apiService.fetchApi<DiagnosisTestRecord>(`/diagnosis-tests/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: string) =>
+    apiService.fetchApi<{ success: boolean; message: string }>(
+      `/diagnosis-tests/${id}`,
+      { method: 'DELETE' }
+    ),
+}
+
+// ===============================
+// TREATMENT MEDICATIONS API
+// ===============================
+
+export interface TreatmentMedicationRecord {
+  id: string
+  patient_id?: string
+  record_date: string
+  record_time?: string
+  record_number: string
+  medications_data?: {
+    medications?: Array<{
+      drug_id: string
+      eye?: string
+      dosage_id?: string
+      route_id?: string
+      duration?: string
+      quantity?: string
+    }>
+  }
+  past_medications_data?: {
+    medications?: Array<{
+      medicine_id?: string
+      medicine_name: string
+      type?: string
+      advice?: string
+      duration?: string
+      eye?: string
+    }>
+  }
+  past_treatments_data?: {
+    treatments?: Array<{
+      treatment: string
+      years: string
+    }>
+  }
+  surgeries_data?: {
+    surgeries?: Array<{
+      eye: string
+      surgery_name: string
+      anesthesia: string
+    }>
+  }
+  treatments_data?: {
+    treatments?: string[]
+  }
+  created_by?: string
+  updated_by?: string
+  created_at: string
+  updated_at: string
+  patients?: Pick<Patient, 'id' | 'patient_id' | 'full_name' | 'email' | 'mobile' | 'gender' | 'date_of_birth' | 'state'>
+}
+
+export interface TreatmentMedicationFilters extends PaginationParams {
+  search?: string
+  patient_id?: string
+  record_number?: string
+}
+
+export const treatmentMedicationsApi = {
+  list: (params: TreatmentMedicationFilters = {}) =>
+    apiService.getList<TreatmentMedicationRecord>('treatment-medications', params),
+
+  get: (id: string) =>
+    apiService.fetchApi<TreatmentMedicationRecord>(`/treatment-medications/${id}`),
+
+  create: (data: Omit<TreatmentMedicationRecord, 'id' | 'created_at' | 'updated_at' | 'patients'>) =>
+    apiService.fetchApi<TreatmentMedicationRecord>('/treatment-medications', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: string, data: Partial<TreatmentMedicationRecord>) =>
+    apiService.fetchApi<TreatmentMedicationRecord>(`/treatment-medications/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: string) =>
+    apiService.fetchApi<{ success: boolean; message: string }>(
+      `/treatment-medications/${id}`,
+      { method: 'DELETE' }
+    ),
+}
+
+// ===============================
+// BLOOD & ADVICE API
+// ===============================
+
+export interface BloodAdviceRecord {
+  id: string
+  patient_id?: string
+  record_date: string
+  record_time?: string
+  record_number: string
+  blood_investigation_data?: {
+    blood_sugar?: string
+    blood_tests?: string[]
+  }
+  advice_remarks?: string
+  created_by?: string
+  updated_by?: string
+  created_at: string
+  updated_at: string
+  patients?: Pick<Patient, 'id' | 'patient_id' | 'full_name' | 'email' | 'mobile' | 'gender' | 'date_of_birth' | 'state'>
+}
+
+export interface BloodAdviceFilters extends PaginationParams {
+  search?: string
+  patient_id?: string
+  record_number?: string
+}
+
+export const bloodAdviceApi = {
+  list: (params: BloodAdviceFilters = {}) =>
+    apiService.getList<BloodAdviceRecord>('blood-advice', params),
+
+  get: (id: string) =>
+    apiService.fetchApi<BloodAdviceRecord>(`/blood-advice/${id}`),
+
+  create: (data: Omit<BloodAdviceRecord, 'id' | 'created_at' | 'updated_at' | 'patients'>) =>
+    apiService.fetchApi<BloodAdviceRecord>('/blood-advice', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: string, data: Partial<BloodAdviceRecord>) =>
+    apiService.fetchApi<BloodAdviceRecord>(`/blood-advice/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: string) =>
+    apiService.fetchApi<{ success: boolean; message: string }>(
+      `/blood-advice/${id}`,
       { method: 'DELETE' }
     ),
 }

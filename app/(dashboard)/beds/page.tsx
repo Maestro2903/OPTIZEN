@@ -26,12 +26,12 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Combobox,
+  ComboboxContent,
+  ComboboxItem,
+  ComboboxTrigger,
+  ComboboxValue,
+} from "@/components/ui/combobox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BedCard } from "@/components/features/beds/bed-card"
 import { BedAssignmentForm } from "@/components/forms/bed-assignment-form"
@@ -603,29 +603,29 @@ export default function BedsPage() {
                 Add New Bed
               </Button>
             </BedForm>
-            <Select value={wardFilter} onValueChange={setWardFilter}>
-              <SelectTrigger className="w-[130px] rounded-lg border border-gray-300 bg-white text-gray-700">
-                <SelectValue placeholder="Ward" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Wards</SelectItem>
-                <SelectItem value="general">General</SelectItem>
-                <SelectItem value="icu">ICU</SelectItem>
-                <SelectItem value="private">Private</SelectItem>
-                <SelectItem value="semi_private">Semi Private</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={floorFilter} onValueChange={setFloorFilter}>
-              <SelectTrigger className="w-[110px] rounded-lg border border-gray-300 bg-white text-gray-700">
-                <SelectValue placeholder="Floor" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Floors</SelectItem>
-                <SelectItem value="1">Floor 1</SelectItem>
-                <SelectItem value="2">Floor 2</SelectItem>
-                <SelectItem value="3">Floor 3</SelectItem>
-              </SelectContent>
-            </Select>
+            <Combobox value={wardFilter} onValueChange={setWardFilter}>
+              <ComboboxTrigger className="w-[130px] rounded-lg border border-gray-300 bg-white text-gray-700">
+                <ComboboxValue placeholder="Ward" />
+              </ComboboxTrigger>
+              <ComboboxContent>
+                <ComboboxItem value="all">All Wards</ComboboxItem>
+                <ComboboxItem value="general">General</ComboboxItem>
+                <ComboboxItem value="icu">ICU</ComboboxItem>
+                <ComboboxItem value="private">Private</ComboboxItem>
+                <ComboboxItem value="semi_private">Semi Private</ComboboxItem>
+              </ComboboxContent>
+            </Combobox>
+            <Combobox value={floorFilter} onValueChange={setFloorFilter}>
+              <ComboboxTrigger className="w-[110px] rounded-lg border border-gray-300 bg-white text-gray-700">
+                <ComboboxValue placeholder="Floor" />
+              </ComboboxTrigger>
+              <ComboboxContent>
+                <ComboboxItem value="all">All Floors</ComboboxItem>
+                <ComboboxItem value="1">Floor 1</ComboboxItem>
+                <ComboboxItem value="2">Floor 2</ComboboxItem>
+                <ComboboxItem value="3">Floor 3</ComboboxItem>
+              </ComboboxContent>
+            </Combobox>
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -835,18 +835,18 @@ export default function BedsPage() {
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-[140px]">
-                      <SelectValue placeholder="All Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="available">Available</SelectItem>
-                      <SelectItem value="occupied">Occupied</SelectItem>
-                      <SelectItem value="maintenance">Maintenance</SelectItem>
-                      <SelectItem value="reserved">Reserved</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Combobox value={statusFilter} onValueChange={setStatusFilter}>
+                    <ComboboxTrigger className="w-[140px]">
+                      <ComboboxValue placeholder="All Status" />
+                    </ComboboxTrigger>
+                    <ComboboxContent>
+                      <ComboboxItem value="all">All Status</ComboboxItem>
+                      <ComboboxItem value="available">Available</ComboboxItem>
+                      <ComboboxItem value="occupied">Occupied</ComboboxItem>
+                      <ComboboxItem value="maintenance">Maintenance</ComboboxItem>
+                      <ComboboxItem value="reserved">Reserved</ComboboxItem>
+                    </ComboboxContent>
+                  </Combobox>
                 </div>
               </div>
             </CardHeader>

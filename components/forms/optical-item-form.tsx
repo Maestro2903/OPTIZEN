@@ -24,12 +24,12 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Combobox,
+  ComboboxContent,
+  ComboboxItem,
+  ComboboxTrigger,
+  ComboboxValue,
+} from "@/components/ui/combobox"
 import { Textarea } from "@/components/ui/textarea"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -196,7 +196,7 @@ export function OpticalItemForm({ children, itemData, mode = "create", onSubmit:
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" onCloseButtonClickOnly={true}>
         <DialogHeader>
           <DialogTitle>{mode === "edit" ? "Edit Optical Item" : "Add New Optical Item"}</DialogTitle>
           <DialogDescription>
@@ -212,21 +212,21 @@ export function OpticalItemForm({ children, itemData, mode = "create", onSubmit:
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Item Type *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Combobox value={field.value} onValueChange={field.onChange}>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
+                        <ComboboxTrigger>
+                          <ComboboxValue placeholder="Select type" />
+                        </ComboboxTrigger>
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="frames">Frames</SelectItem>
-                        <SelectItem value="lenses">Lenses</SelectItem>
-                        <SelectItem value="accessories">Accessories</SelectItem>
-                        <SelectItem value="equipment">Equipment</SelectItem>
-                        <SelectItem value="consumables">Consumables</SelectItem>
-                        <SelectItem value="medicine">Medicine</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      <ComboboxContent>
+                        <ComboboxItem value="frames">Frames</ComboboxItem>
+                        <ComboboxItem value="lenses">Lenses</ComboboxItem>
+                        <ComboboxItem value="accessories">Accessories</ComboboxItem>
+                        <ComboboxItem value="equipment">Equipment</ComboboxItem>
+                        <ComboboxItem value="consumables">Consumables</ComboboxItem>
+                        <ComboboxItem value="medicine">Medicine</ComboboxItem>
+                      </ComboboxContent>
+                    </Combobox>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -354,19 +354,19 @@ export function OpticalItemForm({ children, itemData, mode = "create", onSubmit:
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Gender</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Combobox value={field.value} onValueChange={field.onChange}>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
+                        <ComboboxTrigger>
+                          <ComboboxValue placeholder="Select" />
+                        </ComboboxTrigger>
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="unisex">Unisex</SelectItem>
-                        <SelectItem value="male">Male</SelectItem>
-                        <SelectItem value="female">Female</SelectItem>
-                        <SelectItem value="kids">Kids</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      <ComboboxContent>
+                        <ComboboxItem value="unisex">Unisex</ComboboxItem>
+                        <ComboboxItem value="male">Male</ComboboxItem>
+                        <ComboboxItem value="female">Female</ComboboxItem>
+                        <ComboboxItem value="kids">Kids</ComboboxItem>
+                      </ComboboxContent>
+                    </Combobox>
                     <FormMessage />
                   </FormItem>
                 )}

@@ -24,12 +24,12 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Combobox,
+  ComboboxContent,
+  ComboboxItem,
+  ComboboxTrigger,
+  ComboboxValue,
+} from "@/components/ui/combobox"
 import { Textarea } from "@/components/ui/textarea"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -262,7 +262,7 @@ export function StockAdjustmentForm({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" onCloseButtonClickOnly={true}>
         <DialogHeader>
           <DialogTitle>Stock Adjustment</DialogTitle>
           <DialogDescription>
@@ -278,24 +278,24 @@ export function StockAdjustmentForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Item Type *</FormLabel>
-                    <Select 
+                    <Combobox 
+                      value={field.value}
                       onValueChange={(value) => {
                         field.onChange(value)
                         form.setValue('item_id', '') // Reset item selection
                         setSelectedItem(null)
-                      }} 
-                      defaultValue={field.value}
+                      }}
                     >
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
+                        <ComboboxTrigger>
+                          <ComboboxValue placeholder="Select type" />
+                        </ComboboxTrigger>
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="pharmacy">Pharmacy</SelectItem>
-                        <SelectItem value="optical">Optical</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      <ComboboxContent>
+                        <ComboboxItem value="pharmacy">Pharmacy</ComboboxItem>
+                        <ComboboxItem value="optical">Optical</ComboboxItem>
+                      </ComboboxContent>
+                    </Combobox>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -343,20 +343,20 @@ export function StockAdjustmentForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Movement Type *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Combobox value={field.value} onValueChange={field.onChange}>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
+                        <ComboboxTrigger>
+                          <ComboboxValue placeholder="Select type" />
+                        </ComboboxTrigger>
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="purchase">Purchase (Add Stock)</SelectItem>
-                        <SelectItem value="adjustment">Adjustment (+/-)</SelectItem>
-                        <SelectItem value="return">Return (Add Stock)</SelectItem>
-                        <SelectItem value="expired">Expired (Remove Stock)</SelectItem>
-                        <SelectItem value="damaged">Damaged (Remove Stock)</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      <ComboboxContent>
+                        <ComboboxItem value="purchase">Purchase (Add Stock)</ComboboxItem>
+                        <ComboboxItem value="adjustment">Adjustment (+/-)</ComboboxItem>
+                        <ComboboxItem value="return">Return (Add Stock)</ComboboxItem>
+                        <ComboboxItem value="expired">Expired (Remove Stock)</ComboboxItem>
+                        <ComboboxItem value="damaged">Damaged (Remove Stock)</ComboboxItem>
+                      </ComboboxContent>
+                    </Combobox>
                     <FormMessage />
                   </FormItem>
                 )}

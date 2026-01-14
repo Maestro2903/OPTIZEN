@@ -28,12 +28,12 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Combobox,
+  ComboboxContent,
+  ComboboxItem,
+  ComboboxTrigger,
+  ComboboxValue,
+} from "@/components/ui/combobox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 const fitnessCertSchema = z.object({
@@ -256,19 +256,19 @@ export function CertificateForms({ children }: CertificateFormsProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Purpose *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Combobox value={field.value} onValueChange={field.onChange}>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select purpose" />
-                          </SelectTrigger>
+                          <ComboboxTrigger>
+                            <ComboboxValue placeholder="Select purpose" />
+                          </ComboboxTrigger>
                         </FormControl>
-                        <SelectContent>
-                          <SelectItem value="Employment">Employment</SelectItem>
-                          <SelectItem value="Driving License">Driving License</SelectItem>
-                          <SelectItem value="School">School</SelectItem>
-                          <SelectItem value="Sports">Sports</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        <ComboboxContent>
+                          <ComboboxItem value="Employment">Employment</ComboboxItem>
+                          <ComboboxItem value="Driving License">Driving License</ComboboxItem>
+                          <ComboboxItem value="School">School</ComboboxItem>
+                          <ComboboxItem value="Sports">Sports</ComboboxItem>
+                        </ComboboxContent>
+                      </Combobox>
                       <FormMessage />
                     </FormItem>
                   )}

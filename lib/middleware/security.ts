@@ -70,11 +70,6 @@ export const securityHeaders = {
  * HTTPS enforcement middleware
  */
 export function enforceHTTPS(req: NextRequest): NextResponse | null {
-  // Skip HTTPS enforcement in development
-  if (process.env.NODE_ENV === 'development') {
-    return null
-  }
-
   const protocol = req.headers.get('x-forwarded-proto') || 'http'
 
   // If not HTTPS, redirect to HTTPS using Next.js URL API for security
@@ -108,11 +103,6 @@ export function applySecurityHeaders(response: NextResponse): NextResponse {
  * IP whitelisting for admin endpoints
  */
 export function checkIPWhitelist(req: NextRequest, allowedIPs: string[] = []): boolean {
-  // Skip IP check in development
-  if (process.env.NODE_ENV === 'development') {
-    return true
-  }
-
   const forwarded = req.headers.get('x-forwarded-for')
   const ip = forwarded ? forwarded.split(',')[0].trim() : req.headers.get('x-real-ip') || 'unknown'
 
@@ -146,9 +136,6 @@ export function configureCORS(req: NextRequest, allowedOrigins: string[] = []): 
   if (origin && allowedOriginsList.includes(origin)) {
     headers.set('Access-Control-Allow-Origin', origin)
     headers.set('Access-Control-Allow-Credentials', 'true')
-  } else if (process.env.NODE_ENV === 'development') {
-    headers.set('Access-Control-Allow-Origin', '*')
-    // Don't set credentials with wildcard origin
   }
 
   // Set CORS headers

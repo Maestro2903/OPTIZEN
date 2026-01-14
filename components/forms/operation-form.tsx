@@ -403,7 +403,7 @@ export function OperationForm({ children, onSubmit, operationData, mode = "creat
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {mode === "create" && <DialogTrigger asChild>{children}</DialogTrigger>}
-      <DialogContent className="max-w-4xl max-h-[85vh] p-0 flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[85vh] p-0 flex flex-col" onCloseButtonClickOnly={true}>
         {/* Fixed Header */}
         <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-200 flex-shrink-0">
           <DialogTitle className="text-xl font-bold text-gray-900">

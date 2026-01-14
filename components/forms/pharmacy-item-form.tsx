@@ -24,12 +24,12 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Combobox,
+  ComboboxContent,
+  ComboboxItem,
+  ComboboxTrigger,
+  ComboboxValue,
+} from "@/components/ui/combobox"
 import { Textarea } from "@/components/ui/textarea"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -189,7 +189,7 @@ export function PharmacyItemForm({ children, itemData, mode = "create", onSubmit
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto" onCloseButtonClickOnly={true}>
         <DialogHeader>
           <DialogTitle>{mode === "edit" ? "Edit Medicine" : "Add New Medicine"}</DialogTitle>
           <DialogDescription>
@@ -254,21 +254,21 @@ export function PharmacyItemForm({ children, itemData, mode = "create", onSubmit
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Dosage Form</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Combobox value={field.value} onValueChange={field.onChange}>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select form" />
-                        </SelectTrigger>
+                        <ComboboxTrigger>
+                          <ComboboxValue placeholder="Select form" />
+                        </ComboboxTrigger>
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Tablet">Tablet</SelectItem>
-                        <SelectItem value="Capsule">Capsule</SelectItem>
-                        <SelectItem value="Drops">Drops</SelectItem>
-                        <SelectItem value="Ointment">Ointment</SelectItem>
-                        <SelectItem value="Syrup">Syrup</SelectItem>
-                        <SelectItem value="Injection">Injection</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      <ComboboxContent>
+                        <ComboboxItem value="Tablet">Tablet</ComboboxItem>
+                        <ComboboxItem value="Capsule">Capsule</ComboboxItem>
+                        <ComboboxItem value="Drops">Drops</ComboboxItem>
+                        <ComboboxItem value="Ointment">Ointment</ComboboxItem>
+                        <ComboboxItem value="Syrup">Syrup</ComboboxItem>
+                        <ComboboxItem value="Injection">Injection</ComboboxItem>
+                      </ComboboxContent>
+                    </Combobox>
                     <FormMessage />
                   </FormItem>
                 )}

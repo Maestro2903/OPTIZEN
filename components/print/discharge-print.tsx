@@ -324,7 +324,7 @@ export function DischargePrint({ discharge, children }: DischargePrintProps) {
               </div>
               <div>
                 <div className="text-[10px] uppercase text-gray-400 font-semibold mb-1">Emergency Contact</div>
-                <div className="text-sm font-bold text-gray-900">+91 98765 43210</div>
+                <div className="text-sm font-bold text-gray-900">229461</div>
               </div>
             </div>
           </PrintSection>

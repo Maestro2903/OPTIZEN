@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
     const patient_id = searchParams.get('patient_id') || ''
     const date_from = searchParams.get('date_from') || ''
     const date_to = searchParams.get('date_to') || ''
+    const billing_type = searchParams.get('billing_type') || ''
 
     // Validate and constrain page and limit
     page = isNaN(page) || page < 1 ? 1 : page
@@ -90,6 +91,14 @@ export async function GET(request: NextRequest) {
     }
     if (date_to) {
       query = query.lte('invoice_date', date_to)
+    }
+
+    // Apply billing_type filter
+    if (billing_type) {
+      const allowedBillingTypes = ['consultation_operation', 'medical', 'optical']
+      if (allowedBillingTypes.includes(billing_type)) {
+        query = query.eq('billing_type', billing_type)
+      }
     }
 
     // Apply sorting
@@ -176,7 +185,8 @@ export async function POST(request: NextRequest) {
       payment_method,
       notes,
       items, // Array of invoice items
-      status = 'unpaid'
+      status = 'unpaid',
+      billing_type = 'consultation_operation'
     } = body
 
     if (!invoice_number || !patient_id || !invoice_date || !total_amount || !Array.isArray(items) || items.length === 0) {
@@ -207,6 +217,15 @@ export async function POST(request: NextRequest) {
 
     if (patientError || !patient) {
       return handleNotFoundError('Patient', patient_id)
+    }
+
+    // Validate billing_type
+    const allowedBillingTypes = ['consultation_operation', 'medical', 'optical']
+    if (billing_type && !allowedBillingTypes.includes(billing_type)) {
+      return NextResponse.json(
+        { error: `Invalid billing_type. Must be one of: ${allowedBillingTypes.join(', ')}` },
+        { status: 400 }
+      )
     }
 
     // Calculate balance
@@ -318,6 +337,7 @@ export async function POST(request: NextRequest) {
           payment_method,
           notes,
           status,
+          billing_type: billing_type || 'consultation_operation',
           items: items // Store items as JSONB
         }
       ])

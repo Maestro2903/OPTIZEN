@@ -21,12 +21,12 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Combobox,
+  ComboboxContent,
+  ComboboxItem,
+  ComboboxTrigger,
+  ComboboxValue,
+} from "@/components/ui/combobox"
 import { Textarea } from "@/components/ui/textarea"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -162,7 +162,7 @@ export function BedForm({ children, bedData, mode = "create", onSuccess }: BedFo
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0" onCloseButtonClickOnly={true}>
         {/* Fixed Header */}
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <DialogTitle>{mode === "edit" ? "Edit Bed" : "Add New Bed"}</DialogTitle>
@@ -203,20 +203,20 @@ export function BedForm({ children, bedData, mode = "create", onSuccess }: BedFo
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Bed Type *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Combobox value={field.value} onValueChange={field.onChange}>
                         <FormControl>
-                          <SelectTrigger className="bg-white border-gray-200 focus:border-gray-600 text-sm rounded-lg h-11">
-                            <SelectValue placeholder="Select type" />
-                          </SelectTrigger>
+                          <ComboboxTrigger className="bg-white border-gray-200 focus:border-gray-600 text-sm rounded-lg h-11">
+                            <ComboboxValue placeholder="Select type" />
+                          </ComboboxTrigger>
                         </FormControl>
-                        <SelectContent>
-                          <SelectItem value="Standard">Standard</SelectItem>
-                          <SelectItem value="Deluxe">Deluxe</SelectItem>
-                          <SelectItem value="ICU">ICU Bed</SelectItem>
-                          <SelectItem value="Electric">Electric</SelectItem>
-                          <SelectItem value="Pediatric">Pediatric</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        <ComboboxContent>
+                          <ComboboxItem value="Standard">Standard</ComboboxItem>
+                          <ComboboxItem value="Deluxe">Deluxe</ComboboxItem>
+                          <ComboboxItem value="ICU">ICU Bed</ComboboxItem>
+                          <ComboboxItem value="Electric">Electric</ComboboxItem>
+                          <ComboboxItem value="Pediatric">Pediatric</ComboboxItem>
+                        </ComboboxContent>
+                      </Combobox>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -230,20 +230,20 @@ export function BedForm({ children, bedData, mode = "create", onSuccess }: BedFo
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-xs font-bold text-gray-700 uppercase tracking-wide">Ward Type *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Combobox value={field.value} onValueChange={field.onChange}>
                         <FormControl>
-                          <SelectTrigger className="bg-white border-gray-200 focus:border-gray-600 text-sm rounded-lg h-11">
-                            <SelectValue placeholder="Select ward type" />
-                          </SelectTrigger>
+                          <ComboboxTrigger className="bg-white border-gray-200 focus:border-gray-600 text-sm rounded-lg h-11">
+                            <ComboboxValue placeholder="Select ward type" />
+                          </ComboboxTrigger>
                         </FormControl>
-                        <SelectContent>
-                          <SelectItem value="general">General Ward</SelectItem>
-                          <SelectItem value="icu">ICU (Intensive Care)</SelectItem>
-                          <SelectItem value="private">Private Room</SelectItem>
-                          <SelectItem value="semi_private">Semi-Private</SelectItem>
-                          <SelectItem value="emergency">Emergency Ward</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        <ComboboxContent>
+                          <ComboboxItem value="general">General Ward</ComboboxItem>
+                          <ComboboxItem value="icu">ICU (Intensive Care)</ComboboxItem>
+                          <ComboboxItem value="private">Private Room</ComboboxItem>
+                          <ComboboxItem value="semi_private">Semi-Private</ComboboxItem>
+                          <ComboboxItem value="emergency">Emergency Ward</ComboboxItem>
+                        </ComboboxContent>
+                      </Combobox>
                       <FormMessage />
                     </FormItem>
                   )}

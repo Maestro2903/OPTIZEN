@@ -155,7 +155,10 @@ export function CertificatePrint({ certificate, children }: CertificatePrintProp
           isDraft={certificate.status === 'Draft'}
         >
           {/* Header & Branding */}
-          <PrintHeader />
+          <PrintHeader 
+            hospitalName={certificate.hospital_name}
+            hospitalAddress={certificate.hospital_address}
+          />
 
           {/* Reference Section (Top Right) */}
           <div className="flex justify-end mb-6">
@@ -257,8 +260,8 @@ export function QuickCertificatePrint({ certificate }: { certificate: any }) {
       </head>
       <body>
         <div class="header">
-          <div class="clinic-name">OptiZen Medical Center</div>
-          <div class="clinic-details">123 Medical Plaza, Healthcare District, City - 123456<br>Phone: +91 98765 43210</div>
+          <div class="clinic-name">${certificate.hospital_name || 'Sri Ramana Maharishi Eye Hospital'}</div>
+          <div class="clinic-details">${certificate.hospital_address || '51-C, Somavarakula Street, Tiruvannamalai – 606 603'}<br>Phone: 229461</div>
           <div class="cert-title">${certificate.type?.toUpperCase() || 'MEDICAL CERTIFICATE'}</div>
         </div>
 

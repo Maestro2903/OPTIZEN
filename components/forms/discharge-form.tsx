@@ -30,13 +30,6 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 
 const dischargeFormSchema = z.object({
   patient_id: z.string().min(1, "Patient is required"),
@@ -511,7 +504,7 @@ export function DischargeForm({ children, dischargeData, mode = "add", onSuccess
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0">
+      <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0" onCloseButtonClickOnly={true}>
         {/* Fixed Header */}
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <DialogTitle>{mode === "edit" ? "Edit Discharge Record" : "Add Discharge Record"}</DialogTitle>

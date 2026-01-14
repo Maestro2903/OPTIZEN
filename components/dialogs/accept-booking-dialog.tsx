@@ -21,12 +21,12 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Combobox,
+  ComboboxContent,
+  ComboboxItem,
+  ComboboxTrigger,
+  ComboboxValue,
+} from "@/components/ui/combobox"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useForm } from "react-hook-form"
@@ -214,18 +214,18 @@ export function AcceptBookingDialog({
                 render={({ field }) => (
                   <FormItem>
                     <PremiumLabel required>Gender</PremiumLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Combobox value={field.value} onValueChange={field.onChange}>
                       <FormControl>
-                        <SelectTrigger className="h-11 border-gray-200 rounded-lg">
-                          <SelectValue placeholder="Select gender" />
-                        </SelectTrigger>
+                        <ComboboxTrigger className="h-11 border-gray-200 rounded-lg">
+                          <ComboboxValue placeholder="Select gender" />
+                        </ComboboxTrigger>
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="male">Male</SelectItem>
-                        <SelectItem value="female">Female</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      <ComboboxContent>
+                        <ComboboxItem value="male">Male</ComboboxItem>
+                        <ComboboxItem value="female">Female</ComboboxItem>
+                        <ComboboxItem value="other">Other</ComboboxItem>
+                      </ComboboxContent>
+                    </Combobox>
                     <FormMessage />
                   </FormItem>
                 )}

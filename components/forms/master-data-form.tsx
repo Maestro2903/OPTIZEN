@@ -67,7 +67,7 @@ export function MasterDataForm({ children, title, fieldLabel, category, onSubmit
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md" onCloseButtonClickOnly={true}>
         <DialogHeader>
           <DialogTitle>Add {title}</DialogTitle>
           <DialogDescription>

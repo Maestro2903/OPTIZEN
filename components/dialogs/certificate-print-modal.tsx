@@ -172,13 +172,14 @@ export function CertificatePrintModal({ data, isOpen, onClose }: CertificatePrin
   const certificateTitle = getCertificateTitle()
   const certificateBody = getCertificateBody()
 
-  // Normalize hospital name - replace EyeCare with OptiZen
+  // Get hospital name with fallback
   const getHospitalName = () => {
-    const hospitalName = data.hospital_name || ''
-    if (hospitalName.includes('EyeCare') || hospitalName === '') {
-      return 'OptiZen Medical Center'
-    }
-    return hospitalName
+    return data.hospital_name || 'Sri Ramana Maharishi Eye Hospital'
+  }
+
+  // Get hospital address with fallback
+  const getHospitalAddress = () => {
+    return data.hospital_address || '51-C, Somavarakula Street, Tiruvannamalai – 606 603'
   }
 
   // Handle print
@@ -224,7 +225,7 @@ export function CertificatePrintModal({ data, isOpen, onClose }: CertificatePrin
           {/* Header (Standard) */}
           <PrintHeader
             hospitalName={getHospitalName()}
-            hospitalAddress={data.hospital_address}
+            hospitalAddress={getHospitalAddress()}
           />
 
           {/* Reference Block (Top Right) */}

@@ -167,3 +167,14 @@ The code now includes console logging. Check the browser console for:
 
 
 
+
+
+
+
+
+
+
+
+
+
+

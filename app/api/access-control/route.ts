@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, createServiceClient } from '@/lib/supabase/server'
+import { logger } from '@/lib/utils/logger'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 // Force dynamic rendering to prevent static analysis issues with cookies()
@@ -141,19 +142,34 @@ async function togglePermission(
  * SECURITY: Only super_admin can access - they have full control to view/edit all permissions
  */
 export async function GET(request: NextRequest) {
+  const requestId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+  const startTime = Date.now()
+
   try {
     const { searchParams } = new URL(request.url)
     const roleName = searchParams.get('role')
-    console.log('🔍 GET /api/access-control - Request received for role:', roleName)
+    logger.info('GET /api/access-control request', {
+      request_id: requestId,
+      endpoint: '/api/access-control',
+      role: roleName
+    })
     
     const supabase = await createAuthenticatedClient()
     
     // Check authentication
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-    console.log('🔑 Session status:', session ? 'Active' : 'None', sessionError ? `Error: ${sessionError.message}` : '')
+    logger.debug('Session status check', {
+      request_id: requestId,
+      endpoint: '/api/access-control',
+      has_session: !!session,
+      session_error: sessionError?.message
+    })
     
     if (!session) {
-      console.warn('❌ No session found')
+      logger.warn('No session found for access-control request', {
+        request_id: requestId,
+        endpoint: '/api/access-control'
+      })
       return NextResponse.json(
         { error: 'Unauthorized - Please log in', details: 'No active session' },
         { status: 401 }
@@ -167,10 +183,20 @@ export async function GET(request: NextRequest) {
       .eq('id', session.user.id)
       .single()
 
-    console.log('👤 User fetched:', user?.email, 'Role:', user?.role, userError ? `Error: ${userError.message}` : '')
+    logger.debug('User fetched for authorization', {
+      request_id: requestId,
+      endpoint: '/api/access-control',
+      user_email: user?.email,
+      user_role: user?.role,
+      user_error: userError?.message
+    })
 
     if (userError) {
-      console.error('❌ Error fetching user role:', userError)
+      logger.error('Error fetching user role', userError, {
+        request_id: requestId,
+        endpoint: '/api/access-control',
+        user_id: session.user.id
+      })
       return NextResponse.json(
         { error: 'Database error', message: 'Failed to verify user role', details: userError.message },
         { status: 500 }
@@ -178,18 +204,32 @@ export async function GET(request: NextRequest) {
     }
 
     if (!user || user.role !== 'super_admin') {
-      console.warn(`🚫 Access denied for user ${user?.email} with role ${user?.role}`)
+      logger.warn('Access denied for non-super-admin user', {
+        request_id: requestId,
+        endpoint: '/api/access-control',
+        user_email: user?.email,
+        user_role: user?.role
+      })
       return NextResponse.json(
         { error: 'Forbidden: Only Super Admins can access permission management', userRole: user?.role },
         { status: 403 }
       )
     }
     
-    console.log('✅ Authorization passed for', user.email)
+    logger.debug('Authorization passed', {
+      request_id: requestId,
+      endpoint: '/api/access-control',
+      user_email: user.email,
+      user_id: user.id
+    })
 
     // Validate role parameter
     if (!roleName) {
-      console.error('❌ Missing role parameter in GET request')
+      logger.warn('Missing role parameter in GET request', {
+        request_id: requestId,
+        endpoint: '/api/access-control',
+        user_id: user.id
+      })
       return NextResponse.json(
         { error: 'Role parameter is required', hint: 'Add ?role=<role_name> to the URL' },
         { status: 400 }
@@ -213,15 +253,25 @@ export async function GET(request: NextRequest) {
       .single<RoleData>()
 
     if (roleError || !roleData) {
-      console.error('❌ Role not found:', roleName, roleError)
+      logger.warn('Role not found in direct query', {
+        request_id: requestId,
+        endpoint: '/api/access-control',
+        user_id: user.id,
+        role_name: roleName,
+        error: roleError?.message
+      })
       
       // Fallback: Try using database function to bypass cache
       const { data: roleFromRpc, error: rpcError } = await callGetRoleByName(serviceClient, roleName)
       
       if (rpcError || !roleFromRpc || roleFromRpc.length === 0) {
-        console.error('❌ RPC fallback also failed:', rpcError)
-        console.error('❌ Requested role:', roleName)
-        console.error('💡 Available roles: super_admin, admin, doctor, nurse, receptionist, finance, pharmacy, lab_technician')
+        logger.error('RPC fallback also failed', rpcError, {
+          request_id: requestId,
+          endpoint: '/api/access-control',
+          user_id: user.id,
+          role_name: roleName,
+          available_roles: ['super_admin', 'admin', 'doctor', 'nurse', 'receptionist', 'finance', 'pharmacy', 'lab_technician']
+        })
         return NextResponse.json(
           { 
             error: 'Role not found in database', 
@@ -235,7 +285,12 @@ export async function GET(request: NextRequest) {
       
       // Use the role from RPC
       const roleDataFromRpc = roleFromRpc[0]
-      console.log('✅ Role found via RPC fallback:', roleDataFromRpc.name)
+      logger.debug('Role found via RPC fallback', {
+        request_id: requestId,
+        endpoint: '/api/access-control',
+        user_id: user.id,
+        role_name: roleDataFromRpc.name
+      })
       
       // Use helper function to fetch and transform permissions
       const result = await fetchAndTransformPermissions(serviceClient, roleDataFromRpc.id)
@@ -265,13 +320,23 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    const duration = Date.now() - startTime
+    logger.requestComplete('GET', '/api/access-control', 200, duration, requestId, {
+      user_id: user.id,
+      role_name: roleName
+    })
+
     return NextResponse.json({
       role: roleData,
       permissions: result.permissionsMap
     })
   } catch (error: any) {
-    console.error('💥 Error in GET /api/access-control:', error)
-    console.error('💥 Error stack:', error?.stack)
+    const duration = Date.now() - startTime
+    logger.error('Error in GET /api/access-control', error, {
+      request_id: requestId,
+      endpoint: '/api/access-control',
+      duration_ms: duration
+    })
     return NextResponse.json(
       { 
         error: 'Internal server error', 
@@ -288,22 +353,43 @@ export async function GET(request: NextRequest) {
  * SECURITY: Only super_admin can modify - they control who can delete accounts and edit access
  */
 export async function POST(request: NextRequest) {
+  const requestId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+  const startTime = Date.now()
+
   try {
-    console.log('🔍 POST /api/access-control - Request received')
-    console.log('📍 Request URL:', request.url)
+    logger.info('POST /api/access-control request', {
+      request_id: requestId,
+      endpoint: '/api/access-control',
+      url: request.url
+    })
     const supabase = await createAuthenticatedClient()
     
     // Parse request body first
     const body = await request.json()
     const { roleName, resource, action, enabled } = body
-    console.log('📝 Request body:', { roleName, resource, action, enabled })
+    logger.info('Access control modification request', {
+      request_id: requestId,
+      endpoint: '/api/access-control',
+      role_name: roleName,
+      resource,
+      action,
+      enabled
+    })
     
     // Check authentication
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-    console.log('🔑 Session status:', session ? 'Active' : 'None', sessionError ? `Error: ${sessionError.message}` : '')
+    logger.debug('Session status check', {
+      request_id: requestId,
+      endpoint: '/api/access-control',
+      has_session: !!session,
+      session_error: sessionError?.message
+    })
     
     if (!session) {
-      console.warn('❌ No session found for POST request')
+      logger.warn('No session found for POST request', {
+        request_id: requestId,
+        endpoint: '/api/access-control'
+      })
       return NextResponse.json(
         { error: 'Unauthorized - Please log in', details: 'No active session' },
         { status: 401 }
@@ -317,10 +403,19 @@ export async function POST(request: NextRequest) {
       .eq('id', session.user.id)
       .single()
 
-    console.log('👤 User fetched:', user?.email, 'Role:', user?.role)
+    logger.debug('User fetched for authorization', {
+      request_id: requestId,
+      endpoint: '/api/access-control',
+      user_email: user?.email,
+      user_role: user?.role
+    })
 
     if (userError) {
-      console.error('❌ Error fetching user role:', userError)
+      logger.error('Error fetching user role', userError, {
+        request_id: requestId,
+        endpoint: '/api/access-control',
+        user_id: session.user.id
+      })
       return NextResponse.json(
         { error: 'Database error', message: 'Failed to verify user role', details: userError.message },
         { status: 500 }
@@ -328,14 +423,24 @@ export async function POST(request: NextRequest) {
     }
 
     if (!user || user.role !== 'super_admin') {
-      console.warn(`🚫 Unauthorized permission modification by ${user?.email} with role ${user?.role}`)
+      logger.warn('Unauthorized permission modification attempt', {
+        request_id: requestId,
+        endpoint: '/api/access-control',
+        user_email: user?.email,
+        user_role: user?.role
+      })
       return NextResponse.json(
         { error: 'Forbidden: Only Super Admins can modify permissions and access levels', userRole: user?.role },
         { status: 403 }
       )
     }
     
-    console.log('✅ Authorization passed for', user.email)
+    logger.debug('Authorization passed', {
+      request_id: requestId,
+      endpoint: '/api/access-control',
+      user_email: user.email,
+      user_id: user.id
+    })
 
     // Validate request body
     if (!roleName || !resource || !action || typeof enabled !== 'boolean') {
@@ -481,7 +586,14 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      console.log('✅ Operation completed successfully')
+      const duration = Date.now() - startTime
+      logger.requestComplete('POST', '/api/access-control', 200, duration, requestId, {
+        user_id: user.id,
+        role_name: roleName,
+        resource,
+        action,
+        enabled
+      })
       return NextResponse.json({
         success: true,
         message: `Permission ${enabled ? 'added' : 'removed'} successfully`,
@@ -489,9 +601,12 @@ export async function POST(request: NextRequest) {
       })
     }
   } catch (error: any) {
-    console.error('💥 Error in POST /api/access-control:', error)
-    console.error('💥 Error message:', error?.message)
-    console.error('💥 Error stack:', error?.stack)
+    const duration = Date.now() - startTime
+    logger.error('Error in POST /api/access-control', error, {
+      request_id: requestId,
+      endpoint: '/api/access-control',
+      duration_ms: duration
+    })
     return NextResponse.json(
       { 
         error: 'Internal server error',

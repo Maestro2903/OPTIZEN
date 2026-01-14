@@ -115,7 +115,7 @@ export async function GET(
       )
     }
 
-    // Use service client to bypass RLS during RBAC bypass mode
+    // Use service client for admin operations that need to bypass RLS
     const supabase = createServiceClient()
 
     // Fetch operation with all required data
@@ -201,7 +201,7 @@ export async function PUT(
     }
 
     // Check if operation exists
-    // Use service client to bypass RLS during RBAC bypass mode
+    // Use service client for admin operations that need to bypass RLS
     const supabase = createServiceClient()
     const { data: existingOperation, error: fetchError } = await supabase
       .from('operations')
@@ -254,10 +254,7 @@ export async function PUT(
       updated_at: new Date().toISOString() 
     }
     
-    // Only set updated_by if it's not the mock bypass user ID
-    if (context.user_id !== '00000000-0000-0000-0000-000000000000') {
-      updateData.updated_by = context.user_id
-    }
+    updateData.updated_by = context.user_id
     
     for (const field of allowedFields) {
       if (body[field] !== undefined) {
@@ -365,7 +362,7 @@ export async function DELETE(
       )
     }
 
-    // Use service client to bypass RLS during RBAC bypass mode
+    // Use service client for admin operations that need to bypass RLS
     const supabase = createServiceClient()
 
     // Check if operation exists and is not already deleted
@@ -399,12 +396,8 @@ export async function DELETE(
     // Soft delete by setting deleted_at timestamp
     const deleteData: Record<string, any> = {
       deleted_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }
-    
-    // Only set updated_by if it's not the mock bypass user ID
-    if (context.user_id !== '00000000-0000-0000-0000-000000000000') {
-      deleteData.updated_by = context.user_id
+      updated_at: new Date().toISOString(),
+      updated_by: context.user_id
     }
     
     const { error } = await (supabase as any)
