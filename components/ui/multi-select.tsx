@@ -48,16 +48,32 @@ export function MultiSelect({
   const [open, setOpen] = React.useState(false)
   const [searchQuery, setSearchQuery] = React.useState("")
 
-  const selectedOptions = React.useMemo(
-    () => options.filter((option) => value.includes(option.value)),
-    [options, value]
-  )
+  const selectedOptions = React.useMemo(() => {
+    // Get options that match selected values
+    const matchedOptions = options.filter((option) => value.includes(option.value))
+    // Get custom values (values not in options)
+    const customValues = value.filter((v) => !options.some((opt) => opt.value === v))
+    // Combine matched options with custom values as options
+    return [
+      ...matchedOptions,
+      ...customValues.map((v) => ({ value: v, label: v }))
+    ]
+  }, [options, value])
 
   const filteredOptions = React.useMemo(() => {
     if (!searchQuery.trim()) return options
     const query = searchQuery.toLowerCase().trim()
     return options.filter((option) =>
       option.label.toLowerCase().includes(query)
+    )
+  }, [options, searchQuery])
+
+  // Check if search query matches any option
+  const searchMatchesOption = React.useMemo(() => {
+    if (!searchQuery.trim()) return false
+    const query = searchQuery.toLowerCase().trim()
+    return options.some((option) =>
+      option.label.toLowerCase() === query || option.value.toLowerCase() === query
     )
   }, [options, searchQuery])
 
@@ -141,15 +157,16 @@ export function MultiSelect({
               </>
             )}
           </div>
-          <div className="flex items-center gap-1 ml-2">
+          <div className="flex items-center gap-1 ml-2 shrink-0">
             {value.length > 0 && !loading && (
               <button
                 type="button"
                 onClick={handleClear}
-                className="rounded-sm opacity-70 hover:opacity-100 hover:bg-accent p-0.5 transition-opacity"
+                className="rounded-sm opacity-100 hover:opacity-100 hover:bg-red-50 hover:text-red-600 p-1 transition-all"
                 aria-label="Clear all selections"
+                title="Clear all selections"
               >
-                <X className="h-3.5 w-3.5" />
+                <X className="h-4 w-4" />
               </button>
             )}
             <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
@@ -176,6 +193,18 @@ export function MultiSelect({
               onKeyDown={(e) => {
                 if (e.key === 'Escape') {
                   setOpen(false)
+                } else if (e.key === 'Enter' && searchQuery.trim()) {
+                  e.preventDefault()
+                  // If search query doesn't match any option, add it as custom value
+                  if (!searchMatchesOption) {
+                    const customValue = searchQuery.trim()
+                    // Check if custom value already exists in selected values
+                    if (!value.includes(customValue)) {
+                      onValueChange?.([...value, customValue])
+                    }
+                    setSearchQuery("")
+                    setOpen(false)
+                  }
                 }
               }}
               className={cn(
@@ -190,23 +219,53 @@ export function MultiSelect({
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={handleClear}
-                className="h-7 px-2 text-xs ml-2 shrink-0"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  handleClear(e)
+                }}
+                className="h-7 px-2 text-xs ml-2 shrink-0 hover:bg-destructive/10 hover:text-destructive"
+                title="Clear all selections"
               >
-                Clear
+                Clear All
               </Button>
             )}
           </div>
 
           {/* Options List - matches SearchableSelect */}
-          <ScrollArea className="h-auto max-h-[280px]">
+          <div className="max-h-[280px] overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
             <div className="p-1">
-              {filteredOptions.length === 0 ? (
+              {filteredOptions.length === 0 && !searchQuery.trim() ? (
                 <div className="py-8 text-center text-sm text-muted-foreground">
                   {emptyText}
                 </div>
               ) : (
                 <div className="space-y-0.5">
+                  {/* Show option to add custom value if search doesn't match */}
+                  {searchQuery.trim() && !searchMatchesOption && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const customValue = searchQuery.trim()
+                        if (!value.includes(customValue)) {
+                          onValueChange?.([...value, customValue])
+                        }
+                        setSearchQuery("")
+                        setOpen(false)
+                      }}
+                      className={cn(
+                        "relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-2.5 text-sm outline-none",
+                        "transition-colors",
+                        "hover:bg-accent hover:text-accent-foreground",
+                        "focus:bg-accent focus:text-accent-foreground",
+                        "bg-blue-50 border border-blue-200"
+                      )}
+                    >
+                      <span className="flex-1 text-left whitespace-normal break-words">
+                        Add &quot;{searchQuery.trim()}&quot; (Press Enter)
+                      </span>
+                    </button>
+                  )}
                   {filteredOptions.map((option) => {
                     const isSelected = value.includes(option.value)
                     return (
@@ -237,7 +296,7 @@ export function MultiSelect({
                 </div>
               )}
             </div>
-          </ScrollArea>
+          </div>
         </div>
       </PopoverContent>
     </Popover>

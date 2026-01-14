@@ -93,6 +93,17 @@ export function GroupedSearchableSelect({
   // Find selected option
   const selectedOption = flattenedOptions.find((opt) => opt.complaintId === value)
 
+  // Check if search query matches any complaint
+  const searchMatchesOption = React.useMemo(() => {
+    if (!searchQuery.trim()) return false
+    const query = searchQuery.toLowerCase().trim()
+    return flattenedOptions.some(
+      (option) =>
+        option.complaintName.toLowerCase() === query ||
+        option.complaintId.toLowerCase() === query
+    )
+  }, [flattenedOptions, searchQuery])
+
   // Filter groups based on search query
   const filteredGroups = React.useMemo(() => {
     if (!searchQuery.trim()) return groups
@@ -199,6 +210,19 @@ export function GroupedSearchableSelect({
               placeholder={searchPlaceholder}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  setOpen(false)
+                } else if (e.key === 'Enter' && searchQuery.trim()) {
+                  e.preventDefault()
+                  // If search query doesn't match any option, add it as custom value
+                  if (!searchMatchesOption) {
+                    onValueChange(searchQuery.trim(), null)
+                    setSearchQuery("")
+                    setOpen(false)
+                  }
+                }
+              }}
               className="h-8 border-0 bg-transparent px-0 py-0 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
             />
             {value && (
@@ -215,7 +239,7 @@ export function GroupedSearchableSelect({
           </div>
 
           {/* Options List */}
-          <ScrollArea className="h-auto max-h-[280px]">
+          <div className="max-h-[280px] overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
             <div className="p-1">
               {!loading && filteredGroups.length === 0 ? (
                 <div className="py-8 text-center text-sm text-muted-foreground">
@@ -230,6 +254,28 @@ export function GroupedSearchableSelect({
                 </div>
               ) : (
                 <div className="space-y-1">
+                  {/* Show option to add custom value if search doesn't match */}
+                  {searchQuery.trim() && !searchMatchesOption && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onValueChange(searchQuery.trim(), null)
+                        setSearchQuery("")
+                        setOpen(false)
+                      }}
+                      className={cn(
+                        "relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-2.5 text-sm outline-none",
+                        "transition-colors",
+                        "hover:bg-accent hover:text-accent-foreground",
+                        "focus:bg-accent focus:text-accent-foreground",
+                        "bg-blue-50 border border-blue-200"
+                      )}
+                    >
+                      <span className="flex-1 text-left whitespace-normal break-words">
+                        Add &quot;{searchQuery.trim()}&quot; (Press Enter)
+                      </span>
+                    </button>
+                  )}
                   {filteredGroups.map((group) => (
                     <div key={group.id ?? 'other'} className="space-y-0.5">
                       {/* Category Header */}
@@ -280,7 +326,7 @@ export function GroupedSearchableSelect({
                 </div>
               )}
             </div>
-          </ScrollArea>
+          </div>
         </div>
       </PopoverContent>
     </Popover>

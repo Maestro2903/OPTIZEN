@@ -7,6 +7,7 @@ import * as z from "zod"
 import { Button } from "@/components/ui/button"
 import { useMasterData } from "@/hooks/use-master-data"
 import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
+import { SimpleCombobox } from "@/components/ui/simple-combobox"
 import { GroupedSearchableSelect, type GroupedOption } from "@/components/ui/grouped-searchable-select"
 import { MultiSelect, type MultiSelectOption } from "@/components/ui/multi-select"
 import { patientsApi, type Patient } from "@/lib/services/api"
@@ -32,13 +33,6 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -833,147 +827,6 @@ export function CaseForm({ children, caseData, mode = "add", onSubmit: onSubmitC
     } else {
       form.setValue('patient_id', '')
     }
-  }
-
-  function SimpleCombobox({
-    options,
-    value,
-    onChange,
-    placeholder,
-    className,
-  }: {
-    options: SearchableSelectOption[]
-    value?: string
-    onChange: (v: string) => void
-    placeholder?: string
-    className?: string
-  }) {
-    const [open, setOpen] = React.useState(false)
-    const [inputValue, setInputValue] = React.useState("")
-    const [isTyping, setIsTyping] = React.useState(false)
-    
-    // Find selected option by value (UUID)
-    const selectedOption = options.find(opt => opt.value === value)
-    const displayValue = selectedOption?.label || ""
-    
-    React.useEffect(() => {
-      if (!isTyping) {
-        setInputValue(displayValue)
-      }
-    }, [displayValue, isTyping])
-
-    // debounce
-    const [debounced, setDebounced] = React.useState(inputValue)
-    React.useEffect(() => {
-      const t = setTimeout(() => setDebounced(inputValue), 150)
-      return () => clearTimeout(t)
-    }, [inputValue])
-
-    const filtered = React.useMemo(() => {
-      // Guard against undefined options
-      if (!options || !Array.isArray(options)) return []
-      // If user just opened and hasn't typed, show all
-      if (!isTyping && open) return options
-      const q = (debounced || "").trim().toLowerCase()
-      if (!q) return options
-      return options.filter((o) => o.label.toLowerCase().includes(q))
-    }, [options, debounced, isTyping, open])
-
-    const [active, setActive] = React.useState(0)
-    React.useEffect(() => {
-      setActive(0)
-    }, [debounced, open])
-
-    const handleSelect = (opt: SearchableSelectOption) => {
-      onChange(opt.value)
-      setInputValue(opt.label)
-      setIsTyping(false)
-      setOpen(false)
-    }
-
-    const handleClear = () => {
-      onChange("")
-      setInputValue("")
-      setIsTyping(false)
-      setOpen(false)
-    }
-
-    return (
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            type="button"
-            variant="outline"
-            role="combobox"
-            className={`w-full justify-between text-left font-normal ${!value && 'text-muted-foreground'} ${className || 'border-gray-200 focus:border-gray-800 focus:ring-gray-200 rounded-md text-sm'}`}
-          >
-            <span className="truncate">{displayValue || placeholder || "Select option"}</span>
-            <span className="ml-2">▼</span>
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="p-0 w-[var(--radix-popover-trigger-width)] z-[100]" align="start" sideOffset={4}>
-          <div className="p-2 border-b">
-            <Input
-              placeholder="Search..."
-              value={inputValue}
-              onChange={(e) => {
-                setInputValue(e.target.value)
-                setIsTyping(true)
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'ArrowDown') {
-                  e.preventDefault()
-                  setActive((p) => Math.min(p + 1, Math.max(filtered.length - 1, 0)))
-                } else if (e.key === 'ArrowUp') {
-                  e.preventDefault()
-                  setActive((p) => Math.max(p - 1, 0))
-                } else if (e.key === 'Enter') {
-                  if (filtered[active]) {
-                    e.preventDefault()
-                    handleSelect(filtered[active])
-                  }
-                } else if (e.key === 'Escape') {
-                  setOpen(false)
-                }
-              }}
-              className="h-8 border-gray-300 focus-visible:ring-gray-300 bg-white text-foreground"
-              autoComplete="off"
-              autoFocus
-            />
-          </div>
-          <ScrollArea className="max-h-60 bg-white">
-            {value ? (
-              <button
-                type="button"
-                className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-gray-100 border-b"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={handleClear}
-              >
-                ✕ Clear selection
-              </button>
-            ) : null}
-            {filtered.length === 0 ? (
-              <div className="p-2 text-sm text-muted-foreground">No results</div>
-            ) : (
-              filtered.map((opt, idx) => (
-                <button
-                  type="button"
-                  key={opt.value}
-                  className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${
-                    opt.value === value || idx === active ? 'bg-gray-100' : ''
-                  }`}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onMouseEnter={() => setActive(idx)}
-                  onClick={() => handleSelect(opt)}
-                >
-                  {opt.label}
-                </button>
-              ))
-            )}
-          </ScrollArea>
-        </PopoverContent>
-      </Popover>
-    )
   }
 
   function TagMultiSelect({

@@ -19,6 +19,13 @@ import { CertificateGeneratorForm } from "@/components/forms/certificate-generat
 import { CertificatePrintModal } from "@/components/dialogs/certificate-print-modal"
 import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
 import {
+  Combobox,
+  ComboboxContent,
+  ComboboxItem,
+  ComboboxTrigger,
+  ComboboxValue,
+} from "@/components/ui/combobox"
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -200,17 +207,17 @@ export default function CertificatesPage() {
               </Select>
 
               {/* Status Filter */}
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-[150px] bg-white border border-gray-300 rounded-lg text-sm">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="Issued">Issued</SelectItem>
-                  <SelectItem value="Draft">Draft</SelectItem>
-                  <SelectItem value="Revoked">Revoked</SelectItem>
-                </SelectContent>
-              </Select>
+              <Combobox value={filterStatus} onValueChange={setFilterStatus}>
+                <ComboboxTrigger className="w-[150px] bg-white border border-gray-300 rounded-lg text-sm">
+                  <ComboboxValue placeholder="Filter by status" />
+                </ComboboxTrigger>
+                <ComboboxContent>
+                  <ComboboxItem value="all">All Status</ComboboxItem>
+                  <ComboboxItem value="Issued">Issued</ComboboxItem>
+                  <ComboboxItem value="Draft">Draft</ComboboxItem>
+                  <ComboboxItem value="Revoked">Revoked</ComboboxItem>
+                </ComboboxContent>
+              </Combobox>
             </div>
           </div>
         </div>
@@ -386,20 +393,20 @@ export default function CertificatesPage() {
             <div className="flex items-center justify-between mt-4">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">Rows per page:</span>
-                <Select
+                <Combobox
                   value={pageSize.toString()}
                   onValueChange={(value) => setPageSize(Number(value))}
                 >
-                  <SelectTrigger className="w-[70px] h-8">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="20">20</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                  </SelectContent>
-                </Select>
+                  <ComboboxTrigger className="w-[70px] h-8">
+                    <ComboboxValue />
+                  </ComboboxTrigger>
+                  <ComboboxContent>
+                    <ComboboxItem value="10">10</ComboboxItem>
+                    <ComboboxItem value="20">20</ComboboxItem>
+                    <ComboboxItem value="50">50</ComboboxItem>
+                    <ComboboxItem value="100">100</ComboboxItem>
+                  </ComboboxContent>
+                </Combobox>
               </div>
 
               <div className="flex items-center gap-2">
